@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from loguru import logger
 
 from config import settings
 from .exception_handlers import setup_exception_handlers
@@ -40,17 +41,43 @@ def create_app() -> FastAPI:
     # static file service
     app.mount("/static", StaticFiles(directory="static"), name="static")
     
+    # conditionally enable NiceGUI monitoring interface
+    if settings.enable_monitoring:
+        try:
+            from nicegui import ui
+            from monitoring.task_monitor import setup_monitoring_routes
+            
+            # setup NiceGUI monitoring routes
+            setup_monitoring_routes()
+            
+            # integrate NiceGUI with FastAPI
+            ui.run_with(app, mount_path=settings.monitoring_path)
+            
+            logger.info(f"Monitoring interface enabled at {settings.monitoring_path}/monitor")
+            
+        except ImportError as e:
+            logger.warning(f"NiceGUI not available, monitoring interface disabled: {e}")
+        except Exception as e:
+            logger.error(f"Failed to setup monitoring interface: {e}")
+    else:
+        logger.info("Monitoring interface disabled by configuration")
+    
     # root path
     @app.get("/")
     async def root():
         """root path interface"""
-        return {
+        response_data = {
             "message": "Welcome to Code Graph Knowledge Service",
             "version": settings.app_version,
             "docs": "/docs" if settings.debug else "Documentation disabled in production",
-            "health": "/api/v1/health",
-            "task_monitor": "/static/index.html"
+            "health": "/api/v1/health"
         }
+        
+        # conditionally add monitoring URL
+        if settings.enable_monitoring:
+            response_data["task_monitor"] = f"{settings.monitoring_path}/monitor"
+        
+        return response_data
     
     # system information interface
     @app.get("/info")
@@ -62,6 +89,7 @@ def create_app() -> FastAPI:
             "version": settings.app_version,
             "python_version": sys.version,
             "debug_mode": settings.debug,
+            "monitoring_enabled": settings.enable_monitoring,
             "services": {
                 "neo4j": {
                     "uri": settings.neo4j_uri,
@@ -72,7 +100,7 @@ def create_app() -> FastAPI:
                 "ollama": {
                     "base_url": settings.ollama_base_url,
                     "llm_model": settings.ollama_model,
-                    "embedding_model": settings.embedding_model
+                    "embedding_model": settings.ollama_embedding_model
                 }
             }
         }

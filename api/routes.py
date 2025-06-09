@@ -3,11 +3,9 @@ from fastapi.responses import JSONResponse
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 
-from services.rag_service import rag_service, RAGQuery, KnowledgeDocument
 from services.sql_parser import sql_analyzer
-from services.vector_service import vector_service
 from services.graph_service import graph_service
-from services.knowledge_service import KnowledgeService
+from services.neo4j_knowledge_service import Neo4jKnowledgeService
 from services.task_queue import task_queue
 from config import settings
 from loguru import logger
@@ -15,14 +13,10 @@ from loguru import logger
 # create router
 router = APIRouter()
 
-# initialize knowledge base service
-knowledge_service = KnowledgeService(
-    vector_service=vector_service,
-    graph_service=graph_service,
-    rag_service=rag_service
-)
+# initialize Neo4j knowledge service
+knowledge_service = Neo4jKnowledgeService()
 
-# request model
+# request models
 class HealthResponse(BaseModel):
     status: str
     services: Dict[str, bool]
@@ -36,35 +30,39 @@ class GraphQueryRequest(BaseModel):
     cypher: str
     parameters: Optional[Dict[str, Any]] = None
 
-class VectorSearchRequest(BaseModel):
-    query: str
-    top_k: int = 5
-
 class DocumentAddRequest(BaseModel):
     content: str
-    name: str
-    doc_type: str = "document"
+    title: str = "Untitled"
     metadata: Optional[Dict[str, Any]] = None
 
 class DirectoryProcessRequest(BaseModel):
     directory_path: str
     recursive: bool = True
     file_patterns: Optional[List[str]] = None
-    exclude_patterns: Optional[List[str]] = None
+
+class QueryRequest(BaseModel):
+    question: str
+    mode: str = "hybrid"  # hybrid, graph_only, vector_only
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int = 10
 
 # health check
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     """health check interface"""
     try:
-        # check service status
+        # check Neo4j knowledge service status
+        neo4j_connected = knowledge_service._initialized if hasattr(knowledge_service, '_initialized') else False
+        
         services_status = {
-            "rag_service": rag_service._initialized,
-            "vector_service": vector_service._connected,
-            "graph_service": graph_service._connected,
+            "neo4j_knowledge_service": neo4j_connected,
+            "graph_service": graph_service._connected if hasattr(graph_service, '_connected') else False,
+            "task_queue": True  # task queue is always available
         }
         
-        overall_status = "healthy" if all(services_status.values()) else "degraded"
+        overall_status = "healthy" if services_status["neo4j_knowledge_service"] else "degraded"
         
         return HealthResponse(
             status=overall_status,
@@ -75,71 +73,67 @@ async def health_check():
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# RAG query interface
-@router.post("/query")
-async def query_knowledge(query_request: RAGQuery):
-    """RAG knowledge query interface"""
+# knowledge query interface
+@router.post("/knowledge/query")
+async def query_knowledge(query_request: QueryRequest):
+    """Query knowledge base using Neo4j GraphRAG"""
     try:
-        response = await knowledge_service.query(
+        result = await knowledge_service.query(
             question=query_request.question,
-            search_type=query_request.search_type,
-            top_k=query_request.top_k
+            mode=query_request.mode
         )
-        return response
+        
+        if result.get("success"):
+            return result
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error"))
         
     except Exception as e:
         logger.error(f"Query failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# knowledge base management interface
-
-@router.post("/knowledge/documents")
-async def add_document_to_knowledge_base(
-    request: DocumentAddRequest,
-    async_processing: bool = False
-):
-    """add document to knowledge base"""
+# knowledge search interface
+@router.post("/knowledge/search")
+async def search_knowledge(search_request: SearchRequest):
+    """Search similar nodes in knowledge base"""
     try:
-        if async_processing:
-            # async processing
-            task_id = await task_queue.submit_task(
-                task_func=None,  # will be processed by processor
-                task_kwargs={
-                    "document_content": request.content,
-                    "document_type": request.doc_type,
-                    "metadata": request.metadata
-                },
-                task_name=f"Process document: {request.name}",
-                task_type="document_processing",
-                metadata={"document_name": request.name}
-            )
-            
-            return JSONResponse(status_code=202, content={
-                "message": "Document processing started",
-                "task_id": task_id,
-                "status": "processing"
-            })
+        result = await knowledge_service.search_similar_nodes(
+            query=search_request.query,
+            top_k=search_request.top_k
+        )
+        
+        if result.get("success"):
+            return result
         else:
-            # sync processing (keep backward compatibility)
-            result = await knowledge_service.add_document(
-                content=request.content,
-                name=request.name,
-                doc_type=request.doc_type,
-                metadata=request.metadata
-            )
-            
-            if result.get("success"):
-                return JSONResponse(status_code=201, content=result)
-            else:
-                raise HTTPException(status_code=400, detail=result.get("error"))
+            raise HTTPException(status_code=400, detail=result.get("error"))
+        
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# document management
+@router.post("/documents")
+async def add_document(request: DocumentAddRequest):
+    """Add document to knowledge base"""
+    try:
+        result = await knowledge_service.add_document(
+            content=request.content,
+            title=request.title,
+            metadata=request.metadata
+        )
+        
+        if result.get("success"):
+            return JSONResponse(status_code=201, content=result)
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error"))
             
     except Exception as e:
         logger.error(f"Add document failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/knowledge/files/{file_path:path}")
-async def add_file_to_knowledge_base(file_path: str):
-    """add file to knowledge base"""
+@router.post("/documents/file")
+async def add_file(file_path: str):
+    """Add file to knowledge base"""
     try:
         result = await knowledge_service.add_file(file_path)
         
@@ -152,244 +146,40 @@ async def add_file_to_knowledge_base(file_path: str):
         logger.error(f"Add file failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/knowledge/directories")
-async def add_directory_to_knowledge_base(
-    request: DirectoryProcessRequest,
-    async_processing: bool = True  # directory processing default async
-):
-    """batch add directory to knowledge base"""
+@router.post("/documents/directory")
+async def add_directory(request: DirectoryProcessRequest):
+    """Add directory to knowledge base"""
     try:
-        if async_processing:
-            # async processing
-            task_id = await task_queue.submit_task(
-                task_func=None,  # will be processed by processor
-                task_kwargs={
-                    "directory_path": request.directory_path,
-                    "file_patterns": request.file_patterns or ["*.txt", "*.md", "*.sql"],
-                    "batch_size": 10
-                },
-                task_name=f"Process directory: {request.directory_path}",
-                task_type="batch_processing",
-                metadata={
-                    "directory_path": request.directory_path,
-                    "recursive": request.recursive
-                }
-            )
-            
-            return JSONResponse(status_code=202, content={
-                "message": "Directory processing started",
-                "task_id": task_id,
-                "status": "processing"
-            })
+        result = await knowledge_service.add_directory(
+            directory_path=request.directory_path,
+            recursive=request.recursive,
+            file_extensions=request.file_patterns
+        )
+        
+        if result.get("success"):
+            return JSONResponse(status_code=201, content=result)
         else:
-            # sync processing (keep backward compatibility)
-            result = await knowledge_service.add_directory(
-                directory_path=request.directory_path,
-                recursive=request.recursive,
-                file_patterns=request.file_patterns,
-                exclude_patterns=request.exclude_patterns
-            )
-            
-            if result.get("success"):
-                return JSONResponse(status_code=201, content=result)
-            else:
-                raise HTTPException(status_code=400, detail=result.get("error"))
+            raise HTTPException(status_code=400, detail=result.get("error"))
             
     except Exception as e:
         logger.error(f"Add directory failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/knowledge/repositories/{repo_path:path}")
-async def add_repository_to_knowledge_base(repo_path: str):
-    """add code repository to knowledge base"""
-    try:
-        result = await knowledge_service.add_code_repository(repo_path)
-        
-        if result.get("success"):
-            return JSONResponse(status_code=201, content=result)
-        else:
-            raise HTTPException(status_code=400, detail=result.get("error"))
-            
-    except Exception as e:
-        logger.error(f"Add repository failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# search interface
-
-@router.post("/knowledge/search/documents")
-async def search_documents(query: str, doc_type: Optional[str] = None, top_k: int = 10):
-    """search documents"""
-    try:
-        result = await knowledge_service.search_documents(
-            query=query,
-            doc_type=doc_type,
-            top_k=top_k
-        )
-        return result
-        
-    except Exception as e:
-        logger.error(f"Search documents failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/knowledge/search/code")
-async def search_code(
-    query: str, 
-    language: Optional[str] = None, 
-    code_type: str = "function", 
-    top_k: int = 10
-):
-    """search code"""
-    try:
-        result = await knowledge_service.search_code(
-            query=query,
-            language=language,
-            code_type=code_type,
-            top_k=top_k
-        )
-        return result
-        
-    except Exception as e:
-        logger.error(f"Search code failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/knowledge/search/relations")
-async def search_relations(
-    entity: str,
-    relation_type: Optional[str] = None,
-    direction: str = "both"
-):
-    """search entity relations"""
-    try:
-        result = await knowledge_service.search_relations(
-            entity=entity,
-            relation_type=relation_type,
-            direction=direction
-        )
-        return result
-        
-    except Exception as e:
-        logger.error(f"Search relations failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# backward compatibility - document management
-@router.post("/documents")
-async def add_document(document: KnowledgeDocument):
-    """add document to knowledge base (backward compatibility)"""
-    try:
-        result = await knowledge_service.add_document(
-            content=document.content,
-            name=document.title,
-            doc_type=document.doc_type,
-            metadata={
-                "tags": document.tags,
-                **document.metadata
-            }
-        )
-        
-        if result.get("success"):
-            return JSONResponse(status_code=201, content=result)
-        else:
-            raise HTTPException(status_code=400, detail=result.get("error"))
-            
-    except Exception as e:
-        logger.error(f"Add document failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/documents/upload")
-async def upload_document(
-    file: UploadFile = File(...),
-    title: str = Form(...),
-    doc_type: str = Form("document"),
-    tags: Optional[str] = Form(None),
-    async_processing: bool = Form(False)
-):
-    """upload file to knowledge base (backward compatibility)"""
-    try:
-        # read file content
-        content = await file.read()
-        content_str = content.decode('utf-8')
-        
-        # parse tags
-        tag_list = []
-        if tags:
-            tag_list = [tag.strip() for tag in tags.split(',')]
-        
-        metadata = {
-            "tags": tag_list,
-            "filename": file.filename,
-            "file_size": len(content),
-            "content_type": file.content_type
-        }
-        
-        if async_processing:
-            # async processing
-            task_id = await task_queue.submit_task(
-                task_func=None,  # will be processed by processor
-                task_kwargs={
-                    "document_content": content_str,
-                    "document_type": doc_type,
-                    "metadata": metadata
-                },
-                task_name=f"Upload and process: {title}",
-                task_type="document_processing",
-                metadata={"document_name": title, "filename": file.filename}
-            )
-            
-            return JSONResponse(status_code=202, content={
-                "message": "File upload and processing started",
-                "task_id": task_id,
-                "status": "processing",
-                "filename": file.filename
-            })
-        else:
-            # sync processing (keep backward compatibility)
-            result = await knowledge_service.add_document(
-                content=content_str,
-                name=title,
-                doc_type=doc_type,
-                metadata=metadata
-            )
-            
-            if result.get("success"):
-                return JSONResponse(status_code=201, content=result)
-            else:
-                raise HTTPException(status_code=400, detail=result.get("error"))
-            
-    except Exception as e:
-        logger.error(f"Upload document failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.delete("/documents/{doc_id}")
-async def delete_document(doc_id: str):
-    """delete document (backward compatibility)"""
-    try:
-        # use original RAG service method temporarily
-        result = await rag_service.delete_document(doc_id)
-        
-        if result.get("success"):
-            return result
-        else:
-            raise HTTPException(status_code=400, detail=result.get("error"))
-            
-    except Exception as e:
-        logger.error(f"Delete document failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# SQL parse interface
+# SQL parsing
 @router.post("/sql/parse")
 async def parse_sql(request: SQLParseRequest):
-    """SQL parse interface"""
+    """Parse SQL statement"""
     try:
         result = sql_analyzer.parse_sql(request.sql, request.dialect)
-        return result
+        return result.dict()
         
     except Exception as e:
-        logger.error(f"SQL parse failed: {e}")
+        logger.error(f"SQL parsing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sql/validate")
 async def validate_sql(request: SQLParseRequest):
-    """SQL syntax validation interface"""
+    """Validate SQL syntax"""
     try:
         result = sql_analyzer.validate_sql_syntax(request.sql, request.dialect)
         return result
@@ -404,7 +194,7 @@ async def convert_sql_dialect(
     from_dialect: str,
     to_dialect: str
 ):
-    """SQL dialect conversion interface"""
+    """Convert SQL between dialects"""
     try:
         result = sql_analyzer.convert_between_dialects(sql, from_dialect, to_dialect)
         return result
@@ -413,120 +203,57 @@ async def convert_sql_dialect(
         logger.error(f"SQL conversion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# vector search interface (backward compatibility)
-@router.post("/vector/search")
-async def search_vectors(request: VectorSearchRequest):
-    """vector search interface"""
+# system information
+@router.get("/schema")
+async def get_graph_schema():
+    """Get knowledge graph schema"""
     try:
-        result = await vector_service.search_documents(
-            query=request.query,
-            top_k=request.top_k
-        )
+        result = await knowledge_service.get_graph_schema()
         return result
         
     except Exception as e:
-        logger.error(f"Vector search failed: {e}")
+        logger.error(f"Get schema failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# graph query interface (backward compatibility)
-@router.post("/graph/query")
-async def query_graph(request: GraphQueryRequest):
-    """graph database query interface"""
-    try:
-        result = await graph_service.execute_query(
-            query=request.cypher,
-            parameters=request.parameters or {}
-        )
-        return result
-        
-    except Exception as e:
-        logger.error(f"Graph query failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/graph/nodes/{label}")
-async def get_nodes_by_label(label: str, limit: int = 100):
-    """get nodes by label"""
-    try:
-        query = f"MATCH (n:{label}) RETURN n LIMIT $limit"
-        result = await graph_service.execute_query(query, {"limit": limit})
-        return result
-        
-    except Exception as e:
-        logger.error(f"Get nodes failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/graph/relationships/{rel_type}")
-async def get_relationships_by_type(rel_type: str, limit: int = 100):
-    """get relationships by type"""
-    try:
-        query = f"MATCH ()-[r:{rel_type}]-() RETURN r LIMIT $limit"
-        result = await graph_service.execute_query(query, {"limit": limit})
-        return result
-        
-    except Exception as e:
-        logger.error(f"Get relationships failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# statistics interface
-@router.get("/stats")
-async def get_knowledge_stats():
-    """get knowledge base statistics"""
+@router.get("/statistics")
+async def get_statistics():
+    """Get knowledge base statistics"""
     try:
         result = await knowledge_service.get_statistics()
         return result
         
     except Exception as e:
-        logger.error(f"Get stats failed: {e}")
+        logger.error(f"Get statistics failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/stats/vector")
-async def get_vector_stats():
-    """get vector database statistics"""
-    try:
-        result = await vector_service.get_collection_stats()
-        return result
-        
-    except Exception as e:
-        logger.error(f"Get vector stats failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/stats/graph")
-async def get_graph_stats():
-    """get graph database statistics"""
-    try:
-        result = await graph_service.get_database_stats()
-        return result
-        
-    except Exception as e:
-        logger.error(f"Get graph stats failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# management interface
-@router.delete("/knowledge/clear")
+@router.delete("/clear")
 async def clear_knowledge_base():
-    """clear knowledge base"""
+    """Clear knowledge base"""
     try:
         result = await knowledge_service.clear_knowledge_base()
-        return result
         
+        if result.get("success"):
+            return result
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error"))
+            
     except Exception as e:
         logger.error(f"Clear knowledge base failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# configuration interface
 @router.get("/config")
 async def get_system_config():
-    """get system configuration"""
+    """Get system configuration"""
     try:
         return {
-            "milvus_host": settings.milvus_host,
-            "milvus_port": settings.milvus_port,
-            "neo4j_uri": settings.neo4j_uri,
-            "ollama_host": settings.ollama_host,
-            "model": settings.model,
-            "embedding_model": settings.embedding_model,
-            "app_version": settings.app_version
+            "app_name": settings.app_name,
+            "version": settings.app_version,
+            "debug": settings.debug,
+            "llm_provider": settings.llm_provider,
+            "embedding_provider": settings.embedding_provider,
+            "monitoring_enabled": settings.enable_monitoring
         }
+        
     except Exception as e:
         logger.error(f"Get config failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) 

@@ -1,253 +1,272 @@
-# Code Graph Knowledge Service
+# Code Graph Knowledge System
 
-基于 Neo4j 内置向量索引的现代化知识图谱服务，支持多种 LLM 和嵌入模型提供商，提供 Model Context Protocol (MCP) 接口。
+A comprehensive intelligent knowledge management system for software development, leveraging Neo4j GraphRAG technology to build advanced code intelligence and automated development assistance.
 
-## 🚀 主要特性
+## Overview
 
-### 核心功能
-- **Neo4j GraphRAG**: 使用 Neo4j 内置向量索引的现代化图检索增强生成
-- **多模型支持**: 支持 Ollama、OpenAI、Google Gemini 等多种 LLM 和嵌入模型
-- **混合查询**: 支持向量搜索、图遍历、混合模式三种查询方式
-- **MCP 接口**: 完整的 Model Context Protocol 服务器实现
-- **异步处理**: 完整的异步支持和超时控制
+Code Graph Knowledge System is an enterprise-grade solution that transforms unstructured development documentation and code into a structured, queryable knowledge graph. By combining vector search, graph database technology, and large language models, it provides intelligent code analysis, documentation management, and development assistance capabilities.
 
-### 技术架构
-- **知识图谱**: Neo4j 数据库 + 内置向量索引
-- **文档处理**: LlamaIndex 框架进行文档解析和索引
-- **向量搜索**: Neo4j 原生向量搜索，无需额外向量数据库
-- **图遍历**: 利用 Neo4j 的图查询能力发现实体关系
-- **API 接口**: FastAPI + MCP 双重接口支持
+## Key Features
 
-## 📋 系统要求
+### Current Features (Phase 1: Document Intelligence & Vector Search)
+- **Multi-format Document Processing**: Support for various document formats including text, markdown, PDF, and code files
+- **Neo4j GraphRAG Integration**: Advanced graph-based retrieval augmented generation using Neo4j's native vector index
+- **Universal SQL Schema Parser**: Configurable database schema analysis with industry-specific templates
+- **Intelligent Query Engine**: Hybrid search combining vector similarity and graph traversal
+- **Asynchronous Task Processing**: Background processing for large document collections with real-time monitoring
+- **Web-based Monitoring Dashboard**: Real-time task queue monitoring with NiceGUI interface
+- **Multi-Database Support**: Oracle, MySQL, PostgreSQL, SQL Server schema parsing and analysis
+- **RESTful API**: Complete API endpoints for document management and knowledge querying
+- **MCP Protocol Support**: Model Context Protocol integration for AI assistant compatibility
+- **Multi-provider LLM Support**: Compatible with Ollama, OpenAI, and Gemini models
 
-- Python 3.9+
-- Neo4j 5.0+ (支持向量索引)
-- 至少一个 LLM 提供商:
-  - Ollama (本地部署)
-  - OpenAI API
-  - Google Gemini API
+### Technical Architecture
+- **FastAPI Backend**: High-performance async web framework
+- **Neo4j Database**: Graph database with native vector search capabilities
+- **LlamaIndex Integration**: Advanced document processing and retrieval pipeline
+- **Flexible Embedding Models**: Support for HuggingFace and Ollama embedding models
+- **Modular Design**: Clean separation of concerns with pluggable components
 
-## 🛠️ 安装配置
+## Project Roadmap
 
-### 1. 克隆项目
-```bash
-git clone <repository-url>
-cd code_graph
+### Phase 2: Structured Data & Graph Enhancement (SQL & Graph-Awareness)
+**Objective**: Integrate SQL file parsing capabilities and build a comprehensive knowledge graph for precise structured queries.
+
+**Completed Features**:
+- ✅ **Universal SQL Schema Parser** with configurable business domain classification
+- ✅ **Multi-dialect Support** (Oracle, MySQL, PostgreSQL, SQL Server)
+- ✅ **Pre-built Industry Templates** (Insurance, E-commerce, Banking, Healthcare)
+- ✅ **Configuration-driven** business domain classification via YAML/JSON
+- ✅ **Real-world Testing** on 356 table Oracle database with 4,511 columns
+- ✅ **Zero-impact Integration** with existing codebase
+- ✅ **Professional Documentation** generation
+
+**In Progress**:
+- Neo4j knowledge graph integration for schema querying
+- Natural language queries for database structure exploration
+
+**Planned Features**:
+- Database relationship mapping and foreign key detection
+- Cross-reference linking between code and database schemas
+- Enhanced graph traversal algorithms
+- Structured query optimization
+
+### Phase 3: Deep Code Intelligence & Automation (Code Intelligence & Automation)
+**Objective**: Enable the system to "understand" code and introduce asynchronous tasks with Git integration, creating a "living" system.
+
+**Planned Features**:
+- Advanced code parsing and analysis (AST-based)
+- Function and class relationship mapping
+- Git repository integration and change tracking
+- Automated code documentation generation
+- Code review assistance and suggestions
+- Intelligent code completion and refactoring suggestions
+- Dependency analysis and impact assessment
+- Continuous integration pipeline integration
+
+## Installation
+
+### Prerequisites
+- Python 3.13 or higher
+- Neo4j 5.0 or higher
+- Ollama (optional, for local LLM support)
+
+### Quick Start
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/yourusername/code-graph.git
+   cd code-graph
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   # or using uv (recommended)
+   uv pip install -e .
+   ```
+
+3. **Configure Environment**
+   ```bash
+   cp env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. **Start Neo4j Database**
+   ```bash
+   # Using Docker
+   docker run \
+       --name neo4j-code-graph \
+       -p 7474:7474 -p 7687:7687 \
+       -e NEO4J_AUTH=neo4j/password \
+       -e NEO4J_PLUGINS='["apoc"]' \
+       neo4j:5.15
+   ```
+
+5. **Run the Application**
+   ```bash
+   python start.py
+   ```
+
+6. **Access the Interface**
+   - API Documentation: http://localhost:8000/docs
+   - Task Monitor: http://localhost:8000/ui/monitor
+   - Health Check: http://localhost:8000/api/v1/health
+
+## API Usage
+
+### Adding Documents
+```python
+import httpx
+
+# Add a single document
+response = httpx.post("http://localhost:8000/api/v1/documents/", json={
+    "content": "Your document content here",
+    "title": "Document Title",
+    "metadata": {"source": "manual", "type": "documentation"}
+})
+
+# Add a file
+response = httpx.post("http://localhost:8000/api/v1/documents/file", json={
+    "file_path": "/path/to/your/document.md"
+})
+
+# Add a directory
+response = httpx.post("http://localhost:8000/api/v1/documents/directory", json={
+    "directory_path": "/path/to/docs",
+    "recursive": true,
+    "file_extensions": [".md", ".txt", ".py"]
+})
 ```
 
-### 2. 安装依赖
-```bash
-pip install -r requirements.txt
+### Querying Knowledge
+```python
+# Query the knowledge base
+response = httpx.post("http://localhost:8000/api/v1/knowledge/query", json={
+    "question": "How does the authentication system work?",
+    "mode": "hybrid"  # or "graph_only", "vector_only"
+})
+
+# Search similar documents
+response = httpx.post("http://localhost:8000/api/v1/knowledge/search", json={
+    "query": "user authentication",
+    "top_k": 10
+})
 ```
 
-### 3. 启动 Neo4j
-```bash
-# 使用 Docker
-docker run \
-    --name neo4j \
-    -p 7474:7474 -p 7687:7687 \
-    -d \
-    -e NEO4J_AUTH=neo4j/password \
-    -e NEO4J_PLUGINS='["apoc"]' \
-    neo4j:5.15
-```
+## MCP Integration
 
-### 4. 配置环境变量
-复制 `env.example` 为 `.env` 并配置:
+The system supports Model Context Protocol (MCP) for seamless integration with AI assistants:
 
 ```bash
-# Neo4j 配置
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=password
-
-# LLM 提供商选择 (ollama/openai/gemini)
-LLM_PROVIDER=ollama
-EMBEDDING_PROVIDER=ollama
-
-# Ollama 配置 (如果使用)
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=qwen3:latest
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-
-# OpenAI 配置 (如果使用)
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-3.5-turbo
-OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
-
-# Gemini 配置 (如果使用)
-GOOGLE_API_KEY=your_api_key_here
-GEMINI_MODEL=gemini-pro
-GEMINI_EMBEDDING_MODEL=models/embedding-001
-```
-
-## 🚀 使用方法
-
-### 1. 启动 MCP 服务器
-```bash
+# Start MCP server
 python start_mcp.py
+
+# Or integrate with your MCP client
+{
+  "mcpServers": {
+    "code-graph": {
+      "command": "python",
+      "args": ["start_mcp.py"],
+      "cwd": "/path/to/code-graph"
+    }
+  }
+}
 ```
 
-### 2. 测试 MCP 功能
+## Configuration
+
+Key configuration options in `.env`:
+
 ```bash
-python test_mcp_client.py
+# Application
+APP_NAME=Code Graph Knowledge System
+DEBUG=true
+HOST=0.0.0.0
+PORT=8000
+
+# Monitoring Interface
+ENABLE_MONITORING=true        # Enable/disable web monitoring interface
+MONITORING_PATH=/ui          # Base path for monitoring interface
+
+# Neo4j Configuration
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
+NEO4J_DATABASE=neo4j
+
+# LLM Configuration
+LLM_PROVIDER=ollama  # or openai, gemini
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+EMBEDDING_MODEL=nomic-embed-text
+
+# Processing Configuration
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+TOP_K=10
+VECTOR_DIMENSION=768
 ```
 
-### 3. 直接使用知识服务
-```python
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
+## Development
 
-# 初始化服务
-service = Neo4jKnowledgeService()
-await service.initialize()
-
-# 添加文档
-result = await service.add_document(
-    content="这是一个测试文档...",
-    title="测试文档",
-    metadata={"category": "test"}
-)
-
-# 查询知识
-result = await service.query(
-    question="什么是知识图谱？",
-    mode="hybrid"  # hybrid/graph_only/vector_only
-)
-
-print(result["answer"])
-```
-
-## 🔧 MCP 工具列表
-
-### 核心工具
-- `query_knowledge`: 知识图谱查询
-- `search_similar_nodes`: 向量相似度搜索
-- `add_document`: 添加文档到知识图谱
-- `add_file`: 添加文件到知识图谱
-- `add_directory`: 批量添加目录文件
-- `get_graph_schema`: 获取图谱结构信息
-- `get_statistics`: 获取统计信息
-- `clear_knowledge_base`: 清空知识库
-
-### 资源
-- `knowledge://config`: 系统配置信息
-- `knowledge://status`: 系统状态和健康检查
-- `knowledge://recent-documents/{limit}`: 最近添加的文档
-
-### 提示
-- `suggest_queries`: 根据领域生成查询建议
-
-## 📊 查询模式
-
-### 1. 混合模式 (hybrid)
-结合向量搜索和图遍历，推荐使用:
-```python
-result = await service.query("问题", mode="hybrid")
-```
-
-### 2. 仅图遍历 (graph_only)
-只使用图关系进行查询:
-```python
-result = await service.query("问题", mode="graph_only")
-```
-
-### 3. 仅向量搜索 (vector_only)
-只使用向量相似度搜索:
-```python
-result = await service.query("问题", mode="vector_only")
-```
-
-## ⚙️ 配置说明
-
-### 超时设置
-```bash
-CONNECTION_TIMEOUT=30      # 连接超时 (秒)
-OPERATION_TIMEOUT=120      # 操作超时 (秒)
-LARGE_DOCUMENT_TIMEOUT=300 # 大文档处理超时 (秒)
-```
-
-### 文档处理
-```bash
-CHUNK_SIZE=512        # 文档分块大小
-CHUNK_OVERLAP=50      # 分块重叠大小
-TOP_K=5              # 检索结果数量
-```
-
-### 向量设置
-```bash
-VECTOR_DIMENSION=384  # 向量维度 (取决于嵌入模型)
-```
-
-## 🧪 测试
-
-### 运行所有测试
-```bash
-python test_neo4j_knowledge.py
-```
-
-### 测试特定功能
-```bash
-# 测试 MCP 客户端
-python test_mcp_client.py
-
-# 测试知识服务
-python test_service.py
-
-# 测试数据管道
-python test_pipeline.py
-```
-
-## 📁 项目结构
-
+### Project Structure
 ```
 code_graph/
-├── services/
-│   ├── neo4j_knowledge_service.py  # 核心知识服务
-│   └── pipeline/                   # 数据处理管道
-├── api/                           # FastAPI 接口
-├── tests/                         # 测试文件
-├── config.py                      # 配置管理
-├── mcp_server.py                  # MCP 服务器
-├── start_mcp.py                   # MCP 启动脚本
-└── requirements.txt               # 依赖列表
+├── api/                    # FastAPI route handlers
+├── core/                   # Application core (FastAPI setup, middleware)
+├── services/               # Business logic services
+│   ├── neo4j_knowledge_service.py      # Neo4j knowledge graph service
+│   ├── sql_schema_parser.py            # Legacy SQL parser (insurance-specific)
+│   ├── universal_sql_schema_parser.py  # Universal configurable SQL parser
+│   ├── sql_parser.py                   # Individual SQL statement parser
+│   └── task_queue.py                   # Asynchronous task management
+├── monitoring/             # Task monitoring interface (NiceGUI)
+├── configs/                # Configuration files
+│   └── insurance_schema_config.yaml    # Example schema parser configuration
+├── data/                   # Data storage and models
+├── tests/                  # Test suite including SQL parser tests
+├── docs/                   # Documentation
+└── config.py              # Configuration management
 ```
 
-## 🔍 故障排除
-
-### 常见问题
-
-1. **模型未找到错误**
-   - 检查 `.env` 文件中的模型名称
-   - 确保 Ollama 服务运行并已下载模型
-   - 验证 API 密钥配置
-
-2. **Neo4j 连接失败**
-   - 检查 Neo4j 服务状态
-   - 验证连接参数和认证信息
-   - 确保 Neo4j 版本支持向量索引
-
-3. **超时错误**
-   - 调整超时配置参数
-   - 检查网络连接和服务响应时间
-   - 考虑使用更快的模型
-
-### 日志调试
+### Running Tests
 ```bash
-# 启用调试日志
-DEBUG=true python start_mcp.py
+pytest tests/
 ```
 
-## 🤝 贡献
+### Code Quality
+```bash
+# Format code
+black .
+isort .
 
-欢迎提交 Issue 和 Pull Request！
+# Run linting
+ruff check .
+```
 
-## 📄 许可证
+## Contributing
 
-MIT License
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 🔗 相关链接
+## License
 
-- [Neo4j 文档](https://neo4j.com/docs/)
-- [LlamaIndex 文档](https://docs.llamaindex.ai/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [FastMCP 框架](https://github.com/jlowin/fastmcp)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- Documentation: [GitHub Wiki](https://github.com/yourusername/code-graph/wiki)
+- Neo4j Technical Guide: [README_Neo4j.md](README_Neo4j.md)
+- Issues: [GitHub Issues](https://github.com/yourusername/code-graph/issues)
+- Discussions: [GitHub Discussions](https://github.com/yourusername/code-graph/discussions)
+
+## Acknowledgments
+
+- [Neo4j](https://neo4j.com/) for the powerful graph database technology
+- [LlamaIndex](https://llamaindex.ai/) for the document processing framework
+- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
+- [NiceGUI](https://nicegui.io/) for the monitoring interface

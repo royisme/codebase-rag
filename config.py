@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0", description="Host", alias="HOST")
     port: int = Field(default=8123, description="Port", alias="PORT")
     
+    # Monitoring Settings
+    enable_monitoring: bool = Field(default=True, description="Enable web-based monitoring interface", alias="ENABLE_MONITORING")
+    monitoring_path: str = Field(default="/ui", description="Base path for monitoring interface", alias="MONITORING_PATH")
+    
     # Vector Search Settings (using Neo4j built-in vector index)
     vector_index_name: str = Field(default="knowledge_vectors", description="Neo4j vector index name")
     vector_dimension: int = Field(default=384, description="Vector embedding dimension")

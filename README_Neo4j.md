@@ -1,56 +1,56 @@
-# Neo4j 知识图谱服务
+# Neo4j GraphRAG Technical Documentation
 
-基于 Neo4j 内置向量索引的现代化 GraphRAG 解决方案，使用 LlamaIndex 和 Ollama 构建智能知识库。
+Advanced technical documentation for the Neo4j-based GraphRAG implementation in the Code Graph Knowledge System.
 
-## 🚀 架构优势
+## Architecture Overview
 
-### 统一存储架构
-- **单一数据库**: 使用 Neo4j 5.x 内置向量索引，无需额外的向量数据库
-- **数据一致性**: 文本、图结构和向量存储在同一个数据库中
-- **简化运维**: 只需维护一个 Neo4j 实例
+### Unified Storage Architecture
+- **Single Database**: Uses Neo4j 5.x built-in vector index, eliminating the need for additional vector databases
+- **Data Consistency**: Text, graph structure, and vectors stored in the same database
+- **Simplified Operations**: Only requires maintaining a single Neo4j instance
 
-### 现代化技术栈
-- **LlamaIndex**: 官方推荐的 GraphRAG 框架
-- **Neo4j**: 世界领先的图数据库，内置向量搜索
-- **Ollama**: 本地化 LLM 和嵌入模型服务
-- **FastAPI**: 高性能异步 Web 框架
+### Modern Technology Stack
+- **LlamaIndex**: Official GraphRAG framework recommended by LlamaIndex
+- **Neo4j**: World-leading graph database with built-in vector search
+- **Ollama**: Local LLM and embedding model services
+- **FastAPI**: High-performance async web framework
 
-### 强大的查询能力
-- **混合搜索**: 同时进行图遍历和向量相似度搜索
-- **多模式查询**: 支持纯图查询、纯向量查询和混合查询
-- **智能检索**: 自动选择最佳检索策略
+### Powerful Query Capabilities
+- **Hybrid Search**: Simultaneous graph traversal and vector similarity search
+- **Multi-mode Queries**: Support for pure graph, pure vector, and hybrid queries
+- **Intelligent Retrieval**: Automatic selection of optimal retrieval strategies
 
-## 📋 系统要求
+## System Requirements
 
-### 必需服务
-- **Neo4j 5.x**: 支持向量索引的版本
-- **Ollama**: 本地 LLM 服务
-- **Python 3.8+**: 运行环境
+### Required Services
+- **Neo4j 5.x**: Version with vector index support
+- **Ollama**: Local LLM service
+- **Python 3.13+**: Runtime environment
 
-### 推荐配置
+### Recommended Configuration
 ```bash
 # Neo4j
-Neo4j 5.15+ (Community 或 Enterprise)
-内存: 4GB+
-存储: SSD 推荐
+Neo4j 5.15+ (Community or Enterprise)
+Memory: 4GB+
+Storage: SSD recommended
 
-# Ollama 模型
-LLM: llama2, mistral, qwen
+# Ollama Models
+LLM: llama3.2, mistral, qwen
 Embedding: nomic-embed-text, all-minilm
 ```
 
-## 🛠️ 安装配置
+## Installation and Configuration
 
-### 1. 安装依赖
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 启动 Neo4j
+### 2. Start Neo4j
 ```bash
-# 使用 Docker
+# Using Docker
 docker run \
-    --name neo4j \
+    --name neo4j-code-graph \
     -p 7474:7474 -p 7687:7687 \
     -d \
     -v $HOME/neo4j/data:/data \
@@ -61,300 +61,214 @@ docker run \
     neo4j:5.15
 ```
 
-### 3. 启动 Ollama
+### 3. Start Ollama
 ```bash
-# 安装 Ollama
+# Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# 下载模型
-ollama pull llama2
+# Download models
+ollama pull llama3.2
 ollama pull nomic-embed-text
 ```
 
-### 4. 配置环境变量
+### 4. Configure Environment Variables
 ```bash
-# .env 文件
+# .env file
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
 
-OLLAMA_HOST=http://localhost:11434
-MODEL=llama2
-EMBEDDING_MODEL=nomic-embed-text
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 ```
 
-## 🚀 快速开始
+## Query Modes
 
-### 启动服务
-```bash
-python main.py
-```
-
-### 初始化知识图谱
-```bash
-curl -X POST "http://localhost:8123/api/v1/neo4j-knowledge/initialize"
-```
-
-### 添加文档
-```bash
-curl -X POST "http://localhost:8123/api/v1/neo4j-knowledge/documents" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Python 是一种高级编程语言...",
-    "title": "Python 编程基础",
-    "metadata": {"category": "programming"}
-  }'
-```
-
-### 查询知识库
-```bash
-curl -X POST "http://localhost:8123/api/v1/neo4j-knowledge/query" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "什么是 Python？",
-    "mode": "hybrid"
-  }'
-```
-
-## 📚 API 文档
-
-### 核心端点
-
-#### 初始化服务
-```http
-POST /api/v1/neo4j-knowledge/initialize
-```
-
-#### 文档管理
-```http
-# 添加文档
-POST /api/v1/neo4j-knowledge/documents
-
-# 上传文件
-POST /api/v1/neo4j-knowledge/files
-
-# 批量添加目录
-POST /api/v1/neo4j-knowledge/directories
-```
-
-#### 查询检索
-```http
-# 智能问答
-POST /api/v1/neo4j-knowledge/query
-
-# 向量搜索
-POST /api/v1/neo4j-knowledge/search
-
-# 图谱结构
-GET /api/v1/neo4j-knowledge/schema
-```
-
-#### 系统管理
-```http
-# 统计信息
-GET /api/v1/neo4j-knowledge/statistics
-
-# 健康检查
-GET /api/v1/neo4j-knowledge/health
-
-# 清空知识库
-DELETE /api/v1/neo4j-knowledge/clear
-```
-
-## 🔍 查询模式
-
-### 混合模式 (hybrid)
+### Hybrid Mode (hybrid)
 ```json
 {
-  "question": "Python 有什么特点？",
+  "question": "What are the characteristics of Python?",
   "mode": "hybrid"
 }
 ```
-同时使用图遍历和向量搜索，提供最全面的答案。
+Uses both graph traversal and vector search for comprehensive answers.
 
-### 向量模式 (vector_only)
+### Vector-Only Mode (vector_only)
 ```json
 {
-  "question": "编程语言的特性",
+  "question": "Programming language features",
   "mode": "vector_only"
 }
 ```
-基于语义相似度搜索，适合概念性查询。
+Based on semantic similarity search, suitable for conceptual queries.
 
-### 图模式 (graph_only)
+### Graph-Only Mode (graph_only)
 ```json
 {
-  "question": "Python 与其他语言的关系",
+  "question": "Python's relationship with other languages",
   "mode": "graph_only"
 }
 ```
-基于图结构遍历，适合关系性查询。
+Based on graph structure traversal, suitable for relationship queries.
 
-## 🧪 测试验证
+## Performance Optimization
 
-### 运行测试
-```bash
-python test_neo4j_knowledge.py
-```
-
-### 测试内容
-- ✅ 服务初始化
-- ✅ 文档添加和索引
-- ✅ 多模式查询
-- ✅ 向量相似度搜索
-- ✅ 图谱结构查询
-- ✅ 文件上传处理
-
-## 🏗️ 架构
-
-```
-文档 → LlamaIndex → Neo4j (向量 + 图)
-查询 → 单一 Cypher 查询 → 统一结果
-```
-
-## 核心特性
-
-### 智能文档处理
-- 自动文档分块
-- 实体关系提取
-- 向量嵌入生成
-- 图结构构建
-
-### 高效查询引擎
-- 混合检索策略
-- 上下文感知回答
-- 多跳图遍历
-- 语义相似度匹配
-
-### 灵活扩展性
-- 支持多种文档格式
-- 可配置嵌入模型
-- 自定义查询策略
-- 插件化架构
-
-## 🔧 配置选项
-
-### Neo4j 配置
-```python
-# 向量索引配置
-vector_index_name = "knowledge_vectors"
-vector_dimension = 384  # 根据嵌入模型调整
-```
-
-### LlamaIndex 配置
-```python
-# 文档处理
-chunk_size = 512
-chunk_overlap = 50
-
-# 查询配置
-similarity_top_k = 10
-response_mode = "tree_summarize"
-```
-
-### Ollama 配置
-```python
-# LLM 模型
-ollama_model = "llama2"
-temperature = 0.1
-
-# 嵌入模型
-embedding_model = "nomic-embed-text"
-```
-
-## 📈 性能优化
-
-### Neo4j 优化
+### Neo4j Optimization
 ```cypher
--- 创建向量索引
+-- Create vector index
 CREATE VECTOR INDEX knowledge_vectors 
 FOR (n:Document) ON (n.embedding) 
 OPTIONS {indexConfig: {
-  `vector.dimensions`: 384,
+  `vector.dimensions`: 768,
   `vector.similarity_function`: 'cosine'
 }}
 
--- 创建文本索引
+-- Create text index
 CREATE FULLTEXT INDEX document_text 
 FOR (n:Document) ON EACH [n.text, n.title]
 ```
 
-### 查询优化
-- 使用适当的 `top_k` 值
-- 合理设置 `chunk_size`
-- 启用查询缓存
-- 监控查询性能
+### Query Optimization
+- Use appropriate `top_k` values
+- Set reasonable `chunk_size`
+- Enable query caching
+- Monitor query performance
 
-## 🚨 故障排除
+## Configuration Options
 
-### 常见问题
+### Neo4j Configuration
+```python
+# Vector index configuration
+vector_index_name = "knowledge_vectors"
+vector_dimension = 768  # Adjust based on embedding model
+```
 
-#### Neo4j 连接失败
+### LlamaIndex Configuration
+```python
+# Document processing
+chunk_size = 1000
+chunk_overlap = 200
+
+# Query configuration
+similarity_top_k = 10
+response_mode = "tree_summarize"
+```
+
+### Ollama Configuration
+```python
+# LLM model
+ollama_model = "llama3.2"
+temperature = 0.1
+
+# Embedding model
+embedding_model = "nomic-embed-text"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Neo4j Connection Failed
 ```bash
-# 检查 Neo4j 状态
-docker logs neo4j
+# Check Neo4j status
+docker logs neo4j-code-graph
 
-# 验证连接
+# Verify connection
 curl http://localhost:7474
 ```
 
-#### Ollama 模型未找到
+#### Ollama Model Not Found
 ```bash
-# 列出已安装模型
+# List installed models
 ollama list
 
-# 下载缺失模型
+# Download missing model
 ollama pull nomic-embed-text
 ```
 
-#### 向量索引错误
+#### Vector Index Error
 ```cypher
-// 检查索引状态
+// Check index status
 SHOW INDEXES
 
-// 重建索引
+// Rebuild index
 DROP INDEX knowledge_vectors IF EXISTS;
 CREATE VECTOR INDEX knowledge_vectors ...
 ```
 
-## 📝 开发指南
+## Development Guide
 
-### 添加新的文档类型
+### Adding New Document Types
 ```python
-# 扩展文档处理器
+# Extend document processor
 class CustomDocumentProcessor:
     def process(self, content: str) -> Document:
-        # 自定义处理逻辑
+        # Custom processing logic
         return Document(text=content, metadata={...})
 ```
 
-### 自定义查询策略
+### Custom Query Strategies
 ```python
-# 实现自定义检索器
+# Implement custom retriever
 class CustomRetriever:
     def retrieve(self, query: str) -> List[Node]:
-        # 自定义检索逻辑
+        # Custom retrieval logic
         return nodes
 ```
 
-## 🤝 贡献指南
+## Architecture Diagram
 
-1. Fork 项目
-2. 创建特性分支
-3. 提交更改
-4. 推送到分支
-5. 创建 Pull Request
+```
+Documents → LlamaIndex → Neo4j (Vector + Graph)
+Query → Single Cypher Query → Unified Results
+```
 
-## 📄 许可证
+## Core Features
 
-MIT License - 详见 LICENSE 文件
+### Intelligent Document Processing
+- Automatic document chunking
+- Entity relationship extraction
+- Vector embedding generation
+- Graph structure construction
 
-## 🙏 致谢
+### Efficient Query Engine
+- Hybrid retrieval strategies
+- Context-aware responses
+- Multi-hop graph traversal
+- Semantic similarity matching
 
-- [Neo4j](https://neo4j.com/) - 图数据库技术
-- [LlamaIndex](https://www.llamaindex.ai/) - RAG 框架
-- [Ollama](https://ollama.ai/) - 本地 LLM 服务
+### Flexible Extensibility
+- Support for multiple document formats
+- Configurable embedding models
+- Custom query strategies
+- Plugin architecture
+
+## Testing and Validation
+
+### Run Tests
+```bash
+python test_neo4j_knowledge.py
+```
+
+### Test Coverage
+- Service initialization
+- Document addition and indexing
+- Multi-mode queries
+- Vector similarity search
+- Graph structure queries
+- File upload processing
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Acknowledgments
+
+- [Neo4j](https://neo4j.com/) - Graph database technology
+- [LlamaIndex](https://www.llamaindex.ai/) - RAG framework
+- [Ollama](https://ollama.ai/) - Local LLM service
 
 ---
 
-**现代化 GraphRAG，从 Neo4j 开始！** 🚀 
+**Modern GraphRAG, starting from Neo4j!** 🚀 
