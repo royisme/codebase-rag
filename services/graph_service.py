@@ -6,13 +6,13 @@ from config import settings
 import json
 
 class GraphNode(BaseModel):
-    """图节点模型"""
+    """graph node model"""
     id: str
     labels: List[str]
     properties: Dict[str, Any] = {}
 
 class GraphRelationship(BaseModel):
-    """图关系模型"""
+    """graph relationship model"""
     id: Optional[str] = None
     start_node: str
     end_node: str
@@ -20,28 +20,28 @@ class GraphRelationship(BaseModel):
     properties: Dict[str, Any] = {}
 
 class GraphQueryResult(BaseModel):
-    """图查询结果模型"""
+    """graph query result model"""
     nodes: List[GraphNode] = []
     relationships: List[GraphRelationship] = []
     paths: List[Dict[str, Any]] = []
     raw_result: Optional[Any] = None
 
 class Neo4jGraphService:
-    """Neo4j图数据库服务"""
+    """Neo4j graph database service"""
     
     def __init__(self):
         self.driver = None
         self._connected = False
     
     async def connect(self) -> bool:
-        """连接到Neo4j数据库"""
+        """connect to Neo4j database"""
         try:
             self.driver = GraphDatabase.driver(
                 settings.neo4j_uri,
                 auth=basic_auth(settings.neo4j_username, settings.neo4j_password)
             )
             
-            # 测试连接
+            # test connection
             with self.driver.session(database=settings.neo4j_database) as session:
                 result = session.run("RETURN 1 as test")
                 result.single()
@@ -49,7 +49,7 @@ class Neo4jGraphService:
             self._connected = True
             logger.info(f"Successfully connected to Neo4j at {settings.neo4j_uri}")
             
-            # 创建索引和约束
+            # create indexes and constraints
             await self._setup_schema()
             return True
             
@@ -58,10 +58,10 @@ class Neo4jGraphService:
             return False
     
     async def _setup_schema(self):
-        """设置数据库schema、索引和约束"""
+        """set database schema, indexes and constraints"""
         try:
             with self.driver.session(database=settings.neo4j_database) as session:
-                # 创建唯一性约束
+                # create unique constraints
                 constraints = [
                     "CREATE CONSTRAINT code_entity_id IF NOT EXISTS FOR (n:CodeEntity) REQUIRE n.id IS UNIQUE",
                     "CREATE CONSTRAINT function_id IF NOT EXISTS FOR (n:Function) REQUIRE n.id IS UNIQUE",
@@ -77,7 +77,7 @@ class Neo4jGraphService:
                         if "already exists" not in str(e).lower():
                             logger.warning(f"Failed to create constraint: {e}")
                 
-                # 创建索引
+                # create indexes
                 indexes = [
                     "CREATE INDEX code_entity_name IF NOT EXISTS FOR (n:CodeEntity) ON (n.name)",
                     "CREATE INDEX function_name IF NOT EXISTS FOR (n:Function) ON (n.name)",
@@ -99,13 +99,13 @@ class Neo4jGraphService:
             logger.error(f"Failed to setup schema: {e}")
     
     async def create_node(self, node: GraphNode) -> Dict[str, Any]:
-        """创建图节点"""
+        """create graph node"""
         if not self._connected:
             raise Exception("Not connected to Neo4j")
         
         try:
             with self.driver.session(database=settings.neo4j_database) as session:
-                # 构建创建节点的Cypher查询
+                # build Cypher query to create node
                 labels_str = ":".join(node.labels)
                 query = f"""
                 CREATE (n:{labels_str} {{id: $id}})
@@ -134,7 +134,7 @@ class Neo4jGraphService:
             }
     
     async def create_relationship(self, relationship: GraphRelationship) -> Dict[str, Any]:
-        """创建图关系"""
+        """create graph relationship"""
         if not self._connected:
             raise Exception("Not connected to Neo4j")
         
@@ -170,7 +170,7 @@ class Neo4jGraphService:
             }
     
     async def execute_cypher(self, query: str, parameters: Dict[str, Any] = None) -> GraphQueryResult:
-        """执行Cypher查询"""
+        """execute Cypher query"""
         if not self._connected:
             raise Exception("Not connected to Neo4j")
         
@@ -180,7 +180,7 @@ class Neo4jGraphService:
             with self.driver.session(database=settings.neo4j_database) as session:
                 result = session.run(query, parameters)
                 
-                # 处理结果
+                # process result
                 nodes = []
                 relationships = []
                 paths = []
@@ -189,7 +189,7 @@ class Neo4jGraphService:
                 for record in result:
                     raw_results.append(dict(record))
                     
-                    # 提取节点
+                    # extract nodes
                     for key, value in record.items():
                         if hasattr(value, 'labels'):  # Neo4j Node
                             node = GraphNode(
@@ -227,19 +227,19 @@ class Neo4jGraphService:
             return GraphQueryResult(raw_result={"error": str(e)})
     
     async def find_nodes_by_label(self, label: str, limit: int = 100) -> List[GraphNode]:
-        """根据标签查找节点"""
+        """find nodes by label"""
         query = f"MATCH (n:{label}) RETURN n LIMIT {limit}"
         result = await self.execute_cypher(query)
         return result.nodes
     
     async def find_relationships_by_type(self, rel_type: str, limit: int = 100) -> List[GraphRelationship]:
-        """根据类型查找关系"""
+        """find relationships by type"""
         query = f"MATCH ()-[r:{rel_type}]->() RETURN r LIMIT {limit}"
         result = await self.execute_cypher(query)
         return result.relationships
     
     async def find_connected_nodes(self, node_id: str, depth: int = 1) -> GraphQueryResult:
-        """查找连接的节点"""
+        """find connected nodes"""
         query = f"""
         MATCH (start {{id: $node_id}})-[*1..{depth}]-(connected)
         RETURN start, connected, relationships()
@@ -247,7 +247,7 @@ class Neo4jGraphService:
         return await self.execute_cypher(query, {"node_id": node_id})
     
     async def find_shortest_path(self, start_id: str, end_id: str) -> GraphQueryResult:
-        """查找最短路径"""
+        """find shortest path"""
         query = """
         MATCH (start {id: $start_id}), (end {id: $end_id})
         MATCH path = shortestPath((start)-[*]-(end))
@@ -259,7 +259,7 @@ class Neo4jGraphService:
         })
     
     async def get_node_degree(self, node_id: str) -> Dict[str, int]:
-        """获取节点的度数"""
+        """get node degree"""
         query = """
         MATCH (n {id: $node_id})
         OPTIONAL MATCH (n)-[out_rel]->()
@@ -279,7 +279,7 @@ class Neo4jGraphService:
         return {"out_degree": 0, "in_degree": 0, "total_degree": 0}
     
     async def delete_node(self, node_id: str) -> Dict[str, Any]:
-        """删除节点及其关系"""
+        """delete node and its relationships"""
         if not self._connected:
             raise Exception("Not connected to Neo4j")
         
@@ -306,7 +306,7 @@ class Neo4jGraphService:
             }
     
     async def get_database_stats(self) -> Dict[str, Any]:
-        """获取数据库统计信息"""
+        """get database stats"""
         try:
             stats_queries = [
                 ("total_nodes", "MATCH (n) RETURN count(n) as count"),
@@ -331,13 +331,13 @@ class Neo4jGraphService:
             return {"error": str(e)}
     
     async def batch_create_nodes(self, nodes: List[GraphNode]) -> Dict[str, Any]:
-        """批量创建节点"""
+        """batch create nodes"""
         if not self._connected:
             raise Exception("Not connected to Neo4j")
         
         try:
             with self.driver.session(database=settings.neo4j_database) as session:
-                # 准备批量数据
+                # prepare batch data
                 node_data = []
                 for node in nodes:
                     node_data.append({
@@ -360,12 +360,12 @@ class Neo4jGraphService:
                     "created_count": summary.get("created_count", len(nodes))
                 }
         except Exception as e:
-            # 如果APOC不可用，使用标准方法
+            # if APOC is not available, use standard method
             logger.warning(f"APOC not available, using standard method: {e}")
             return await self._batch_create_nodes_standard(nodes)
     
     async def _batch_create_nodes_standard(self, nodes: List[GraphNode]) -> Dict[str, Any]:
-        """使用标准方法批量创建节点"""
+        """use standard method to batch create nodes"""
         created_count = 0
         errors = []
         
@@ -383,7 +383,7 @@ class Neo4jGraphService:
         }
     
     async def close(self):
-        """关闭数据库连接"""
+        """close database connection"""
         try:
             if self.driver:
                 self.driver.close()
@@ -392,5 +392,5 @@ class Neo4jGraphService:
         except Exception as e:
             logger.error(f"Failed to close Neo4j connection: {e}")
 
-# 全局图服务实例
+# global graph service instance
 graph_service = Neo4jGraphService() 

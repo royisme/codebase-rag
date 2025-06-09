@@ -1,7 +1,7 @@
 """
-异步任务队列服务
-用于处理长时间运行的文档处理任务，避免阻塞用户请求
-集成SQLite持久化存储，确保任务数据不会丢失
+asynchronous task queue service
+used to handle long-running document processing tasks, avoiding blocking user requests
+integrates SQLite persistence to ensure task data is not lost
 """
 
 import asyncio
@@ -36,38 +36,38 @@ class TaskResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 class TaskQueue:
-    """异步任务队列管理器（带持久化存储）"""
+    """asynchronous task queue manager (with persistent storage)"""
     
     def __init__(self, max_concurrent_tasks: int = 3):
         self.max_concurrent_tasks = max_concurrent_tasks
         self.tasks: Dict[str, TaskResult] = {}
         self.running_tasks: Dict[str, asyncio.Task] = {}
         self.task_semaphore = asyncio.Semaphore(max_concurrent_tasks)
-        self._cleanup_interval = 3600  # 1小时清理一次完成的任务
+        self._cleanup_interval = 3600  # 1 hour to clean up completed tasks
         self._cleanup_task = None
-        self._storage = None  # 延迟初始化，避免循环导入
-        self._worker_id = str(uuid.uuid4())  # 唯一工作者ID用于锁定
+        self._storage = None  # delay initialization to avoid circular import
+        self._worker_id = str(uuid.uuid4())  # unique worker ID for locking
         
     async def start(self):
-        """启动任务队列"""
-        # 延迟导入避免循环依赖
+        """start task queue"""
+        # delay import to avoid circular dependency
         from .task_storage import TaskStorage
         self._storage = TaskStorage()
         
-        # 从数据库恢复任务
+        # restore tasks from database
         await self._restore_tasks_from_storage()
         
         if self._cleanup_task is None:
             self._cleanup_task = asyncio.create_task(self._cleanup_completed_tasks())
         
-        # 启动工作者处理待处理任务
+        # start worker to process pending tasks
         asyncio.create_task(self._process_pending_tasks())
         
         logger.info(f"Task queue started with max {self.max_concurrent_tasks} concurrent tasks")
     
     async def stop(self):
-        """停止任务队列"""
-        # 取消所有运行中的任务
+        """stop task queue"""
+        # cancel all running tasks
         for task_id, task in self.running_tasks.items():
             task.cancel()
             if self._storage:
@@ -75,7 +75,7 @@ class TaskQueue:
             if task_id in self.tasks:
                 self.tasks[task_id].status = TaskStatus.CANCELLED
         
-        # 停止清理任务
+        # stop cleanup task
         if self._cleanup_task:
             self._cleanup_task.cancel()
             self._cleanup_task = None
@@ -83,16 +83,16 @@ class TaskQueue:
         logger.info("Task queue stopped")
     
     async def _restore_tasks_from_storage(self):
-        """从存储中恢复任务状态"""
+        """restore task status from storage"""
         if not self._storage:
             return
             
         try:
-            # 恢复所有未完成的任务
+            # restore all incomplete tasks
             stored_tasks = await self._storage.list_tasks(limit=1000)
             
             for task in stored_tasks:
-                # 创建TaskResult对象用于内存管理
+                # create TaskResult object for memory management
                 task_result = TaskResult(
                     task_id=task.id,
                     status=task.status,
@@ -106,7 +106,7 @@ class TaskQueue:
                 )
                 self.tasks[task.id] = task_result
                 
-                # 重新启动被中断的运行中任务
+                # restart interrupted running tasks
                 if task.status == TaskStatus.PROCESSING:
                     logger.warning(f"Task {task.id} was processing when service stopped, marking as failed")
                     await self._storage.update_task_status(
@@ -131,13 +131,13 @@ class TaskQueue:
                          task_type: str = "unknown",
                          metadata: Dict[str, Any] = None,
                          priority: int = 0) -> str:
-        """提交一个新任务到队列"""
+        """submit a new task to the queue"""
         from .task_storage import TaskType
         
         task_kwargs = task_kwargs or {}
         metadata = metadata or {}
         
-        # 准备任务载荷
+        # prepare task payload
         payload = {
             "task_name": task_name,
             "task_type": task_type,
@@ -147,7 +147,7 @@ class TaskQueue:
             **metadata
         }
         
-        # 映射任务类型
+        # map task type
         task_type_enum = TaskType.DOCUMENT_PROCESSING
         if task_type == "schema_parsing":
             task_type_enum = TaskType.SCHEMA_PARSING
@@ -156,14 +156,14 @@ class TaskQueue:
         elif task_type == "batch_processing":
             task_type_enum = TaskType.BATCH_PROCESSING
         
-        # 在数据库中创建任务
+        # create task in database
         if self._storage:
             task = await self._storage.create_task(task_type_enum, payload, priority)
             task_id = task.id
         else:
             task_id = str(uuid.uuid4())
         
-        # 创建内存中的任务结果对象
+        # create task result object in memory
         task_result = TaskResult(
             task_id=task_id,
             status=TaskStatus.PENDING,
@@ -177,7 +177,7 @@ class TaskQueue:
         return task_id
     
     async def _process_pending_tasks(self):
-        """持续处理待处理的任务"""
+        """continuously process pending tasks"""
         while True:
             try:
                 if self._storage:
@@ -207,12 +207,12 @@ class TaskQueue:
                 await asyncio.sleep(5)
     
     async def _execute_stored_task(self, task):
-        """执行存储的任务"""
+        """execute stored task"""
         task_id = task.id
         task_result = self.tasks.get(task_id)
         
         if not task_result:
-            # 创建任务结果对象
+            # create task result object
             task_result = TaskResult(
                 task_id=task_id,
                 status=task.status,
@@ -223,7 +223,7 @@ class TaskQueue:
             self.tasks[task_id] = task_result
         
         try:
-            # 更新任务状态为处理中
+            # update task status to processing
             task_result.status = TaskStatus.PROCESSING
             task_result.started_at = datetime.now()
             task_result.message = "Task is processing"
@@ -235,15 +235,15 @@ class TaskQueue:
             
             logger.info(f"Task {task_id} started execution")
             
-            # 从载荷中恢复任务函数和参数
+            # restore task function and parameters from payload
             payload = task.payload
             task_name = payload.get("task_name", "Unknown Task")
             
-            # 这里需要根据任务类型动态恢复任务函数
-            # 暂时使用占位符，实际实现需要任务注册机制
+            # here we need to dynamically restore task function based on task type
+            # for now, we use a placeholder, actual implementation needs task registration mechanism
             result = await self._execute_task_by_type(task)
             
-            # 任务完成
+            # task completed
             task_result.status = TaskStatus.SUCCESS
             task_result.completed_at = datetime.now()
             task_result.progress = 100.0
@@ -255,7 +255,7 @@ class TaskQueue:
                     task_id, TaskStatus.SUCCESS
                 )
             
-            # 通知WebSocket客户端
+            # notify WebSocket clients
             await self._notify_websocket_clients(task_id)
             
             logger.info(f"Task {task_id} completed successfully")
@@ -288,45 +288,45 @@ class TaskQueue:
                     error_message=str(e)
                 )
             
-            # 通知WebSocket客户端
+            # notify WebSocket clients
             await self._notify_websocket_clients(task_id)
             
             logger.error(f"Task {task_id} failed: {e}")
             
         finally:
-            # 释放任务锁
+            # release task lock
             if self._storage:
                 await self._storage.release_task_lock(task_id, self._worker_id)
             
-            # 从运行任务列表中移除
+            # remove task from running tasks list
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
     
     async def _execute_task_by_type(self, task):
-        """根据任务类型执行任务"""
+        """execute task based on task type"""
         from .task_processors import processor_registry
         
-        # 获取对应的任务处理器
+        # get corresponding task processor
         processor = processor_registry.get_processor(task.type)
         
         if not processor:
             raise ValueError(f"No processor found for task type: {task.type.value}")
         
-        # 创建进度回调函数
+        # create progress callback function
         def progress_callback(progress: float, message: str = ""):
             self.update_task_progress(task.id, progress, message)
         
-        # 执行任务
+        # execute task
         result = await processor.process(task, progress_callback)
         
         return result
     
     def get_task_status(self, task_id: str) -> Optional[TaskResult]:
-        """获取任务状态"""
+        """get task status"""
         return self.tasks.get(task_id)
     
     async def get_task_from_storage(self, task_id: str):
-        """从存储中获取任务详情"""
+        """get task details from storage"""
         if self._storage:
             return await self._storage.get_task(task_id)
         return None
@@ -334,21 +334,21 @@ class TaskQueue:
     def get_all_tasks(self, 
                      status_filter: Optional[TaskStatus] = None,
                      limit: int = 100) -> List[TaskResult]:
-        """获取所有任务"""
+        """get all tasks"""
         tasks = list(self.tasks.values())
         
         if status_filter:
             tasks = [t for t in tasks if t.status == status_filter]
         
-        # 按创建时间倒序排列
+        # sort by creation time in descending order
         tasks.sort(key=lambda x: x.created_at, reverse=True)
         
         return tasks[:limit]
     
     async def cancel_task(self, task_id: str) -> bool:
-        """取消任务"""
+        """cancel task"""
         if task_id in self.running_tasks:
-            # 取消正在运行的任务
+            # cancel running task
             self.running_tasks[task_id].cancel()
             return True
         
@@ -365,7 +365,7 @@ class TaskQueue:
                         error_message="Task was cancelled"
                     )
                 
-                # 通知WebSocket客户端
+                # notify WebSocket clients
                 await self._notify_websocket_clients(task_id)
                 
                 return True
@@ -373,13 +373,13 @@ class TaskQueue:
         return False
     
     def update_task_progress(self, task_id: str, progress: float, message: str = ""):
-        """更新任务进度"""
+        """update task progress"""
         if task_id in self.tasks:
             self.tasks[task_id].progress = progress
             if message:
                 self.tasks[task_id].message = message
             
-            # 异步更新存储
+            # async update storage
             if self._storage:
                 asyncio.create_task(
                     self._storage.update_task_status(
@@ -388,23 +388,23 @@ class TaskQueue:
                     )
                 )
             
-            # 通知WebSocket客户端
+            # notify WebSocket clients
             asyncio.create_task(self._notify_websocket_clients(task_id))
     
     async def _cleanup_completed_tasks(self):
-        """定期清理已完成的任务"""
+        """clean up completed tasks periodically"""
         while True:
             try:
                 await asyncio.sleep(self._cleanup_interval)
                 
-                # 清理内存中的已完成任务（保留最近100个）
+                # clean up completed tasks in memory (keep last 100)
                 completed_tasks = [
                     (task_id, task) for task_id, task in self.tasks.items()
                     if task.status in [TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.CANCELLED]
                 ]
                 
                 if len(completed_tasks) > 100:
-                    # 按完成时间排序，删除最旧的
+                    # sort by completion time, delete oldest
                     completed_tasks.sort(key=lambda x: x[1].completed_at or datetime.now())
                     tasks_to_remove = completed_tasks[:-100]
                     
@@ -413,7 +413,7 @@ class TaskQueue:
                     
                     logger.info(f"Cleaned up {len(tasks_to_remove)} completed tasks from memory")
                 
-                # 清理数据库中的旧任务
+                # clean up old tasks in database
                 if self._storage:
                     cleaned_count = await self._storage.cleanup_old_tasks(days=30)
                     if cleaned_count > 0:
@@ -423,7 +423,7 @@ class TaskQueue:
                 logger.error(f"Error in cleanup task: {e}")
     
     async def get_queue_stats(self) -> Dict[str, Any]:
-        """获取队列统计信息"""
+        """get queue statistics"""
         stats = {
             "total_tasks": len(self.tasks),
             "running_tasks": len(self.running_tasks),
@@ -431,7 +431,7 @@ class TaskQueue:
             "available_slots": self.task_semaphore._value,
         }
         
-        # 状态统计
+        # status statistics
         status_counts = {}
         for task in self.tasks.values():
             status = task.status.value
@@ -439,7 +439,7 @@ class TaskQueue:
         
         stats["status_breakdown"] = status_counts
         
-        # 从存储获取更详细的统计
+        # get more detailed statistics from storage
         if self._storage:
             storage_stats = await self._storage.get_task_stats()
             stats["storage_stats"] = storage_stats
@@ -447,25 +447,25 @@ class TaskQueue:
         return stats
     
     async def _notify_websocket_clients(self, task_id: str):
-        """通知WebSocket客户端任务状态变化"""
+        """notify WebSocket clients about task status change"""
         try:
-            # 延迟导入避免循环依赖
+            # delay import to avoid circular dependency
             from api.websocket_routes import notify_task_status_change
             await notify_task_status_change(task_id, self.tasks[task_id].status.value, self.tasks[task_id].progress)
         except Exception as e:
             logger.error(f"Failed to notify WebSocket clients: {e}")
 
-# 全局任务队列实例
+# global task queue instance
 task_queue = TaskQueue()
 
-# 便捷函数
+# convenience function
 async def submit_document_processing_task(
     service_method: Callable,
     *args,
     task_name: str = "Document Processing",
     **kwargs
 ) -> str:
-    """提交文档处理任务"""
+    """submit document processing task"""
     return await task_queue.submit_task(
         service_method,
         args,
@@ -480,7 +480,7 @@ async def submit_directory_processing_task(
     task_name: str = "Directory Processing",
     **kwargs
 ) -> str:
-    """提交目录处理任务"""
+    """submit directory processing task"""
     return await task_queue.submit_task(
         service_method,
         (directory_path,),

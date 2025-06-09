@@ -5,16 +5,16 @@ from loguru import logger
 from .base import EmbeddingGenerator
 
 class HuggingFaceEmbeddingGenerator(EmbeddingGenerator):
-    """HuggingFace嵌入生成器"""
+    """HuggingFace embedding generator"""
     
-    def __init__(self, model_name: str = "BAAI/bge-small-zh-v1.5"):
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
         self.model_name = model_name
         self.tokenizer = None
         self.model = None
         self._initialized = False
     
     async def _initialize(self):
-        """延迟初始化模型"""
+        """delay initialize model"""
         if self._initialized:
             return
         
@@ -37,18 +37,18 @@ class HuggingFaceEmbeddingGenerator(EmbeddingGenerator):
             raise
     
     async def generate_embedding(self, text: str) -> List[float]:
-        """生成单个文本的嵌入向量"""
+        """generate single text embedding vector"""
         await self._initialize()
         
         try:
             import torch
             
-            # 文本预处理
+            # text preprocessing
             text = text.strip()
             if not text:
                 raise ValueError("Empty text provided")
             
-            # 分词
+            # tokenization
             inputs = self.tokenizer(
                 text,
                 padding=True,
@@ -57,10 +57,10 @@ class HuggingFaceEmbeddingGenerator(EmbeddingGenerator):
                 return_tensors='pt'
             )
             
-            # 生成嵌入
+            # generate embedding
             with torch.no_grad():
                 outputs = self.model(**inputs)
-                # 使用CLS token的输出作为句子嵌入
+                # use CLS token output as sentence embedding
                 embeddings = outputs.last_hidden_state[:, 0, :].squeeze()
                 
             return embeddings.tolist()
@@ -70,7 +70,7 @@ class HuggingFaceEmbeddingGenerator(EmbeddingGenerator):
             raise
     
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """批量生成嵌入向量"""
+        """batch generate embedding vectors"""
         await self._initialize()
         
         if not texts:
@@ -79,12 +79,12 @@ class HuggingFaceEmbeddingGenerator(EmbeddingGenerator):
         try:
             import torch
             
-            # 过滤空文本
+            # filter empty text
             valid_texts = [text.strip() for text in texts if text.strip()]
             if not valid_texts:
                 raise ValueError("No valid texts provided")
             
-            # 批量分词
+            # batch tokenization
             inputs = self.tokenizer(
                 valid_texts,
                 padding=True,
@@ -93,10 +93,10 @@ class HuggingFaceEmbeddingGenerator(EmbeddingGenerator):
                 return_tensors='pt'
             )
             
-            # 生成嵌入
+            # generate embedding
             with torch.no_grad():
                 outputs = self.model(**inputs)
-                # 使用CLS token的输出作为句子嵌入
+                # use CLS token output as sentence embedding
                 embeddings = outputs.last_hidden_state[:, 0, :]
                 
             return embeddings.tolist()
@@ -106,7 +106,7 @@ class HuggingFaceEmbeddingGenerator(EmbeddingGenerator):
             raise
 
 class OpenAIEmbeddingGenerator(EmbeddingGenerator):
-    """OpenAI嵌入生成器"""
+    """OpenAI embedding generator"""
     
     def __init__(self, api_key: str, model: str = "text-embedding-ada-002"):
         self.api_key = api_key
@@ -114,7 +114,7 @@ class OpenAIEmbeddingGenerator(EmbeddingGenerator):
         self.client = None
     
     async def _get_client(self):
-        """获取OpenAI客户端"""
+        """get OpenAI client"""
         if self.client is None:
             try:
                 from openai import AsyncOpenAI
@@ -124,7 +124,7 @@ class OpenAIEmbeddingGenerator(EmbeddingGenerator):
         return self.client
     
     async def generate_embedding(self, text: str) -> List[float]:
-        """生成单个文本的嵌入向量"""
+        """generate single text embedding vector"""
         client = await self._get_client()
         
         try:
@@ -139,7 +139,7 @@ class OpenAIEmbeddingGenerator(EmbeddingGenerator):
             raise
     
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """批量生成嵌入向量"""
+        """batch generate embedding vectors"""
         client = await self._get_client()
         
         try:
@@ -154,14 +154,14 @@ class OpenAIEmbeddingGenerator(EmbeddingGenerator):
             raise
 
 class OllamaEmbeddingGenerator(EmbeddingGenerator):
-    """Ollama本地嵌入生成器"""
+    """Ollama local embedding generator"""
     
     def __init__(self, host: str = "http://localhost:11434", model: str = "nomic-embed-text"):
         self.host = host.rstrip('/')
         self.model = model
     
     async def generate_embedding(self, text: str) -> List[float]:
-        """生成单个文本的嵌入向量"""
+        """generate single text embedding vector"""
         import aiohttp
         
         url = f"{self.host}/api/embeddings"
@@ -185,8 +185,8 @@ class OllamaEmbeddingGenerator(EmbeddingGenerator):
             raise
     
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """批量生成嵌入向量"""
-        # Ollama通常需要逐个请求，我们使用并发来提高性能
+        """batch generate embedding vectors"""
+        # Ollama usually needs to make individual requests, we use concurrency to improve performance
         tasks = [self.generate_embedding(text) for text in texts]
         
         try:
@@ -198,11 +198,11 @@ class OllamaEmbeddingGenerator(EmbeddingGenerator):
             raise
 
 class EmbeddingGeneratorFactory:
-    """嵌入生成器工厂"""
+    """embedding generator factory"""
     
     @staticmethod
     def create_generator(config: dict) -> EmbeddingGenerator:
-        """根据配置创建嵌入生成器"""
+        """create embedding generator based on configuration"""
         provider = config.get("provider", "huggingface").lower()
         
         if provider == "huggingface":
@@ -224,20 +224,20 @@ class EmbeddingGeneratorFactory:
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
 
-# 默认嵌入生成器（可以通过配置修改）
+# default embedding generator (can be modified through configuration)
 default_embedding_generator = None
 
 def get_default_embedding_generator() -> EmbeddingGenerator:
-    """获取默认嵌入生成器"""
+    """get default embedding generator"""
     global default_embedding_generator
     
     if default_embedding_generator is None:
-        # 使用HuggingFace作为默认选择
+        # use HuggingFace as default choice
         default_embedding_generator = HuggingFaceEmbeddingGenerator()
     
     return default_embedding_generator
 
 def set_default_embedding_generator(generator: EmbeddingGenerator):
-    """设置默认嵌入生成器"""
+    """set default embedding generator"""
     global default_embedding_generator
     default_embedding_generator = generator 

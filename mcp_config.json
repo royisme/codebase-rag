@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "knowledge-graph": {
-      "command": "python",
+      "command": "uv",
       "args": ["mcp_server.py"],
       "cwd": ".",
       "env": {

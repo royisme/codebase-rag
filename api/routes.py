@@ -12,17 +12,17 @@ from services.task_queue import task_queue
 from config import settings
 from loguru import logger
 
-# 创建路由器
+# create router
 router = APIRouter()
 
-# 初始化知识库服务
+# initialize knowledge base service
 knowledge_service = KnowledgeService(
     vector_service=vector_service,
     graph_service=graph_service,
     rag_service=rag_service
 )
 
-# 请求模型
+# request model
 class HealthResponse(BaseModel):
     status: str
     services: Dict[str, bool]
@@ -52,12 +52,12 @@ class DirectoryProcessRequest(BaseModel):
     file_patterns: Optional[List[str]] = None
     exclude_patterns: Optional[List[str]] = None
 
-# 健康检查
+# health check
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """健康检查接口"""
+    """health check interface"""
     try:
-        # 检查各个服务状态
+        # check service status
         services_status = {
             "rag_service": rag_service._initialized,
             "vector_service": vector_service._connected,
@@ -75,10 +75,10 @@ async def health_check():
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# RAG查询接口
+# RAG query interface
 @router.post("/query")
 async def query_knowledge(query_request: RAGQuery):
-    """RAG知识查询接口"""
+    """RAG knowledge query interface"""
     try:
         response = await knowledge_service.query(
             question=query_request.question,
@@ -91,19 +91,19 @@ async def query_knowledge(query_request: RAGQuery):
         logger.error(f"Query failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 知识库管理接口
+# knowledge base management interface
 
 @router.post("/knowledge/documents")
 async def add_document_to_knowledge_base(
     request: DocumentAddRequest,
     async_processing: bool = False
 ):
-    """添加文档到知识库"""
+    """add document to knowledge base"""
     try:
         if async_processing:
-            # 异步处理
+            # async processing
             task_id = await task_queue.submit_task(
-                task_func=None,  # 将由处理器处理
+                task_func=None,  # will be processed by processor
                 task_kwargs={
                     "document_content": request.content,
                     "document_type": request.doc_type,
@@ -120,7 +120,7 @@ async def add_document_to_knowledge_base(
                 "status": "processing"
             })
         else:
-            # 同步处理（保持向后兼容）
+            # sync processing (keep backward compatibility)
             result = await knowledge_service.add_document(
                 content=request.content,
                 name=request.name,
@@ -139,7 +139,7 @@ async def add_document_to_knowledge_base(
 
 @router.post("/knowledge/files/{file_path:path}")
 async def add_file_to_knowledge_base(file_path: str):
-    """添加文件到知识库"""
+    """add file to knowledge base"""
     try:
         result = await knowledge_service.add_file(file_path)
         
@@ -155,14 +155,14 @@ async def add_file_to_knowledge_base(file_path: str):
 @router.post("/knowledge/directories")
 async def add_directory_to_knowledge_base(
     request: DirectoryProcessRequest,
-    async_processing: bool = True  # 目录处理默认异步
+    async_processing: bool = True  # directory processing default async
 ):
-    """批量添加目录到知识库"""
+    """batch add directory to knowledge base"""
     try:
         if async_processing:
-            # 异步处理
+            # async processing
             task_id = await task_queue.submit_task(
-                task_func=None,  # 将由处理器处理
+                task_func=None,  # will be processed by processor
                 task_kwargs={
                     "directory_path": request.directory_path,
                     "file_patterns": request.file_patterns or ["*.txt", "*.md", "*.sql"],
@@ -182,7 +182,7 @@ async def add_directory_to_knowledge_base(
                 "status": "processing"
             })
         else:
-            # 同步处理（保持向后兼容）
+            # sync processing (keep backward compatibility)
             result = await knowledge_service.add_directory(
                 directory_path=request.directory_path,
                 recursive=request.recursive,
@@ -201,7 +201,7 @@ async def add_directory_to_knowledge_base(
 
 @router.post("/knowledge/repositories/{repo_path:path}")
 async def add_repository_to_knowledge_base(repo_path: str):
-    """添加代码仓库到知识库"""
+    """add code repository to knowledge base"""
     try:
         result = await knowledge_service.add_code_repository(repo_path)
         
@@ -214,11 +214,11 @@ async def add_repository_to_knowledge_base(repo_path: str):
         logger.error(f"Add repository failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 搜索接口
+# search interface
 
 @router.post("/knowledge/search/documents")
 async def search_documents(query: str, doc_type: Optional[str] = None, top_k: int = 10):
-    """搜索文档"""
+    """search documents"""
     try:
         result = await knowledge_service.search_documents(
             query=query,
@@ -238,7 +238,7 @@ async def search_code(
     code_type: str = "function", 
     top_k: int = 10
 ):
-    """搜索代码"""
+    """search code"""
     try:
         result = await knowledge_service.search_code(
             query=query,
@@ -258,7 +258,7 @@ async def search_relations(
     relation_type: Optional[str] = None,
     direction: str = "both"
 ):
-    """搜索实体关系"""
+    """search entity relations"""
     try:
         result = await knowledge_service.search_relations(
             entity=entity,
@@ -271,10 +271,10 @@ async def search_relations(
         logger.error(f"Search relations failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 兼容旧API - 文档管理
+# backward compatibility - document management
 @router.post("/documents")
 async def add_document(document: KnowledgeDocument):
-    """添加文档到知识库（兼容接口）"""
+    """add document to knowledge base (backward compatibility)"""
     try:
         result = await knowledge_service.add_document(
             content=document.content,
@@ -303,13 +303,13 @@ async def upload_document(
     tags: Optional[str] = Form(None),
     async_processing: bool = Form(False)
 ):
-    """上传文件到知识库（兼容接口）"""
+    """upload file to knowledge base (backward compatibility)"""
     try:
-        # 读取文件内容
+        # read file content
         content = await file.read()
         content_str = content.decode('utf-8')
         
-        # 解析标签
+        # parse tags
         tag_list = []
         if tags:
             tag_list = [tag.strip() for tag in tags.split(',')]
@@ -322,9 +322,9 @@ async def upload_document(
         }
         
         if async_processing:
-            # 异步处理
+            # async processing
             task_id = await task_queue.submit_task(
-                task_func=None,  # 将由处理器处理
+                task_func=None,  # will be processed by processor
                 task_kwargs={
                     "document_content": content_str,
                     "document_type": doc_type,
@@ -342,7 +342,7 @@ async def upload_document(
                 "filename": file.filename
             })
         else:
-            # 同步处理（保持向后兼容）
+            # sync processing (keep backward compatibility)
             result = await knowledge_service.add_document(
                 content=content_str,
                 name=title,
@@ -361,9 +361,9 @@ async def upload_document(
 
 @router.delete("/documents/{doc_id}")
 async def delete_document(doc_id: str):
-    """删除文档（兼容接口）"""
+    """delete document (backward compatibility)"""
     try:
-        # 这里暂时使用原来的RAG服务方法
+        # use original RAG service method temporarily
         result = await rag_service.delete_document(doc_id)
         
         if result.get("success"):
@@ -375,10 +375,10 @@ async def delete_document(doc_id: str):
         logger.error(f"Delete document failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# SQL解析接口
+# SQL parse interface
 @router.post("/sql/parse")
 async def parse_sql(request: SQLParseRequest):
-    """SQL解析接口"""
+    """SQL parse interface"""
     try:
         result = sql_analyzer.parse_sql(request.sql, request.dialect)
         return result
@@ -389,7 +389,7 @@ async def parse_sql(request: SQLParseRequest):
 
 @router.post("/sql/validate")
 async def validate_sql(request: SQLParseRequest):
-    """SQL语法验证接口"""
+    """SQL syntax validation interface"""
     try:
         result = sql_analyzer.validate_sql_syntax(request.sql, request.dialect)
         return result
@@ -404,7 +404,7 @@ async def convert_sql_dialect(
     from_dialect: str,
     to_dialect: str
 ):
-    """SQL方言转换接口"""
+    """SQL dialect conversion interface"""
     try:
         result = sql_analyzer.convert_between_dialects(sql, from_dialect, to_dialect)
         return result
@@ -413,10 +413,10 @@ async def convert_sql_dialect(
         logger.error(f"SQL conversion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 向量搜索接口（兼容）
+# vector search interface (backward compatibility)
 @router.post("/vector/search")
 async def search_vectors(request: VectorSearchRequest):
-    """向量搜索接口"""
+    """vector search interface"""
     try:
         result = await vector_service.search_documents(
             query=request.query,
@@ -428,10 +428,10 @@ async def search_vectors(request: VectorSearchRequest):
         logger.error(f"Vector search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 图查询接口（兼容）
+# graph query interface (backward compatibility)
 @router.post("/graph/query")
 async def query_graph(request: GraphQueryRequest):
-    """图数据库查询接口"""
+    """graph database query interface"""
     try:
         result = await graph_service.execute_query(
             query=request.cypher,
@@ -445,7 +445,7 @@ async def query_graph(request: GraphQueryRequest):
 
 @router.get("/graph/nodes/{label}")
 async def get_nodes_by_label(label: str, limit: int = 100):
-    """根据标签获取节点"""
+    """get nodes by label"""
     try:
         query = f"MATCH (n:{label}) RETURN n LIMIT $limit"
         result = await graph_service.execute_query(query, {"limit": limit})
@@ -457,7 +457,7 @@ async def get_nodes_by_label(label: str, limit: int = 100):
 
 @router.get("/graph/relationships/{rel_type}")
 async def get_relationships_by_type(rel_type: str, limit: int = 100):
-    """根据类型获取关系"""
+    """get relationships by type"""
     try:
         query = f"MATCH ()-[r:{rel_type}]-() RETURN r LIMIT $limit"
         result = await graph_service.execute_query(query, {"limit": limit})
@@ -467,10 +467,10 @@ async def get_relationships_by_type(rel_type: str, limit: int = 100):
         logger.error(f"Get relationships failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 统计接口
+# statistics interface
 @router.get("/stats")
 async def get_knowledge_stats():
-    """获取知识库统计信息"""
+    """get knowledge base statistics"""
     try:
         result = await knowledge_service.get_statistics()
         return result
@@ -481,7 +481,7 @@ async def get_knowledge_stats():
 
 @router.get("/stats/vector")
 async def get_vector_stats():
-    """获取向量数据库统计"""
+    """get vector database statistics"""
     try:
         result = await vector_service.get_collection_stats()
         return result
@@ -492,7 +492,7 @@ async def get_vector_stats():
 
 @router.get("/stats/graph")
 async def get_graph_stats():
-    """获取图数据库统计"""
+    """get graph database statistics"""
     try:
         result = await graph_service.get_database_stats()
         return result
@@ -501,10 +501,10 @@ async def get_graph_stats():
         logger.error(f"Get graph stats failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 管理接口
+# management interface
 @router.delete("/knowledge/clear")
 async def clear_knowledge_base():
-    """清空知识库"""
+    """clear knowledge base"""
     try:
         result = await knowledge_service.clear_knowledge_base()
         return result
@@ -513,10 +513,10 @@ async def clear_knowledge_base():
         logger.error(f"Clear knowledge base failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 配置接口
+# configuration interface
 @router.get("/config")
 async def get_system_config():
-    """获取系统配置"""
+    """get system configuration"""
     try:
         return {
             "milvus_host": settings.milvus_host,

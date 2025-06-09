@@ -1,6 +1,6 @@
 """
-FastAPI应用配置模块
-负责创建和配置FastAPI应用实例
+FastAPI application configuration module
+Responsible for creating and configuring FastAPI application instance
 """
 
 from fastapi import FastAPI
@@ -17,33 +17,33 @@ from .lifespan import lifespan
 
 
 def create_app() -> FastAPI:
-    """创建FastAPI应用实例"""
+    """create FastAPI application instance"""
     
     app = FastAPI(
         title=settings.app_name,
-        description="基于FastAPI的代码知识图谱服务，集成SQL解析、向量检索、图查询和RAG功能",
+        description="Code Graph Knowledge Service based on FastAPI, integrated SQL parsing, vector search, graph query and RAG functionality",
         version=settings.app_version,
         lifespan=lifespan,
         docs_url="/docs" if settings.debug else None,
         redoc_url="/redoc" if settings.debug else None
     )
     
-    # 设置中间件
+    # set middleware
     setup_middleware(app)
     
-    # 设置异常处理器
+    # set exception handler
     setup_exception_handlers(app)
     
-    # 设置路由
+    # set routes
     setup_routes(app)
     
-    # 静态文件服务
+    # static file service
     app.mount("/static", StaticFiles(directory="static"), name="static")
     
-    # 根路径
+    # root path
     @app.get("/")
     async def root():
-        """根路径接口"""
+        """root path interface"""
         return {
             "message": "Welcome to Code Graph Knowledge Service",
             "version": settings.app_version,
@@ -52,10 +52,10 @@ def create_app() -> FastAPI:
             "task_monitor": "/static/index.html"
         }
     
-    # 系统信息接口
+    # system information interface
     @app.get("/info")
     async def system_info():
-        """系统信息接口"""
+        """system information interface"""
         import sys
         return {
             "app_name": settings.app_name,

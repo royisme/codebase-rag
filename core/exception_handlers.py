@@ -1,5 +1,5 @@
 """
-异常处理器模块
+Exception handler module
 """
 
 from fastapi import FastAPI, HTTPException
@@ -10,11 +10,11 @@ from config import settings
 
 
 def setup_exception_handlers(app: FastAPI) -> None:
-    """设置异常处理器"""
+    """set exception handler"""
     
     @app.exception_handler(Exception)
     async def global_exception_handler(request, exc):
-        """全局异常处理器"""
+        """global exception handler"""
         logger.error(f"Global exception: {exc}")
         return JSONResponse(
             status_code=500,
@@ -26,7 +26,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
     
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request, exc):
-        """HTTP异常处理器"""
+        """HTTP exception handler"""
         logger.warning(f"HTTP exception: {exc.status_code} - {exc.detail}")
         return JSONResponse(
             status_code=exc.status_code,

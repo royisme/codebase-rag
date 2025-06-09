@@ -6,14 +6,14 @@ from loguru import logger
 from .base import DataLoader, DataSource, DataSourceType
 
 class FileLoader(DataLoader):
-    """通用文件加载器"""
+    """generic file loader"""
     
     def can_handle(self, data_source: DataSource) -> bool:
-        """判断是否能处理该数据源"""
+        """check if can handle the data source"""
         return data_source.source_path is not None
     
     async def load(self, data_source: DataSource) -> str:
-        """加载文件内容"""
+        """load file content"""
         if not data_source.source_path:
             raise ValueError("source_path is required for FileLoader")
         
@@ -23,7 +23,7 @@ class FileLoader(DataLoader):
                 logger.info(f"Successfully loaded file: {data_source.source_path}")
                 return content
         except UnicodeDecodeError:
-            # 尝试其他编码
+            # try other encodings
             try:
                 async with aiofiles.open(data_source.source_path, 'r', encoding='gbk') as file:
                     content = await file.read()
@@ -34,14 +34,14 @@ class FileLoader(DataLoader):
                 raise
 
 class ContentLoader(DataLoader):
-    """内容加载器（直接从内容字段加载）"""
+    """content loader (load directly from content field)"""
     
     def can_handle(self, data_source: DataSource) -> bool:
-        """判断是否能处理该数据源"""
+        """check if can handle the data source"""
         return data_source.content is not None
     
     async def load(self, data_source: DataSource) -> str:
-        """直接返回内容"""
+        """return content directly"""
         if not data_source.content:
             raise ValueError("content is required for ContentLoader")
         
@@ -49,10 +49,10 @@ class ContentLoader(DataLoader):
         return data_source.content
 
 class DocumentLoader(DataLoader):
-    """文档加载器（支持PDF、Word等）"""
+    """document loader (supports PDF, Word, etc.)"""
     
     def can_handle(self, data_source: DataSource) -> bool:
-        """判断是否能处理该数据源"""
+        """check if can handle the data source"""
         if data_source.type != DataSourceType.DOCUMENT:
             return False
         
@@ -64,19 +64,19 @@ class DocumentLoader(DataLoader):
         return path.suffix.lower() in supported_extensions
     
     async def load(self, data_source: DataSource) -> str:
-        """加载文档内容"""
+        """load document content"""
         path = Path(data_source.source_path)
         extension = path.suffix.lower()
         
         try:
             if extension in ['.md', '.markdown', '.txt']:
-                # 纯文本文件
+                # pure text file
                 return await self._load_text_file(data_source.source_path)
             elif extension == '.pdf':
-                # PDF文件
+                # PDF file
                 return await self._load_pdf_file(data_source.source_path)
             elif extension in ['.docx', '.doc']:
-                # Word文件
+                # Word file
                 return await self._load_word_file(data_source.source_path)
             else:
                 raise ValueError(f"Unsupported document type: {extension}")
@@ -86,14 +86,14 @@ class DocumentLoader(DataLoader):
             raise
     
     async def _load_text_file(self, file_path: str) -> str:
-        """加载纯文本文件"""
+        """load pure text file"""
         async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
             return await file.read()
     
     async def _load_pdf_file(self, file_path: str) -> str:
-        """加载PDF文件"""
+        """load PDF file"""
         try:
-            # 需要安装 PyPDF2 或 pdfplumber
+            # need to install PyPDF2 or pdfplumber
             import PyPDF2
             
             with open(file_path, 'rb') as file:
@@ -116,7 +116,7 @@ class DocumentLoader(DataLoader):
                 raise ImportError("Please install PyPDF2 or pdfplumber to handle PDF files")
     
     async def _load_word_file(self, file_path: str) -> str:
-        """加载Word文件"""
+        """load Word file"""
         try:
             import python_docx
             
@@ -129,10 +129,10 @@ class DocumentLoader(DataLoader):
             raise ImportError("Please install python-docx to handle Word files")
 
 class CodeLoader(DataLoader):
-    """代码文件加载器"""
+    """code file loader"""
     
     def can_handle(self, data_source: DataSource) -> bool:
-        """判断是否能处理该数据源"""
+        """check if can handle the data source"""
         if data_source.type != DataSourceType.CODE:
             return False
             
@@ -144,12 +144,12 @@ class CodeLoader(DataLoader):
         return path.suffix.lower() in supported_extensions
     
     async def load(self, data_source: DataSource) -> str:
-        """加载代码文件"""
+        """load code file"""
         try:
             async with aiofiles.open(data_source.source_path, 'r', encoding='utf-8') as file:
                 content = await file.read()
                 
-            # 添加代码特有的元数据
+            # add code specific metadata
             path = Path(data_source.source_path)
             data_source.metadata.update({
                 "language": self._detect_language(path.suffix),
@@ -165,7 +165,7 @@ class CodeLoader(DataLoader):
             raise
     
     def _detect_language(self, extension: str) -> str:
-        """根据文件扩展名检测编程语言"""
+        """detect programming language from file extension"""
         language_map = {
             '.py': 'python',
             '.js': 'javascript',
@@ -183,10 +183,10 @@ class CodeLoader(DataLoader):
         return language_map.get(extension.lower(), 'unknown')
 
 class SQLLoader(DataLoader):
-    """SQL文件加载器"""
+    """SQL file loader"""
     
     def can_handle(self, data_source: DataSource) -> bool:
-        """判断是否能处理该数据源"""
+        """check if can handle the data source"""
         if data_source.type != DataSourceType.SQL:
             return False
             
@@ -194,11 +194,11 @@ class SQLLoader(DataLoader):
             path = Path(data_source.source_path)
             return path.suffix.lower() in ['.sql', '.ddl']
         
-        # 也可以处理直接的SQL内容
+        # can also handle direct SQL content
         return data_source.content is not None
     
     async def load(self, data_source: DataSource) -> str:
-        """加载SQL文件或内容"""
+        """load SQL file or content"""
         if data_source.source_path:
             try:
                 async with aiofiles.open(data_source.source_path, 'r', encoding='utf-8') as file:
@@ -215,19 +215,19 @@ class SQLLoader(DataLoader):
             raise ValueError("Either source_path or content is required for SQLLoader")
 
 class LoaderRegistry:
-    """加载器注册表"""
+    """loader registry"""
     
     def __init__(self):
         self.loaders = [
             DocumentLoader(),
             CodeLoader(),
             SQLLoader(),
-            FileLoader(),      # 通用文件加载器作为后备
-            ContentLoader(),   # 内容加载器作为最后的后备
+            FileLoader(),      # generic file loader as fallback
+            ContentLoader(),   # content loader as last fallback
         ]
     
     def get_loader(self, data_source: DataSource) -> DataLoader:
-        """根据数据源获取合适的加载器"""
+        """get suitable loader based on data source"""
         for loader in self.loaders:
             if loader.can_handle(data_source):
                 return loader
@@ -235,8 +235,8 @@ class LoaderRegistry:
         raise ValueError(f"No suitable loader found for data source: {data_source.name}")
     
     def add_loader(self, loader: DataLoader):
-        """添加自定义加载器"""
-        self.loaders.insert(0, loader)  # 新加载器优先级最高
+        """add custom loader"""
+        self.loaders.insert(0, loader)  # new loader has highest priority
 
-# 全局加载器注册表实例
+# global loader registry instance
 loader_registry = LoaderRegistry() 

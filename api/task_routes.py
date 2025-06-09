@@ -1,6 +1,6 @@
 """
-任务管理API路由
-提供任务队列的REST API接口
+Task management API routes
+Provide REST API interface for task queue
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -15,7 +15,7 @@ from loguru import logger
 
 router = APIRouter(prefix="/tasks", tags=["Task Management"])
 
-# 请求模型
+# request model
 class CreateTaskRequest(BaseModel):
     task_type: str
     task_name: str
@@ -49,13 +49,13 @@ class TaskStatsResponse(BaseModel):
     failed_tasks: int
     cancelled_tasks: int
 
-# API端点
+# API endpoints
 
 @router.post("/", response_model=Dict[str, str])
 async def create_task(request: CreateTaskRequest):
-    """创建新任务"""
+    """create new task"""
     try:
-        # 验证任务类型
+        # validate task type
         valid_task_types = ["document_processing", "schema_parsing", "knowledge_graph_construction", "batch_processing"]
         if request.task_type not in valid_task_types:
             raise HTTPException(
@@ -63,12 +63,12 @@ async def create_task(request: CreateTaskRequest):
                 detail=f"Invalid task type. Must be one of: {', '.join(valid_task_types)}"
             )
         
-        # 准备任务参数
+        # prepare task parameters
         task_kwargs = request.payload.copy()
         if request.metadata:
             task_kwargs.update(request.metadata)
         
-        # 根据任务类型选择处理函数
+        # select processing function based on task type
         task_func = None
         if request.task_type == "document_processing":
             from services.task_processors import process_document_task
@@ -86,7 +86,7 @@ async def create_task(request: CreateTaskRequest):
         if not task_func:
             raise HTTPException(status_code=400, detail="Task processor not found")
         
-        # 提交任务
+        # submit task
         task_id = await task_queue.submit_task(
             task_func=task_func,
             task_kwargs=task_kwargs,
@@ -105,18 +105,18 @@ async def create_task(request: CreateTaskRequest):
 
 @router.get("/{task_id}", response_model=TaskResponse)
 async def get_task_status(task_id: str):
-    """获取任务状态"""
+    """get task status"""
     try:
-        # 先从内存中获取
+        # first get from memory
         task_result = task_queue.get_task_status(task_id)
         
         if not task_result:
-            # 从存储中获取
+            # get from storage
             stored_task = await task_queue.get_task_from_storage(task_id)
             if not stored_task:
                 raise HTTPException(status_code=404, detail="Task not found")
             
-            # 转换为TaskResponse格式
+            # convert to TaskResponse format
             return TaskResponse(
                 task_id=stored_task.id,
                 status=stored_task.status.value,
@@ -156,9 +156,9 @@ async def list_tasks(
     page_size: int = Query(20, ge=1, le=100, description="Page size"),
     task_type: Optional[str] = Query(None, description="Filter by task type")
 ):
-    """获取任务列表"""
+    """get task list"""
     try:
-        # 验证状态参数
+        # validate status parameter
         status_filter = None
         if status:
             try:
@@ -169,15 +169,15 @@ async def list_tasks(
                     detail=f"Invalid status. Must be one of: {', '.join([s.value for s in TaskStatus])}"
                 )
         
-        # 获取任务列表
+        # get task list
         tasks = task_queue.get_all_tasks(status_filter=status_filter, limit=page_size * 10)
         
-        # 应用分页
+        # apply pagination
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
         paginated_tasks = tasks[start_idx:end_idx]
         
-        # 转换为响应格式
+        # convert to response format
         task_responses = []
         for task in paginated_tasks:
             task_responses.append(TaskResponse(
@@ -208,7 +208,7 @@ async def list_tasks(
 
 @router.delete("/{task_id}")
 async def cancel_task(task_id: str):
-    """取消任务"""
+    """cancel task"""
     try:
         success = await task_queue.cancel_task(task_id)
         
@@ -226,7 +226,7 @@ async def cancel_task(task_id: str):
 
 @router.get("/stats/overview", response_model=TaskStatsResponse)
 async def get_task_stats():
-    """获取任务统计信息"""
+    """get task statistics"""
     try:
         all_tasks = task_queue.get_all_tasks(limit=1000)
         
@@ -247,16 +247,16 @@ async def get_task_stats():
 
 @router.post("/{task_id}/retry")
 async def retry_task(task_id: str):
-    """重试失败的任务"""
+    """retry failed task"""
     try:
-        # 获取任务信息
+        # get task information
         task_result = task_queue.get_task_status(task_id)
         if not task_result:
             stored_task = await task_queue.get_task_from_storage(task_id)
             if not stored_task:
                 raise HTTPException(status_code=404, detail="Task not found")
         
-        # 检查任务状态
+        # check task status
         current_status = task_result.status if task_result else TaskStatus(stored_task.status)
         if current_status not in [TaskStatus.FAILED, TaskStatus.CANCELLED]:
             raise HTTPException(
@@ -264,12 +264,12 @@ async def retry_task(task_id: str):
                 detail="Only failed or cancelled tasks can be retried"
             )
         
-        # 重新提交任务
+        # resubmit task
         metadata = task_result.metadata if task_result else stored_task.payload
         task_name = metadata.get("task_name", "Retried Task")
         task_type = metadata.get("task_type", "unknown")
         
-        # 根据任务类型选择处理函数
+        # select processing function based on task type
         task_func = None
         if task_type == "document_processing":
             from services.task_processors import process_document_task
@@ -307,7 +307,7 @@ async def retry_task(task_id: str):
 
 @router.get("/queue/status")
 async def get_queue_status():
-    """获取队列状态"""
+    """get queue status"""
     try:
         running_tasks = len(task_queue.running_tasks)
         max_concurrent = task_queue.max_concurrent_tasks

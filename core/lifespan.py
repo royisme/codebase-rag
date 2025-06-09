@@ -1,5 +1,5 @@
 """
-应用生命周期管理模块
+Application lifecycle management module
 """
 
 from contextlib import asynccontextmanager
@@ -13,11 +13,11 @@ from services.task_processors import processor_registry
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
+    """application lifecycle management"""
     logger.info("Starting Code Graph Knowledge Service...")
     
     try:
-        # 初始化服务
+        # initialize services
         await initialize_services()
         
         yield
@@ -26,40 +26,40 @@ async def lifespan(app: FastAPI):
         logger.error(f"Service initialization failed: {e}")
         raise
     finally:
-        # 清理资源
+        # clean up resources
         await cleanup_services()
 
 
 async def initialize_services():
-    """初始化所有服务"""
+    """initialize all services"""
     
-    # 初始化 Neo4j 知识图谱服务
+    # initialize Neo4j knowledge graph service
     logger.info("Initializing Neo4j Knowledge Service...")
     if not await neo4j_knowledge_service.initialize():
         logger.error("Failed to initialize Neo4j Knowledge Service")
         raise RuntimeError("Neo4j service initialization failed")
     logger.info("Neo4j Knowledge Service initialized successfully")
     
-    # 初始化任务处理器
+    # initialize task processors
     logger.info("Initializing Task Processors...")
     processor_registry.initialize_default_processors(neo4j_knowledge_service)
     logger.info("Task Processors initialized successfully")
     
-    # 初始化任务队列
+    # initialize task queue
     logger.info("Initializing Task Queue...")
     await task_queue.start()
     logger.info("Task Queue initialized successfully")
 
 
 async def cleanup_services():
-    """清理所有服务"""
+    """clean up all services"""
     logger.info("Shutting down services...")
     
     try:
-        # 停止任务队列
+        # stop task queue
         await task_queue.stop()
         
-        # 关闭Neo4j服务
+        # close Neo4j service
         await neo4j_knowledge_service.close()
         
         logger.info("Services shut down successfully")

@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 """
-MCP服务器启动脚本
-提供知识图谱查询服务给AI使用
+MCP server for knowledge graph
+Provide knowledge graph query service for AI
 """
 
 import sys
-import asyncio
 from pathlib import Path
 from loguru import logger
 
-# 添加项目根目录到Python路径
+# add project root to Python path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 def check_dependencies():
-    """检查必要的依赖"""
+    """check necessary dependencies"""
     required_packages = [
         "fastmcp",
         "neo4j", 
@@ -41,12 +40,12 @@ def check_dependencies():
     return True
 
 def check_services():
-    """检查必要的服务"""
+    """check necessary services"""
     from config import validate_neo4j_connection, validate_ollama_connection
     
     logger.info("Checking service connections...")
     
-    # 检查Neo4j连接
+    # check Neo4j connection
     if validate_neo4j_connection():
         logger.info("✓ Neo4j connection successful")
     else:
@@ -54,7 +53,7 @@ def check_services():
         logger.error("Please ensure Neo4j is running and accessible")
         return False
     
-    # 检查Ollama连接
+    # check Ollama connection
     if validate_ollama_connection():
         logger.info("✓ Ollama connection successful")
     else:
@@ -65,7 +64,7 @@ def check_services():
     return True
 
 def print_mcp_info():
-    """打印MCP服务器信息"""
+    """print MCP server info"""
     from config import settings
     
     logger.info("=" * 60)
@@ -114,30 +113,30 @@ def print_mcp_info():
     logger.info("=" * 60)
 
 def main():
-    """主函数"""
+    """main function"""
     logger.info("Starting Knowledge Graph MCP Server...")
     
-    # 检查依赖
+    # check dependencies
     if not check_dependencies():
         logger.error("Dependency check failed. Exiting.")
         sys.exit(1)
     
-    # 检查服务
+    # check services
     if not check_services():
         logger.error("Service check failed. Exiting.")
         sys.exit(1)
     
-    # 打印服务信息
+    # print service info
     print_mcp_info()
     
-    # 启动MCP服务器
+    # start MCP server
     try:
         logger.info("Starting MCP server...")
         logger.info("The server will run in STDIO mode for MCP client connections")
         logger.info("To test the server, run: python test_mcp_client.py")
         logger.info("Press Ctrl+C to stop the server")
         
-        # 导入并运行MCP服务器
+        # import and run MCP server
         from mcp_server import mcp
         mcp.run()
         

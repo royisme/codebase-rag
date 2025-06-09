@@ -1,6 +1,6 @@
 """
-WebSocket路由
-提供实时任务状态更新
+WebSocket routes
+Provide real-time task status updates
 """
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -14,25 +14,25 @@ from services.task_queue import task_queue
 router = APIRouter()
 
 class ConnectionManager:
-    """WebSocket连接管理器"""
+    """WebSocket connection manager"""
     
     def __init__(self):
         self.active_connections: List[WebSocket] = []
     
     async def connect(self, websocket: WebSocket):
-        """接受WebSocket连接"""
+        """accept WebSocket connection"""
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
     
     def disconnect(self, websocket: WebSocket):
-        """断开WebSocket连接"""
+        """disconnect WebSocket connection"""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
     
     async def send_personal_message(self, message: str, websocket: WebSocket):
-        """发送个人消息"""
+        """send personal message"""
         try:
             await websocket.send_text(message)
         except Exception as e:
@@ -40,7 +40,7 @@ class ConnectionManager:
             self.disconnect(websocket)
     
     async def broadcast(self, message: str):
-        """广播消息给所有连接"""
+        """broadcast message to all connections"""
         disconnected = []
         for connection in self.active_connections:
             try:
@@ -49,32 +49,32 @@ class ConnectionManager:
                 logger.error(f"Failed to broadcast message: {e}")
                 disconnected.append(connection)
         
-        # 清理断开的连接
+        # clean up disconnected connections
         for connection in disconnected:
             self.disconnect(connection)
 
-# 全局连接管理器
+# global connection manager
 manager = ConnectionManager()
 
 @router.websocket("/ws/tasks")
 async def websocket_endpoint(websocket: WebSocket):
-    """任务状态WebSocket端点"""
+    """task status WebSocket endpoint"""
     await manager.connect(websocket)
     
     try:
-        # 发送初始数据
+        # send initial data
         await send_initial_data(websocket)
         
-        # 启动定期更新任务
+        # start periodic update task
         update_task = asyncio.create_task(periodic_updates(websocket))
         
-        # 监听客户端消息
+        # listen to client messages
         while True:
             try:
                 data = await websocket.receive_text()
                 message = json.loads(data)
                 
-                # 处理客户端请求
+                # handle client requests
                 await handle_client_message(websocket, message)
                 
             except WebSocketDisconnect:
@@ -96,22 +96,22 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
     finally:
-        # 取消更新任务
+        # cancel update task
         if 'update_task' in locals():
             update_task.cancel()
         manager.disconnect(websocket)
 
 async def send_initial_data(websocket: WebSocket):
-    """发送初始数据"""
+    """send initial data"""
     try:
-        # 发送任务统计
+        # send task statistics
         stats = await get_task_stats()
         await manager.send_personal_message(
             json.dumps({"type": "stats", "data": stats}),
             websocket
         )
         
-        # 发送任务列表
+        # send task list
         tasks = task_queue.get_all_tasks(limit=50)
         task_data = [format_task_for_ws(task) for task in tasks]
         await manager.send_personal_message(
@@ -119,7 +119,7 @@ async def send_initial_data(websocket: WebSocket):
             websocket
         )
         
-        # 发送队列状态
+        # send queue status
         queue_status = {
             "running_tasks": len(task_queue.running_tasks),
             "max_concurrent_tasks": task_queue.max_concurrent_tasks,
@@ -134,19 +134,19 @@ async def send_initial_data(websocket: WebSocket):
         logger.error(f"Failed to send initial data: {e}")
 
 async def periodic_updates(websocket: WebSocket):
-    """定期发送更新"""
+    """periodic updates"""
     try:
         while True:
-            await asyncio.sleep(3)  # 每3秒更新一次
+            await asyncio.sleep(3)  # update every 3 seconds
             
-            # 发送统计更新
+            # send statistics update
             stats = await get_task_stats()
             await manager.send_personal_message(
                 json.dumps({"type": "stats_update", "data": stats}),
                 websocket
             )
             
-            # 发送正在处理的任务进度更新
+            # send processing task progress update
             processing_tasks = task_queue.get_all_tasks(status_filter=None, limit=100)
             processing_tasks = [t for t in processing_tasks if t.status.value == 'processing']
             
@@ -163,11 +163,11 @@ async def periodic_updates(websocket: WebSocket):
         logger.error(f"Error in periodic updates: {e}")
 
 async def handle_client_message(websocket: WebSocket, message: dict):
-    """处理客户端消息"""
+    """handle client messages"""
     message_type = message.get("type")
     
     if message_type == "get_tasks":
-        # 获取任务列表
+        # get task list
         status_filter = message.get("status_filter")
         limit = message.get("limit", 50)
         
@@ -188,7 +188,7 @@ async def handle_client_message(websocket: WebSocket, message: dict):
         )
     
     elif message_type == "get_task_detail":
-        # 获取任务详情
+        # get task detail
         task_id = message.get("task_id")
         if task_id:
             task_result = task_queue.get_task_status(task_id)
@@ -205,16 +205,16 @@ async def handle_client_message(websocket: WebSocket, message: dict):
                 )
     
     elif message_type == "subscribe_task":
-        # 订阅特定任务的更新
+        # subscribe to specific task updates
         task_id = message.get("task_id")
-        # 这里可以实现特定任务的订阅逻辑
+        # here you can implement specific task subscription logic
         await manager.send_personal_message(
             json.dumps({"type": "subscribed", "task_id": task_id}),
             websocket
         )
 
 async def get_task_stats():
-    """获取任务统计信息"""
+    """get task statistics"""
     try:
         all_tasks = task_queue.get_all_tasks(limit=1000)
         
@@ -241,7 +241,7 @@ async def get_task_stats():
         }
 
 def format_task_for_ws(task_result):
-    """格式化任务数据用于WebSocket传输"""
+    """format task data for WebSocket transmission"""
     return {
         "task_id": task_result.task_id,
         "status": task_result.status.value,
@@ -254,9 +254,9 @@ def format_task_for_ws(task_result):
         "metadata": task_result.metadata
     }
 
-# 任务状态变化通知函数
+# task status change notification function
 async def notify_task_status_change(task_id: str, status: str, progress: float = None):
-    """通知任务状态变化"""
+    """notify task status change"""
     try:
         task_result = task_queue.get_task_status(task_id)
         if task_result:

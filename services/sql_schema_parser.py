@@ -1,6 +1,6 @@
 """
-SQL Schema 解析服务
-专门用于解析 ws_dundas 项目的数据库 schema 信息
+SQL Schema parser service
+used to parse database schema information for SQL dump file
 """
 
 import re
@@ -10,7 +10,7 @@ from loguru import logger
 
 @dataclass
 class ColumnInfo:
-    """列信息"""
+    """column information"""
     name: str
     data_type: str
     nullable: bool = True
@@ -23,7 +23,7 @@ class ColumnInfo:
 
 @dataclass
 class TableInfo:
-    """表信息"""
+    """table information"""
     schema_name: str
     table_name: str
     columns: List[ColumnInfo]
@@ -35,23 +35,23 @@ class TableInfo:
             self.foreign_keys = []
 
 class SQLSchemaParser:
-    """SQL Schema 解析器"""
+    """SQL Schema parser"""
     
     def __init__(self):
         self.tables: Dict[str, TableInfo] = {}
         
     def parse_schema_file(self, file_path: str) -> Dict[str, Any]:
-        """解析SQL schema文件"""
+        """parse SQL schema file"""
         logger.info(f"Parsing SQL schema file: {file_path}")
         
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # 分析内容
+            # analyze content
             self._parse_content(content)
             
-            # 生成分析报告
+            # generate analysis report
             analysis = self._generate_analysis()
             
             logger.success(f"Successfully parsed {len(self.tables)} tables")
@@ -62,11 +62,11 @@ class SQLSchemaParser:
             raise
     
     def _parse_content(self, content: str):
-        """解析SQL内容"""
-        # 清理内容，移除注释
+        """parse SQL content"""
+        # clean content, remove comments
         content = self._clean_sql_content(content)
         
-        # 分割为语句
+        # split into statements
         statements = self._split_statements(content)
         
         for statement in statements:
@@ -89,17 +89,17 @@ class SQLSchemaParser:
         return content
     
     def _split_statements(self, content: str) -> List[str]:
-        """分割SQL语句"""
-        # 按照 / 分割语句（Oracle风格）
+        """split SQL statements"""
+        # split by / (Oracle style)
         statements = content.split('/')
         
-        # 清理空语句
+        # clean empty statements
         return [stmt.strip() for stmt in statements if stmt.strip()]
     
     def _parse_create_table(self, statement: str):
-        """解析CREATE TABLE语句"""
+        """parse CREATE TABLE statement"""
         try:
-            # 提取表名
+            # extract table name
             table_match = re.search(r'create\s+table\s+(\w+)\.(\w+)', statement, re.IGNORECASE)
             if not table_match:
                 return
@@ -107,7 +107,7 @@ class SQLSchemaParser:
             schema_name = table_match.group(1)
             table_name = table_match.group(2)
             
-            # 提取列定义
+            # extract column definitions
             columns_section = re.search(r'\((.*)\)', statement, re.DOTALL)
             if not columns_section:
                 return
@@ -115,7 +115,7 @@ class SQLSchemaParser:
             columns_text = columns_section.group(1)
             columns = self._parse_columns(columns_text)
             
-            # 创建表信息
+            # create table information
             table_info = TableInfo(
                 schema_name=schema_name,
                 table_name=table_name,
@@ -130,10 +130,10 @@ class SQLSchemaParser:
             logger.warning(f"Failed to parse CREATE TABLE statement: {e}")
     
     def _parse_columns(self, columns_text: str) -> List[ColumnInfo]:
-        """解析列定义"""
+        """parse column definitions"""
         columns = []
         
-        # 分割列定义
+        # split column definitions
         column_lines = self._split_column_definitions(columns_text)
         
         for line in column_lines:
@@ -148,7 +148,7 @@ class SQLSchemaParser:
         return columns
     
     def _split_column_definitions(self, columns_text: str) -> List[str]:
-        """分割列定义"""
+        """split column definitions"""
         lines = []
         current_line = ""
         paren_count = 0
@@ -160,7 +160,7 @@ class SQLSchemaParser:
             elif char == ')':
                 paren_count -= 1
             elif char == ',' and paren_count == 0:
-                lines.append(current_line[:-1])  # 移除逗号
+                lines.append(current_line[:-1])  # remove comma
                 current_line = ""
         
         if current_line.strip():
@@ -169,9 +169,9 @@ class SQLSchemaParser:
         return lines
     
     def _parse_single_column(self, line: str) -> Optional[ColumnInfo]:
-        """解析单个列定义"""
+        """parse single column definition"""
         try:
-            # 基本模式：列名 数据类型 [约束...]
+            # basic pattern: column name data type [constraints...]
             parts = line.strip().split()
             if len(parts) < 2:
                 return None
@@ -179,16 +179,16 @@ class SQLSchemaParser:
             column_name = parts[0]
             data_type = parts[1]
             
-            # 检查是否可空
+            # check if nullable
             nullable = 'not null' not in line.lower()
             
-            # 提取默认值
+            # extract default value
             default_value = None
             default_match = re.search(r'default\s+([^,\s]+)', line, re.IGNORECASE)
             if default_match:
                 default_value = default_match.group(1).strip("'\"")
             
-            # 提取约束
+            # extract constraints
             constraints = []
             if 'primary key' in line.lower():
                 constraints.append('PRIMARY KEY')
@@ -210,17 +210,17 @@ class SQLSchemaParser:
             return None
     
     def _generate_analysis(self) -> Dict[str, Any]:
-        """生成分析报告"""
-        # 按业务领域分类表
+        """generate analysis report"""
+        # categorize tables by business domains
         business_domains = self._categorize_tables()
         
-        # 统计信息
+        # statistics
         stats = {
             "total_tables": len(self.tables),
             "total_columns": sum(len(table.columns) for table in self.tables.values()),
         }
         
-        # 数据类型分析
+        # analyze data types
         data_types = self._analyze_data_types()
         
         return {
@@ -233,61 +233,61 @@ class SQLSchemaParser:
         }
     
     def _categorize_tables(self) -> Dict[str, List[str]]:
-        """按业务领域分类表"""
+        """categorize tables by business domains"""
         domains = {
-            "保单管理": [],
-            "客户管理": [],
-            "代理人管理": [],
-            "产品管理": [],
-            "基金管理": [],
-            "佣金管理": [],
-            "核保管理": [],
-            "系统管理": [],
-            "报表分析": [],
-            "其他": []
+            "policy_management": [],
+            "customer_management": [],
+            "agent_management": [],
+            "product_management": [],
+            "fund_management": [],
+            "commission_management": [],
+            "underwriting_management": [],
+            "system_management": [],
+            "report_analysis": [],
+            "other": []
         }
         
         for table_name in self.tables.keys():
             table_name_upper = table_name.upper()
             
             if any(keyword in table_name_upper for keyword in ['POLICY', 'PREMIUM']):
-                domains["保单管理"].append(table_name)
+                domains["policy_management"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['CLIENT', 'CUSTOMER']):
-                domains["客户管理"].append(table_name)
+                domains["customer_management"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['AGENT', 'ADVISOR']):
-                domains["代理人管理"].append(table_name)
+                domains["agent_management"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['PRODUCT', 'PLAN']):
-                domains["产品管理"].append(table_name)
+                domains["product_management"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['FD_', 'FUND']):
-                domains["基金管理"].append(table_name)
+                domains["fund_management"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['COMMISSION', 'COMM_']):
-                domains["佣金管理"].append(table_name)
+                domains["commission_management"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['UNDERWRITING', 'UW_', 'RATING']):
-                domains["核保管理"].append(table_name)
+                domains["underwriting_management"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['SUN_', 'REPORT', 'STAT']):
-                domains["报表分析"].append(table_name)
+                domains["report_analysis"].append(table_name)
             elif any(keyword in table_name_upper for keyword in ['TYPE_', 'CONFIG', 'PARAM', 'LOOKUP']):
-                domains["系统管理"].append(table_name)
+                domains["system_management"].append(table_name)
             else:
-                domains["其他"].append(table_name)
+                domains["other"].append(table_name)
         
-        # 移除空的域
+        # remove empty domains
         return {k: v for k, v in domains.items() if v}
     
     def _analyze_data_types(self) -> Dict[str, int]:
-        """分析数据类型分布"""
+        """analyze data type distribution"""
         type_counts = {}
         
         for table in self.tables.values():
             for column in table.columns:
-                # 提取基本数据类型
+                # extract basic data type
                 base_type = column.data_type.split('(')[0].upper()
                 type_counts[base_type] = type_counts.get(base_type, 0) + 1
         
         return dict(sorted(type_counts.items(), key=lambda x: x[1], reverse=True))
     
     def _table_to_dict(self, table: TableInfo) -> Dict[str, Any]:
-        """将表信息转换为字典"""
+        """convert table information to dictionary"""
         return {
             "schema_name": table.schema_name,
             "table_name": table.table_name,
@@ -297,7 +297,7 @@ class SQLSchemaParser:
         }
     
     def _column_to_dict(self, column: ColumnInfo) -> Dict[str, Any]:
-        """将列信息转换为字典"""
+        """convert column information to dictionary"""
         return {
             "name": column.name,
             "data_type": column.data_type,
@@ -307,34 +307,34 @@ class SQLSchemaParser:
         }
     
     def generate_documentation(self, analysis: Dict[str, Any]) -> str:
-        """生成文档"""
-        doc = f"""# {analysis['project_name']} 数据库架构文档
+        """generate documentation"""
+        doc = f"""# {analysis['project_name']} database schema documentation
 
-## 项目概述
-- **项目名称**: {analysis['project_name']}
-- **数据库Schema**: {analysis['database_schema']}
+## project overview
+- **project name**: {analysis['project_name']}
+- **database schema**: {analysis['database_schema']}
 
-## 统计信息
-- **总表数**: {analysis['statistics']['total_tables']}
-- **总列数**: {analysis['statistics']['total_columns']}
+## statistics
+- **total tables**: {analysis['statistics']['total_tables']}
+- **total columns**: {analysis['statistics']['total_columns']}
 
-## 业务领域分类
+## business domain classification
 """
         
         for domain, tables in analysis['business_domains'].items():
-            doc += f"\n### {domain} ({len(tables)}个表)\n"
-            for table in tables[:10]:  # 只显示前10个
+            doc += f"\n### {domain} ({len(tables)} tables)\n"
+            for table in tables[:10]:  # only show first 10 tables
                 doc += f"- {table}\n"
             if len(tables) > 10:
-                doc += f"- ... 还有 {len(tables) - 10} 个表\n"
+                doc += f"- ... and {len(tables) - 10} more tables\n"
         
         doc += f"""
-## 数据类型分布
+## data type distribution
 """
         for data_type, count in list(analysis['data_types'].items())[:10]:
-            doc += f"- **{data_type}**: {count} 个字段\n"
+            doc += f"- **{data_type}**: {count} fields\n"
         
         return doc
 
-# 全局解析器实例
+# global parser instance
 sql_parser = SQLSchemaParser() 

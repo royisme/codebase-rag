@@ -9,21 +9,21 @@ from config import settings
 import numpy as np
 
 class VectorSearchResult(BaseModel):
-    """向量搜索结果模型"""
+    """vector search result model"""
     id: str
     content: str
     score: float
     metadata: Dict[str, Any] = {}
 
 class VectorDocument(BaseModel):
-    """向量文档模型"""
+    """vector document model"""
     id: str
     content: str
     embedding: List[float]
     metadata: Dict[str, Any] = {}
 
 class MilvusVectorService:
-    """Milvus向量服务"""
+    """Milvus vector service"""
     
     def __init__(self):
         self.connection_alias = "default"
@@ -33,7 +33,7 @@ class MilvusVectorService:
         self._connected = False
     
     async def connect(self) -> bool:
-        """连接到Milvus服务"""
+        """connect to Milvus service"""
         try:
             connections.connect(
                 alias=self.connection_alias,
@@ -43,7 +43,7 @@ class MilvusVectorService:
             self._connected = True
             logger.info(f"Successfully connected to Milvus at {settings.milvus_host}:{settings.milvus_port}")
             
-            # 初始化集合
+            # initialize collection
             await self._init_collection()
             return True
         except Exception as e:
@@ -51,17 +51,17 @@ class MilvusVectorService:
             return False
     
     async def _init_collection(self):
-        """初始化Milvus集合"""
+        """initialize Milvus collection"""
         try:
-            # 检查集合是否存在
+            # check if collection exists
             if utility.has_collection(self.collection_name):
                 self.collection = Collection(self.collection_name)
                 logger.info(f"Collection {self.collection_name} already exists")
             else:
-                # 创建新集合
+                # create new collection
                 await self._create_collection()
             
-            # 加载集合到内存
+            # load collection into memory
             self.collection.load()
             logger.info(f"Collection {self.collection_name} loaded into memory")
             
@@ -70,9 +70,9 @@ class MilvusVectorService:
             raise
     
     async def _create_collection(self):
-        """创建Milvus集合"""
+        """create Milvus collection"""
         try:
-            # 定义字段schema
+            # define field schema
             fields = [
                 FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
                 FieldSchema(name="content", dtype=DataType.VARCHAR, max_length=65535),
@@ -80,19 +80,19 @@ class MilvusVectorService:
                 FieldSchema(name="metadata_json", dtype=DataType.VARCHAR, max_length=65535),
             ]
             
-            # 创建集合schema
+            # create collection schema
             schema = CollectionSchema(
                 fields=fields,
                 description="Code knowledge vector collection"
             )
             
-            # 创建集合
+            # create collection
             self.collection = Collection(
                 name=self.collection_name,
                 schema=schema
             )
             
-            # 创建索引
+            # create index
             index_params = {
                 "metric_type": "COSINE",
                 "index_type": "IVF_FLAT",
@@ -110,22 +110,22 @@ class MilvusVectorService:
             raise
     
     async def insert_documents(self, documents: List[VectorDocument]) -> Dict[str, Any]:
-        """插入文档到向量数据库"""
+        """insert documents into vector database"""
         if not self._connected or not self.collection:
             raise Exception("Not connected to Milvus or collection not initialized")
         
         try:
-            # 准备数据
+            # prepare data
             ids = [doc.id for doc in documents]
             contents = [doc.content for doc in documents]
             embeddings = [doc.embedding for doc in documents]
             metadata_jsons = [str(doc.metadata) for doc in documents]
             
-            # 插入数据
+            # insert data
             entities = [ids, contents, embeddings, metadata_jsons]
             insert_result = self.collection.insert(entities)
             
-            # 刷新集合以确保数据持久化
+            # flush collection to ensure data persistence
             self.collection.flush()
             
             logger.info(f"Successfully inserted {len(documents)} documents")
@@ -148,20 +148,20 @@ class MilvusVectorService:
         top_k: int = None,
         filters: Optional[str] = None
     ) -> List[VectorSearchResult]:
-        """向量相似度搜索"""
+        """vector similarity search"""
         if not self._connected or not self.collection:
             raise Exception("Not connected to Milvus or collection not initialized")
         
         top_k = top_k or settings.top_k
         
         try:
-            # 搜索参数
+            # search parameters
             search_params = {
                 "metric_type": "COSINE",
                 "params": {"nprobe": 10}
             }
             
-            # 执行搜索
+            # execute search
             results = self.collection.search(
                 data=[query_embedding],
                 anns_field="embedding",
@@ -171,7 +171,7 @@ class MilvusVectorService:
                 expr=filters
             )
             
-            # 处理结果
+            # process results
             search_results = []
             for hits in results:
                 for hit in hits:
@@ -191,15 +191,15 @@ class MilvusVectorService:
             return []
     
     async def delete_documents(self, ids: List[str]) -> Dict[str, Any]:
-        """删除文档"""
+        """delete documents"""
         if not self._connected or not self.collection:
             raise Exception("Not connected to Milvus or collection not initialized")
         
         try:
-            # 构建删除表达式
+            # build delete expression
             id_expr = f"id in {ids}"
             
-            # 执行删除
+            # execute delete
             self.collection.delete(id_expr)
             self.collection.flush()
             
@@ -217,7 +217,7 @@ class MilvusVectorService:
             }
     
     async def get_collection_stats(self) -> Dict[str, Any]:
-        """获取集合统计信息"""
+        """get collection statistics"""
         if not self._connected or not self.collection:
             return {"error": "Not connected"}
         
@@ -233,14 +233,14 @@ class MilvusVectorService:
             return {"error": str(e)}
     
     async def update_document(self, document: VectorDocument) -> Dict[str, Any]:
-        """更新文档（先删除再插入）"""
+        """update document (delete old one and insert new one)"""
         try:
-            # 先删除旧文档
+            # delete old document
             delete_result = await self.delete_documents([document.id])
             if not delete_result.get("success"):
                 return delete_result
             
-            # 插入新文档
+            # insert new document
             insert_result = await self.insert_documents([document])
             return insert_result
             
@@ -256,7 +256,7 @@ class MilvusVectorService:
         query_embeddings: List[List[float]], 
         top_k: int = None
     ) -> List[List[VectorSearchResult]]:
-        """批量向量搜索"""
+        """batch vector search"""
         if not self._connected or not self.collection:
             raise Exception("Not connected to Milvus or collection not initialized")
         
@@ -276,7 +276,7 @@ class MilvusVectorService:
                 output_fields=["id", "content", "metadata_json"]
             )
             
-            # 处理批量结果
+            # process batch results
             batch_results = []
             for hits in results:
                 search_results = []
@@ -297,7 +297,7 @@ class MilvusVectorService:
             return []
     
     async def close(self):
-        """关闭连接"""
+        """close connection"""
         try:
             if self.collection:
                 self.collection.release()
@@ -307,5 +307,5 @@ class MilvusVectorService:
         except Exception as e:
             logger.error(f"Failed to close Milvus connection: {e}")
 
-# 全局向量服务实例
+# global vector service instance
 vector_service = MilvusVectorService() 

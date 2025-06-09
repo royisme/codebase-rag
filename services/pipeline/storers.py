@@ -4,13 +4,13 @@ from loguru import logger
 from .base import DataStorer, ProcessedChunk, ExtractedRelation
 
 class MilvusChunkStorer(DataStorer):
-    """Milvus向量数据库存储器"""
+    """Milvus vector database storer"""
     
     def __init__(self, vector_service):
         self.vector_service = vector_service
     
     async def store_chunks(self, chunks: List[ProcessedChunk]) -> Dict[str, Any]:
-        """存储数据块到Milvus"""
+        """store chunks to Milvus"""
         if not chunks:
             return {"success": True, "stored_count": 0}
         
@@ -18,7 +18,7 @@ class MilvusChunkStorer(DataStorer):
             stored_count = 0
             
             for chunk in chunks:
-                # 构建向量数据
+                # build vector data
                 vector_data = {
                     "id": chunk.id,
                     "source_id": chunk.source_id,
@@ -29,11 +29,11 @@ class MilvusChunkStorer(DataStorer):
                     "metadata": chunk.metadata
                 }
                 
-                # 如果已有嵌入向量则直接使用，否则生成
+                # if embedding vector exists, use it, otherwise generate
                 if chunk.embedding:
                     vector_data["embedding"] = chunk.embedding
                 
-                # 存储到Milvus
+                # store to Milvus
                 result = await self.vector_service.add_document(
                     content=chunk.content,
                     doc_type=chunk.chunk_type.value,
@@ -65,7 +65,7 @@ class MilvusChunkStorer(DataStorer):
             }
     
     async def store_relations(self, relations: List[ExtractedRelation]) -> Dict[str, Any]:
-        """Milvus不存储关系，返回空结果"""
+        """Milvus does not store relations, return empty result"""
         return {
             "success": True,
             "stored_count": 0,
@@ -74,13 +74,13 @@ class MilvusChunkStorer(DataStorer):
         }
 
 class Neo4jRelationStorer(DataStorer):
-    """Neo4j图数据库存储器"""
+    """Neo4j graph database storer"""
     
     def __init__(self, graph_service):
         self.graph_service = graph_service
     
     async def store_chunks(self, chunks: List[ProcessedChunk]) -> Dict[str, Any]:
-        """将数据块作为节点存储到Neo4j"""
+        """store chunks as nodes to Neo4j"""
         if not chunks:
             return {"success": True, "stored_count": 0}
         
@@ -88,21 +88,21 @@ class Neo4jRelationStorer(DataStorer):
             stored_count = 0
             
             for chunk in chunks:
-                # 构建节点数据
+                # build node data
                 node_data = {
                     "id": chunk.id,
                     "source_id": chunk.source_id,
                     "chunk_type": chunk.chunk_type.value,
                     "title": chunk.title or "",
-                    "content": chunk.content[:1000],  # 限制内容长度
+                    "content": chunk.content[:1000],  # limit content length
                     "summary": chunk.summary or "",
                     **chunk.metadata
                 }
                 
-                # 根据chunk类型确定节点标签
+                # determine node label based on chunk type
                 node_label = self._get_node_label(chunk.chunk_type.value)
                 
-                # 创建节点
+                # create node
                 result = await self.graph_service.create_node(
                     label=node_label,
                     properties=node_data
@@ -133,7 +133,7 @@ class Neo4jRelationStorer(DataStorer):
             }
     
     async def store_relations(self, relations: List[ExtractedRelation]) -> Dict[str, Any]:
-        """存储关系到Neo4j"""
+        """store relations to Neo4j"""
         if not relations:
             return {"success": True, "stored_count": 0}
         
@@ -141,7 +141,7 @@ class Neo4jRelationStorer(DataStorer):
             stored_count = 0
             
             for relation in relations:
-                # 创建关系
+                # create relationship
                 result = await self.graph_service.create_relationship(
                     from_node_id=relation.from_entity,
                     to_node_id=relation.to_entity,
@@ -188,19 +188,19 @@ class Neo4jRelationStorer(DataStorer):
         return label_map.get(chunk_type, "Chunk")
 
 class HybridStorer(DataStorer):
-    """混合存储器 - 同时使用Milvus和Neo4j"""
+    """hybrid storer - use Milvus and Neo4j"""
     
     def __init__(self, vector_service, graph_service):
         self.milvus_storer = MilvusChunkStorer(vector_service)
         self.neo4j_storer = Neo4jRelationStorer(graph_service)
     
     async def store_chunks(self, chunks: List[ProcessedChunk]) -> Dict[str, Any]:
-        """同时存储到Milvus和Neo4j"""
+        """store chunks to Milvus and Neo4j"""
         if not chunks:
             return {"success": True, "stored_count": 0}
         
         try:
-            # 并行存储到两个数据库
+            # parallel store to two databases
             import asyncio
             
             milvus_task = self.milvus_storer.store_chunks(chunks)
@@ -210,7 +210,7 @@ class HybridStorer(DataStorer):
                 milvus_task, neo4j_task, return_exceptions=True
             )
             
-            # 处理结果
+            # process results
             total_stored = 0
             errors = []
             
@@ -250,35 +250,35 @@ class HybridStorer(DataStorer):
             }
     
     async def store_relations(self, relations: List[ExtractedRelation]) -> Dict[str, Any]:
-        """存储关系到Neo4j（Milvus不存储关系）"""
+        """store relations to Neo4j (Milvus does not store relations)"""
         return await self.neo4j_storer.store_relations(relations)
 
 class StorerRegistry:
-    """存储器注册表"""
+    """storer registry"""
     
     def __init__(self):
         self.storers = {}
     
     def register_storer(self, name: str, storer: DataStorer):
-        """注册存储器"""
+        """register storer"""
         self.storers[name] = storer
         logger.info(f"Registered storer: {name}")
     
     def get_storer(self, name: str) -> DataStorer:
-        """获取存储器"""
+        """get storer"""
         if name not in self.storers:
             raise ValueError(f"Storer '{name}' not found. Available storers: {list(self.storers.keys())}")
         return self.storers[name]
     
     def list_storers(self) -> List[str]:
-        """列出所有注册的存储器"""
+        """list all registered storers"""
         return list(self.storers.keys())
 
-# 全局存储器注册表实例
+# global storer registry instance
 storer_registry = StorerRegistry()
 
 def setup_default_storers(vector_service, graph_service):
-    """设置默认存储器"""
-    storer_registry.register_storer("milvus", MilvusChunkStorer(vector_service))
+    """set default storers"""
+    #storer_registry.register_storer("milvus", MilvusChunkStorer(vector_service))
     storer_registry.register_storer("neo4j", Neo4jRelationStorer(graph_service))
     storer_registry.register_storer("hybrid", HybridStorer(vector_service, graph_service)) 

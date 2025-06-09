@@ -1,6 +1,6 @@
 """
-任务处理器模块
-定义不同类型任务的具体执行逻辑
+task processor module
+define the specific execution logic for different types of tasks
 """
 
 import asyncio
@@ -15,32 +15,32 @@ from .task_storage import TaskType, Task
 logger = logging.getLogger(__name__)
 
 class TaskProcessor(ABC):
-    """任务处理器基类"""
+    """task processor base class"""
     
     @abstractmethod
     async def process(self, task: Task, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """处理任务的抽象方法"""
+        """abstract method to process tasks"""
         pass
     
     def _update_progress(self, progress_callback: Optional[Callable], progress: float, message: str = ""):
-        """更新任务进度"""
+        """update task progress"""
         if progress_callback:
             progress_callback(progress, message)
 
 class DocumentProcessingProcessor(TaskProcessor):
-    """文档处理任务处理器"""
+    """document processing task processor"""
     
     def __init__(self, neo4j_service=None):
         self.neo4j_service = neo4j_service
     
     async def process(self, task: Task, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """处理文档处理任务"""
+        """process document processing task"""
         payload = task.payload
         
         try:
             self._update_progress(progress_callback, 10, "Starting document processing")
             
-            # 从载荷中提取参数
+            # extract parameters from payload
             document_content = payload.get("document_content")
             document_path = payload.get("document_path")
             document_type = payload.get("document_type", "text")
@@ -48,7 +48,7 @@ class DocumentProcessingProcessor(TaskProcessor):
             if not document_content and not document_path:
                 raise ValueError("Either document_content or document_path must be provided")
             
-            # 如果提供了路径，读取文件内容
+            # if path is provided, read file content
             if document_path and not document_content:
                 self._update_progress(progress_callback, 20, "Reading document file")
                 document_path = Path(document_path)
@@ -60,13 +60,13 @@ class DocumentProcessingProcessor(TaskProcessor):
             
             self._update_progress(progress_callback, 30, "Processing document content")
             
-            # 使用Neo4j服务处理文档
+            # use Neo4j service to process document
             if self.neo4j_service:
                 result = await self._process_with_neo4j(
                     document_content, document_type, progress_callback
                 )
             else:
-                # 模拟处理
+                # simulate processing
                 result = await self._simulate_processing(
                     document_content, document_type, progress_callback
                 )
@@ -86,11 +86,11 @@ class DocumentProcessingProcessor(TaskProcessor):
             raise
     
     async def _process_with_neo4j(self, content: str, doc_type: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """使用Neo4j服务处理文档"""
+        """use Neo4j service to process document"""
         try:
             self._update_progress(progress_callback, 40, "Analyzing document structure")
             
-            # 调用Neo4j服务的add_document方法
+            # call Neo4j service's add_document method
             result = await self.neo4j_service.add_document(content, doc_type)
             
             self._update_progress(progress_callback, 80, "Storing in knowledge graph")
@@ -106,7 +106,7 @@ class DocumentProcessingProcessor(TaskProcessor):
             raise
     
     async def _simulate_processing(self, content: str, doc_type: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """模拟文档处理（用于测试）"""
+        """simulate document processing (for testing)"""
         self._update_progress(progress_callback, 50, "Simulating document analysis")
         await asyncio.sleep(1)
         
@@ -117,26 +117,26 @@ class DocumentProcessingProcessor(TaskProcessor):
         await asyncio.sleep(0.5)
         
         return {
-            "nodes_created": len(content.split()) // 10,  # 模拟节点数
-            "relationships_created": len(content.split()) // 20,  # 模拟关系数
+            "nodes_created": len(content.split()) // 10,  # simulate node count
+            "relationships_created": len(content.split()) // 20,  # simulate relationship count
             "processing_time": 2.5,
             "simulated": True
         }
 
 class SchemaParsingProcessor(TaskProcessor):
-    """数据库模式解析任务处理器"""
+    """database schema parsing task processor"""
     
     def __init__(self, neo4j_service=None):
         self.neo4j_service = neo4j_service
     
     async def process(self, task: Task, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """处理数据库模式解析任务"""
+        """process database schema parsing task"""
         payload = task.payload
         
         try:
             self._update_progress(progress_callback, 10, "Starting schema parsing")
             
-            # 从载荷中提取参数
+            # extract parameters from payload
             schema_content = payload.get("schema_content")
             schema_path = payload.get("schema_path")
             schema_type = payload.get("schema_type", "sql")
@@ -144,7 +144,7 @@ class SchemaParsingProcessor(TaskProcessor):
             if not schema_content and not schema_path:
                 raise ValueError("Either schema_content or schema_path must be provided")
             
-            # 如果提供了路径，读取文件内容
+            # if path is provided, read file content
             if schema_path and not schema_content:
                 self._update_progress(progress_callback, 20, "Reading schema file")
                 schema_path = Path(schema_path)
@@ -156,13 +156,13 @@ class SchemaParsingProcessor(TaskProcessor):
             
             self._update_progress(progress_callback, 30, "Parsing schema structure")
             
-            # 使用Neo4j服务处理模式
+            # use Neo4j service to process schema
             if self.neo4j_service:
                 result = await self._process_schema_with_neo4j(
                     schema_content, schema_type, progress_callback
                 )
             else:
-                # 模拟处理
+                # simulate processing
                 result = await self._simulate_schema_processing(
                     schema_content, schema_type, progress_callback
                 )
@@ -182,15 +182,15 @@ class SchemaParsingProcessor(TaskProcessor):
             raise
     
     async def _process_schema_with_neo4j(self, content: str, schema_type: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """使用Neo4j服务处理模式"""
+        """use Neo4j service to process schema"""
         try:
             self._update_progress(progress_callback, 40, "Analyzing schema structure")
             
-            # 调用Neo4j服务的相应方法
+            # call Neo4j service's corresponding method
             if hasattr(self.neo4j_service, 'parse_schema'):
                 result = await self.neo4j_service.parse_schema(content, schema_type)
             else:
-                # 使用通用文档处理方法
+                # use generic document processing method
                 result = await self.neo4j_service.add_document(content, f"schema_{schema_type}")
             
             self._update_progress(progress_callback, 80, "Building schema graph")
@@ -202,7 +202,7 @@ class SchemaParsingProcessor(TaskProcessor):
             raise
     
     async def _simulate_schema_processing(self, content: str, schema_type: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """模拟模式处理（用于测试）"""
+        """simulate schema processing (for testing)"""
         self._update_progress(progress_callback, 50, "Simulating schema analysis")
         await asyncio.sleep(1)
         
@@ -212,31 +212,31 @@ class SchemaParsingProcessor(TaskProcessor):
         self._update_progress(progress_callback, 90, "Simulating relationship mapping")
         await asyncio.sleep(0.5)
         
-        # 简单的SQL表计数模拟
+        # simple SQL table count simulation
         table_count = content.upper().count("CREATE TABLE")
         
         return {
             "tables_parsed": table_count,
-            "relationships_found": table_count * 2,  # 模拟关系数
+            "relationships_found": table_count * 2,  # simulate relationship count
             "processing_time": 2.5,
             "schema_type": schema_type,
             "simulated": True
         }
 
 class KnowledgeGraphConstructionProcessor(TaskProcessor):
-    """知识图谱构建任务处理器"""
+    """knowledge graph construction task processor"""
     
     def __init__(self, neo4j_service=None):
         self.neo4j_service = neo4j_service
     
     async def process(self, task: Task, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """处理知识图谱构建任务"""
+        """process knowledge graph construction task"""
         payload = task.payload
         
         try:
             self._update_progress(progress_callback, 10, "Starting knowledge graph construction")
             
-            # 从载荷中提取参数
+            # extract parameters from payload
             data_sources = payload.get("data_sources", [])
             construction_type = payload.get("construction_type", "full")
             
@@ -256,13 +256,13 @@ class KnowledgeGraphConstructionProcessor(TaskProcessor):
                     f"Processing source {i+1}/{total_sources}"
                 )
                 
-                # 处理单个数据源
+                # process single data source
                 source_result = await self._process_data_source(source, progress_callback)
                 results.append(source_result)
             
             self._update_progress(progress_callback, 80, "Integrating knowledge graph")
             
-            # 整合结果
+            # integrate results
             final_result = await self._integrate_results(results, progress_callback)
             
             self._update_progress(progress_callback, 100, "Knowledge graph construction completed")
@@ -280,7 +280,7 @@ class KnowledgeGraphConstructionProcessor(TaskProcessor):
             raise
     
     async def _process_data_source(self, source: Dict[str, Any], progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """处理单个数据源"""
+        """process single data source"""
         source_type = source.get("type", "unknown")
         source_path = source.get("path")
         source_content = source.get("content")
@@ -289,12 +289,12 @@ class KnowledgeGraphConstructionProcessor(TaskProcessor):
             if source_content:
                 return await self.neo4j_service.add_document(source_content, source_type)
             elif source_path:
-                # 读取文件并处理
+                # read file and process
                 with open(source_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 return await self.neo4j_service.add_document(content, source_type)
         
-        # 模拟处理
+        # simulate processing
         await asyncio.sleep(0.5)
         return {
             "nodes_created": 10,
@@ -304,11 +304,11 @@ class KnowledgeGraphConstructionProcessor(TaskProcessor):
         }
     
     async def _integrate_results(self, results: list, progress_callback: Optional[Callable]) -> Dict[str, Any]:
-        """整合处理结果"""
+        """integrate processing results"""
         total_nodes = sum(r.get("nodes_created", 0) for r in results)
         total_relationships = sum(r.get("relationships_created", 0) for r in results)
         
-        # 模拟整合过程
+        # simulate integration process
         await asyncio.sleep(1)
         
         return {
@@ -319,19 +319,19 @@ class KnowledgeGraphConstructionProcessor(TaskProcessor):
         }
 
 class BatchProcessingProcessor(TaskProcessor):
-    """批处理任务处理器"""
+    """batch processing task processor"""
     
     def __init__(self, neo4j_service=None):
         self.neo4j_service = neo4j_service
     
     async def process(self, task: Task, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-        """处理批处理任务"""
+        """process batch processing task"""
         payload = task.payload
         
         try:
             self._update_progress(progress_callback, 10, "Starting batch processing")
             
-            # 从载荷中提取参数
+            # extract parameters from payload
             directory_path = payload.get("directory_path")
             file_patterns = payload.get("file_patterns", ["*.txt", "*.md", "*.sql"])
             batch_size = payload.get("batch_size", 10)
@@ -345,7 +345,7 @@ class BatchProcessingProcessor(TaskProcessor):
             
             self._update_progress(progress_callback, 20, "Scanning directory for files")
             
-            # 收集所有匹配的文件
+            # collect all matching files
             files_to_process = []
             for pattern in file_patterns:
                 files_to_process.extend(directory.glob(pattern))
@@ -359,7 +359,7 @@ class BatchProcessingProcessor(TaskProcessor):
             
             self._update_progress(progress_callback, 30, f"Found {len(files_to_process)} files to process")
             
-            # 批量处理文件
+            # batch process files
             results = []
             total_files = len(files_to_process)
             
@@ -378,7 +378,7 @@ class BatchProcessingProcessor(TaskProcessor):
             
             self._update_progress(progress_callback, 90, "Finalizing batch processing")
             
-            # 汇总结果
+            # summarize results
             summary = self._summarize_batch_results(results)
             
             self._update_progress(progress_callback, 100, "Batch processing completed")
@@ -396,23 +396,23 @@ class BatchProcessingProcessor(TaskProcessor):
             raise
     
     async def _process_file_batch(self, files: list, progress_callback: Optional[Callable]) -> list:
-        """处理一批文件"""
+        """process a batch of files"""
         results = []
         
         for file_path in files:
             try:
-                # 读取文件内容
+                # read file content
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
-                # 确定文件类型
+                # determine file type
                 file_type = file_path.suffix.lower().lstrip('.')
                 
-                # 处理文件
+                # process file
                 if self.neo4j_service:
                     result = await self.neo4j_service.add_document(content, file_type)
                 else:
-                    # 模拟处理
+                    # simulate processing
                     await asyncio.sleep(0.1)
                     result = {
                         "nodes_created": len(content.split()) // 20,
@@ -439,7 +439,7 @@ class BatchProcessingProcessor(TaskProcessor):
         return results
     
     def _summarize_batch_results(self, results: list) -> Dict[str, Any]:
-        """汇总批处理结果"""
+        """summarize batch processing results"""
         successful = [r for r in results if r.get("status") == "success"]
         failed = [r for r in results if r.get("status") == "failed"]
         
@@ -464,22 +464,22 @@ class BatchProcessingProcessor(TaskProcessor):
         }
 
 class TaskProcessorRegistry:
-    """任务处理器注册表"""
+    """task processor registry"""
     
     def __init__(self):
         self._processors: Dict[TaskType, TaskProcessor] = {}
     
     def register_processor(self, task_type: TaskType, processor: TaskProcessor):
-        """注册任务处理器"""
+        """register task processor"""
         self._processors[task_type] = processor
         logger.info(f"Registered processor for task type: {task_type.value}")
     
     def get_processor(self, task_type: TaskType) -> Optional[TaskProcessor]:
-        """获取任务处理器"""
+        """get task processor"""
         return self._processors.get(task_type)
     
     def initialize_default_processors(self, neo4j_service=None):
-        """初始化默认的任务处理器"""
+        """initialize default task processors"""
         self.register_processor(
             TaskType.DOCUMENT_PROCESSING, 
             DocumentProcessingProcessor(neo4j_service)
@@ -499,27 +499,26 @@ class TaskProcessorRegistry:
         
         logger.info("Initialized all default task processors")
 
-# 全局处理器注册表
+# global processor registry
 processor_registry = TaskProcessorRegistry()
 
-# 便捷函数，用于API路由
+# convenience function for API routing
 async def process_document_task(**kwargs):
-    """文档处理任务便捷函数"""
-    # 这个函数会被任务队列调用，实际处理由处理器完成
-    # 这里只是一个占位符，实际处理在TaskQueue._execute_task_by_type中完成
+    """document processing task convenience function"""
+    # this function will be called by task queue, actual processing is done in TaskQueue._execute_task_by_type
     pass
 
 async def process_schema_parsing_task(**kwargs):
-    """模式解析任务便捷函数"""
-    # 这个函数会被任务队列调用，实际处理由处理器完成
+    """schema parsing task convenience function"""
+    # this function will be called by task queue, actual processing is done in TaskQueue._execute_task_by_type
     pass
 
 async def process_knowledge_graph_task(**kwargs):
-    """知识图谱构建任务便捷函数"""
-    # 这个函数会被任务队列调用，实际处理由处理器完成
+    """knowledge graph construction task convenience function"""
+    # this function will be called by task queue, actual processing is done in TaskQueue._execute_task_by_type
     pass
 
 async def process_batch_task(**kwargs):
-    """批处理任务便捷函数"""
-    # 这个函数会被任务队列调用，实际处理由处理器完成
+    """batch processing task convenience function"""
+    # this function will be called by task queue, actual processing is done in TaskQueue._execute_task_by_type
     pass 

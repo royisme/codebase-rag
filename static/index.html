@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>任务队列监控面板</title>
+    <title>Task Queue Monitoring Panel</title>
     <style>
         * {
             margin: 0;
@@ -319,92 +319,92 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>任务队列监控面板</h1>
-            <p>实时监控和管理异步任务处理状态</p>
+            <h1>Task Queue Monitoring Panel</h1>
+            <p>Real-time monitoring and management of asynchronous task processing status</p>
         </div>
 
-        <!-- 统计信息 -->
+        <!-- Statistics -->
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="stat-number pending" id="pendingCount">-</div>
-                <div class="stat-label">等待中</div>
+                <div class="stat-label">Pending</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number processing" id="processingCount">-</div>
-                <div class="stat-label">处理中</div>
+                <div class="stat-label">Processing</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number success" id="successCount">-</div>
-                <div class="stat-label">已完成</div>
+                <div class="stat-label">Completed</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number failed" id="failedCount">-</div>
-                <div class="stat-label">失败</div>
+                <div class="stat-label">Failed</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number cancelled" id="cancelledCount">-</div>
-                <div class="stat-label">已取消</div>
+                <div class="stat-label">Cancelled</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number" id="totalCount">-</div>
-                <div class="stat-label">总计</div>
+                <div class="stat-label">Total</div>
             </div>
         </div>
 
-        <!-- 创建任务 -->
+        <!-- Create Task -->
         <div class="controls">
-            <h2>创建新任务</h2>
+            <h2>Create New Task</h2>
             <div id="createTaskMessage"></div>
             <form id="createTaskForm">
                 <div class="form-group">
-                    <label for="taskType">任务类型</label>
+                    <label for="taskType">Task Type</label>
                     <select id="taskType" required>
-                        <option value="">请选择任务类型</option>
-                        <option value="document_processing">文档处理</option>
-                        <option value="schema_parsing">模式解析</option>
-                        <option value="knowledge_graph_construction">知识图谱构建</option>
-                        <option value="batch_processing">批处理</option>
+                        <option value="">Please select task type</option>
+                        <option value="document_processing">Document Processing</option>
+                        <option value="schema_parsing">Schema Parsing</option>
+                        <option value="knowledge_graph_construction">Knowledge Graph Construction</option>
+                        <option value="batch_processing">Batch Processing</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="taskName">任务名称</label>
-                    <input type="text" id="taskName" placeholder="输入任务名称" required>
+                    <label for="taskName">Task Name</label>
+                    <input type="text" id="taskName" placeholder="Enter task name" required>
                 </div>
                 <div class="form-group">
-                    <label for="taskPayload">任务参数 (JSON)</label>
-                    <textarea id="taskPayload" placeholder='{"document_content": "示例内容", "document_type": "text"}'></textarea>
+                    <label for="taskPayload">Task Payload (JSON)</label>
+                    <textarea id="taskPayload" placeholder='{"document_content": "example content", "document_type": "text"}'></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="taskPriority">优先级</label>
+                    <label for="taskPriority">Priority</label>
                     <select id="taskPriority">
-                        <option value="0">普通</option>
-                        <option value="1">高</option>
-                        <option value="2">紧急</option>
+                        <option value="0">Normal</option>
+                        <option value="1">High</option>
+                        <option value="2">Urgent</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-success">创建任务</button>
-                <button type="button" class="btn" onclick="loadExamplePayload()">加载示例</button>
+                <button type="submit" class="btn btn-success">Create Task</button>
+                <button type="button" class="btn" onclick="loadExamplePayload()">Load Example</button>
             </form>
         </div>
 
-        <!-- 任务列表 -->
+        <!-- Task List -->
         <div class="tasks-section">
             <div class="tasks-header">
-                <h2>任务列表</h2>
+                <h2>Task List</h2>
                 <div class="filter-controls">
                     <select id="statusFilter">
-                        <option value="">所有状态</option>
-                        <option value="pending">等待中</option>
-                        <option value="processing">处理中</option>
-                        <option value="success">已完成</option>
-                        <option value="failed">失败</option>
-                        <option value="cancelled">已取消</option>
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="success">Completed</option>
+                        <option value="failed">Failed</option>
+                        <option value="cancelled">Cancelled</option>
                     </select>
-                    <button class="btn" onclick="refreshTasks()">刷新</button>
+                    <button class="btn" onclick="refreshTasks()">Refresh</button>
                 </div>
             </div>
             <div id="taskList" class="task-list">
-                <div class="loading">加载中...</div>
+                <div class="loading">Loading...</div>
             </div>
         </div>
     </div>
@@ -416,14 +416,14 @@
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
 
-        // 页面加载时初始化
+        // initialize when page loaded
         document.addEventListener('DOMContentLoaded', function() {
             initWebSocket();
             
-            // 绑定表单提交事件
+            // bind form submit event
             document.getElementById('createTaskForm').addEventListener('submit', createTask);
             
-            // 绑定状态过滤器
+            // bind status filter
             document.getElementById('statusFilter').addEventListener('change', function() {
                 if (websocket && websocket.readyState === WebSocket.OPEN) {
                     const statusFilter = this.value;
@@ -438,7 +438,7 @@
             });
         });
 
-        // WebSocket初始化
+        // initialize WebSocket
         function initWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/tasks`;
@@ -447,10 +447,10 @@
                 websocket = new WebSocket(wsUrl);
                 
                 websocket.onopen = function(event) {
-                    console.log('WebSocket连接已建立');
+                    console.log('WebSocket connection established');
                     reconnectAttempts = 0;
                     
-                    // 清除HTTP轮询
+                    // clear HTTP polling
                     if (refreshInterval) {
                         clearInterval(refreshInterval);
                         refreshInterval = null;
@@ -462,35 +462,35 @@
                         const message = JSON.parse(event.data);
                         handleWebSocketMessage(message);
                     } catch (error) {
-                        console.error('解析WebSocket消息失败:', error);
+                        console.error('Failed to parse WebSocket message:', error);
                     }
                 };
                 
                 websocket.onclose = function(event) {
-                    console.log('WebSocket连接已关闭');
+                    console.log('WebSocket connection closed');
                     
-                    // 尝试重连
+                    // try to reconnect
                     if (reconnectAttempts < maxReconnectAttempts) {
                         reconnectAttempts++;
-                        console.log(`尝试重连 (${reconnectAttempts}/${maxReconnectAttempts})`);
+                        console.log(`Trying to reconnect (${reconnectAttempts}/${maxReconnectAttempts})`);
                         setTimeout(initWebSocket, 3000 * reconnectAttempts);
                     } else {
-                        console.log('WebSocket重连失败，切换到HTTP轮询');
+                        console.log('WebSocket reconnection failed, switching to HTTP polling');
                         fallbackToPolling();
                     }
                 };
                 
                 websocket.onerror = function(error) {
-                    console.error('WebSocket错误:', error);
+                    console.error('WebSocket error:', error);
                 };
                 
             } catch (error) {
-                console.error('WebSocket初始化失败:', error);
+                console.error('WebSocket initialization failed:', error);
                 fallbackToPolling();
             }
         }
         
-        // 处理WebSocket消息
+        // handle WebSocket message
         function handleWebSocketMessage(message) {
             switch (message.type) {
                 case 'stats':
@@ -515,7 +515,7 @@
             }
         }
         
-        // 更新统计信息
+        // update statistics
         function updateStats(stats) {
             document.getElementById('pendingCount').textContent = stats.pending_tasks;
             document.getElementById('processingCount').textContent = stats.processing_tasks;
@@ -525,7 +525,7 @@
             document.getElementById('totalCount').textContent = stats.total_tasks;
         }
         
-        // 更新任务进度
+        // update task progress
         function updateTaskProgress(tasks) {
             tasks.forEach(task => {
                 const taskElement = document.querySelector(`[data-task-id="${task.task_id}"]`);
@@ -542,9 +542,9 @@
             });
         }
         
-        // 更新单个任务
+        // update single task
         function updateSingleTask(task) {
-            // 重新加载任务列表以确保数据一致性
+            // reload task list to ensure data consistency
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 const statusFilter = document.getElementById('statusFilter').value;
                 websocket.send(JSON.stringify({
@@ -555,25 +555,25 @@
             }
         }
         
-        // 回退到HTTP轮询
+        // fallback to HTTP polling
         function fallbackToPolling() {
-            console.log('使用HTTP轮询模式');
+            console.log('Using HTTP polling mode');
             loadStats();
             loadTasks();
             startAutoRefresh();
         }
         
-        // 自动刷新（HTTP轮询模式）
+        // auto refresh (HTTP polling mode)
         function startAutoRefresh() {
-            if (refreshInterval) return; // 避免重复设置
+            if (refreshInterval) return; // avoid duplicate setting
             
             refreshInterval = setInterval(() => {
                 loadStats();
                 loadTasks();
-            }, 5000); // 每5秒刷新一次
+            }, 5000); // refresh every 5 seconds
         }
 
-        // 加载统计信息
+        // load statistics
         async function loadStats() {
             try {
                 const response = await fetch(`${API_BASE}/tasks/stats/overview`);
@@ -586,11 +586,11 @@
                 document.getElementById('cancelledCount').textContent = stats.cancelled_tasks;
                 document.getElementById('totalCount').textContent = stats.total_tasks;
             } catch (error) {
-                console.error('加载统计信息失败:', error);
+                console.error('Failed to load statistics:', error);
             }
         }
 
-        // 加载任务列表
+        // load task list
         async function loadTasks() {
             try {
                 const statusFilter = document.getElementById('statusFilter').value;
@@ -604,17 +604,17 @@
                 
                 renderTasks(data.tasks);
             } catch (error) {
-                console.error('加载任务列表失败:', error);
-                document.getElementById('taskList').innerHTML = '<div class="error">加载任务列表失败</div>';
+                console.error('Failed to load task list:', error);
+                document.getElementById('taskList').innerHTML = '<div class="error">Failed to load task list</div>';
             }
         }
 
-        // 渲染任务列表
+        // render task list
         function renderTasks(tasks) {
             const taskList = document.getElementById('taskList');
             
             if (tasks.length === 0) {
-                taskList.innerHTML = '<div class="loading">暂无任务</div>';
+                taskList.innerHTML = '<div class="loading">No tasks</div>';
                 return;
             }
             
@@ -622,17 +622,17 @@
                 <div class="task-item" data-task-id="${task.task_id}">
                     <div class="task-header">
                         <div>
-                            <strong>${task.metadata.task_name || '未命名任务'}</strong>
+                            <strong>${task.metadata.task_name || 'Unnamed task'}</strong>
                             <div class="task-id">ID: ${task.task_id}</div>
                         </div>
                         <span class="task-status status-${task.status}">${getStatusText(task.status)}</span>
                     </div>
                     <div class="task-info">
                         <div>
-                            <strong>创建时间:</strong> ${formatTime(task.created_at)}
+                            <strong>Created at:</strong> ${formatTime(task.created_at)}
                         </div>
                         <div>
-                            <strong>类型:</strong> ${getTaskTypeText(task.metadata.task_type)}
+                            <strong>Type:</strong> ${getTaskTypeText(task.metadata.task_type)}
                         </div>
                     </div>
                     ${task.status === 'processing' ? `
@@ -643,15 +643,15 @@
                             <div class="progress-text">${task.progress.toFixed(1)}% - ${task.message}</div>
                         </div>
                     ` : ''}
-                    ${task.error ? `<div class="error">错误: ${task.error}</div>` : ''}
+                    ${task.error ? `<div class="error">Error: ${task.error}</div>` : ''}
                     <div class="task-actions">
                         ${task.status === 'pending' || task.status === 'processing' ? `
-                            <button class="btn btn-small btn-danger" onclick="cancelTask('${task.task_id}')">取消</button>
+                            <button class="btn btn-small btn-danger" onclick="cancelTask('${task.task_id}')">Cancel</button>
                         ` : ''}
                         ${task.status === 'failed' || task.status === 'cancelled' ? `
-                            <button class="btn btn-small btn-warning" onclick="retryTask('${task.task_id}')">重试</button>
+                            <button class="btn btn-small btn-warning" onclick="retryTask('${task.task_id}')">Retry</button>
                         ` : ''}
-                        <button class="btn btn-small" onclick="viewTaskDetails('${task.task_id}')">详情</button>
+                        <button class="btn btn-small" onclick="viewTaskDetails('${task.task_id}')">Details</button>
                     </div>
                 </div>
             `).join('');
@@ -659,7 +659,7 @@
             taskList.innerHTML = html;
         }
 
-        // 创建任务
+        // create task
         async function createTask(event) {
             event.preventDefault();
             
@@ -693,10 +693,10 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    messageDiv.innerHTML = `<div class="success-message">任务创建成功！任务ID: ${result.task_id}</div>`;
+                    messageDiv.innerHTML = `<div class="success-message">Task created successfully! Task ID: ${result.task_id}</div>`;
                     document.getElementById('createTaskForm').reset();
                     
-                    // 如果WebSocket可用，请求更新数据
+                    // if WebSocket is available, request data update
                     if (websocket && websocket.readyState === WebSocket.OPEN) {
                         websocket.send(JSON.stringify({type: 'get_tasks', limit: 50}));
                     } else {
@@ -704,16 +704,16 @@
                         loadTasks();
                     }
                 } else {
-                    messageDiv.innerHTML = `<div class="error">创建任务失败: ${result.detail}</div>`;
+                    messageDiv.innerHTML = `<div class="error">Failed to create task: ${result.detail}</div>`;
                 }
             } catch (error) {
-                messageDiv.innerHTML = `<div class="error">创建任务失败: ${error.message}</div>`;
+                messageDiv.innerHTML = `<div class="error">Failed to create task: ${error.message}</div>`;
             }
         }
 
-        // 取消任务
+        // cancel task
         async function cancelTask(taskId) {
-            if (!confirm('确定要取消这个任务吗？')) return;
+            if (!confirm('Are you sure you want to cancel this task?')) return;
             
             try {
                 const response = await fetch(`${API_BASE}/tasks/${taskId}`, {
@@ -724,14 +724,14 @@
                     loadStats();
                     loadTasks();
                 } else {
-                    alert('取消任务失败');
+                    alert('Failed to cancel task');
                 }
             } catch (error) {
-                alert('取消任务失败: ' + error.message);
+                alert('Failed to cancel task: ' + error.message);
             }
         }
 
-        // 重试任务
+        // retry task
         async function retryTask(taskId) {
             try {
                 const response = await fetch(`${API_BASE}/tasks/${taskId}/retry`, {
@@ -742,58 +742,58 @@
                     loadStats();
                     loadTasks();
                 } else {
-                    alert('重试任务失败');
+                    alert('Failed to retry task');
                 }
             } catch (error) {
-                alert('重试任务失败: ' + error.message);
+                alert('Failed to retry task: ' + error.message);
             }
         }
 
-        // 查看任务详情
+        // view task details
         async function viewTaskDetails(taskId) {
             try {
                 const response = await fetch(`${API_BASE}/tasks/${taskId}`);
                 const task = await response.json();
                 
                 const details = `
-任务ID: ${task.task_id}
-任务名称: ${task.metadata.task_name || '未命名'}
-任务类型: ${getTaskTypeText(task.metadata.task_type)}
-状态: ${getStatusText(task.status)}
-进度: ${task.progress.toFixed(1)}%
-创建时间: ${formatTime(task.created_at)}
-开始时间: ${task.started_at ? formatTime(task.started_at) : '未开始'}
-完成时间: ${task.completed_at ? formatTime(task.completed_at) : '未完成'}
-消息: ${task.message}
-${task.error ? '错误: ' + task.error : ''}
+Task ID: ${task.task_id}
+Task Name: ${task.metadata.task_name || 'Unnamed'}
+Task Type: ${getTaskTypeText(task.metadata.task_type)}
+Status: ${getStatusText(task.status)}
+Progress: ${task.progress.toFixed(1)}%
+Created at: ${formatTime(task.created_at)}
+Started at: ${task.started_at ? formatTime(task.started_at) : 'Not started'}
+Completed at: ${task.completed_at ? formatTime(task.completed_at) : 'Not completed'}
+Message: ${task.message}
+${task.error ? 'Error: ' + task.error : ''}
                 `;
                 
                 alert(details);
             } catch (error) {
-                alert('获取任务详情失败: ' + error.message);
+                alert('Failed to get task details: ' + error.message);
             }
         }
 
-        // 刷新任务
+        // refresh tasks
         function refreshTasks() {
             loadStats();
             loadTasks();
         }
 
-        // 加载示例载荷
+        // load example payload
         function loadExamplePayload() {
             const taskType = document.getElementById('taskType').value;
             let example = '';
             
             switch (taskType) {
                 case 'document_processing':
-                    example = '{"document_content": "这是一个示例文档内容", "document_type": "text"}';
+                    example = '{"document_content": "This is an example document content", "document_type": "text"}';
                     break;
                 case 'schema_parsing':
                     example = '{"schema_content": "CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(100));", "schema_type": "sql"}';
                     break;
                 case 'knowledge_graph_construction':
-                    example = '{"data_sources": [{"type": "document", "content": "示例内容"}]}';
+                    example = '{"data_sources": [{"type": "document", "content": "example content"}]}';
                     break;
                 case 'batch_processing':
                     example = '{"directory_path": "/path/to/documents", "file_patterns": ["*.txt", "*.md"]}';
@@ -805,34 +805,34 @@ ${task.error ? '错误: ' + task.error : ''}
             document.getElementById('taskPayload').value = example;
         }
 
-        // 辅助函数
+        // helper functions
         function getStatusText(status) {
             const statusMap = {
-                'pending': '等待中',
-                'processing': '处理中',
-                'success': '已完成',
-                'failed': '失败',
-                'cancelled': '已取消'
+                'pending': 'Pending',
+                'processing': 'Processing',
+                'success': 'Completed',
+                'failed': 'Failed',
+                'cancelled': 'Cancelled'
             };
             return statusMap[status] || status;
         }
 
         function getTaskTypeText(type) {
             const typeMap = {
-                'document_processing': '文档处理',
-                'schema_parsing': '模式解析',
-                'knowledge_graph_construction': '知识图谱构建',
-                'batch_processing': '批处理'
+                'document_processing': 'Document Processing',
+                'schema_parsing': 'Schema Parsing',
+                'knowledge_graph_construction': 'Knowledge Graph Construction',
+                'batch_processing': 'Batch Processing'
             };
             return typeMap[type] || type;
         }
 
         function formatTime(timeString) {
-            if (!timeString) return '未知';
-            return new Date(timeString).toLocaleString('zh-CN');
+            if (!timeString) return 'Unknown';
+            return new Date(timeString).toLocaleString('en-US');
         }
 
-        // 页面卸载时清理定时器
+        // clean up timer when page unloaded
         window.addEventListener('beforeunload', function() {
             if (refreshInterval) {
                 clearInterval(refreshInterval);

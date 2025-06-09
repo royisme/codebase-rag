@@ -1,5 +1,5 @@
 """
-中间件配置模块
+Middleware configuration module
 """
 
 from fastapi import FastAPI
@@ -10,9 +10,9 @@ from config import settings
 
 
 def setup_middleware(app: FastAPI) -> None:
-    """设置应用中间件"""
+    """set application middleware"""
     
-    # CORS中间件
+    # CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -21,5 +21,5 @@ def setup_middleware(app: FastAPI) -> None:
         allow_headers=["*"],
     )
     
-    # Gzip压缩中间件
+    # Gzip compression middleware
     app.add_middleware(GZipMiddleware, minimum_size=1000) 

@@ -1,7 +1,7 @@
 """
-基于 Neo4j 内置向量索引的现代化知识图谱服务
-使用 LlamaIndex 的 KnowledgeGraphIndex 和 Neo4j 的原生向量搜索功能
-支持多种 LLM 和嵌入模型提供商
+modern knowledge graph service based on Neo4j's native vector index
+uses LlamaIndex's KnowledgeGraphIndex and Neo4j's native vector search functionality
+supports multiple LLM and embedding model providers
 """
 
 from typing import List, Dict, Any, Optional, Union
@@ -38,7 +38,7 @@ from llama_index.core.node_parser import SimpleNodeParser
 from config import settings
 
 class Neo4jKnowledgeService:
-    """基于 Neo4j 内置向量索引的知识图谱服务"""
+    """knowledge graph service based on Neo4j's native vector index"""
     
     def __init__(self):
         self.graph_store = None
@@ -46,7 +46,7 @@ class Neo4jKnowledgeService:
         self.query_engine = None
         self._initialized = False
         
-        # 从配置中获取超时设置
+        # get timeout settings from config
         self.connection_timeout = settings.connection_timeout
         self.operation_timeout = settings.operation_timeout
         self.large_document_timeout = settings.large_document_timeout
@@ -54,7 +54,7 @@ class Neo4jKnowledgeService:
         logger.info("Neo4j Knowledge Service created")
     
     def _create_llm(self):
-        """根据配置创建 LLM 实例"""
+        """create LLM instance based on config"""
         provider = settings.llm_provider.lower()
         
         if provider == "ollama":
@@ -88,7 +88,7 @@ class Neo4jKnowledgeService:
             raise ValueError(f"Unsupported LLM provider: {provider}")
     
     def _create_embedding_model(self):
-        """根据配置创建嵌入模型实例"""
+        """create embedding model instance based on config"""
         provider = settings.embedding_provider.lower()
         
         if provider == "ollama":
@@ -121,11 +121,11 @@ class Neo4jKnowledgeService:
             raise ValueError(f"Unsupported embedding provider: {provider}")
     
     async def initialize(self) -> bool:
-        """初始化服务"""
+        """initialize service"""
         try:
             logger.info(f"Initializing with LLM provider: {settings.llm_provider}, Embedding provider: {settings.embedding_provider}")
             
-            # 设置 LlamaIndex 全局配置
+            # set LlamaIndex global config
             Settings.llm = self._create_llm()
             Settings.embed_model = self._create_embedding_model()
             
@@ -135,7 +135,7 @@ class Neo4jKnowledgeService:
             logger.info(f"LLM: {settings.llm_provider} - {getattr(settings, f'{settings.llm_provider}_model')}")
             logger.info(f"Embedding: {settings.embedding_provider} - {getattr(settings, f'{settings.embedding_provider}_embedding_model')}")
             
-            # 初始化 Neo4j 图存储，添加超时配置
+            # initialize Neo4j graph store, add timeout config
             self.graph_store = Neo4jGraphStore(
                 username=settings.neo4j_username,
                 password=settings.neo4j_password,
@@ -144,12 +144,12 @@ class Neo4jKnowledgeService:
                 timeout=self.connection_timeout
             )
             
-            # 创建存储上下文
+            # create storage context
             storage_context = StorageContext.from_defaults(
                 graph_store=self.graph_store
             )
             
-            # 尝试加载现有索引，如果不存在则创建新的
+            # try to load existing index, if not exists, create new one
             try:
                 self.knowledge_index = await asyncio.wait_for(
                     asyncio.to_thread(
@@ -168,7 +168,7 @@ class Neo4jKnowledgeService:
                 )
                 logger.info("Created new knowledge graph index")
             except Exception:
-                # 创建空的知识图谱索引
+                # create empty knowledge graph index
                 self.knowledge_index = KnowledgeGraphIndex(
                     nodes=[],
                     storage_context=storage_context,
@@ -195,12 +195,12 @@ class Neo4jKnowledgeService:
                          content: str, 
                          title: str = None,
                          metadata: Dict[str, Any] = None) -> Dict[str, Any]:
-        """添加文档到知识图谱"""
+        """add document to knowledge graph"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 创建文档
+            # create document
             doc = Document(
                 text=content,
                 metadata={
@@ -211,13 +211,13 @@ class Neo4jKnowledgeService:
                 }
             )
             
-            # 根据文档大小选择超时时间
+            # select timeout based on document size
             content_size = len(content)
             timeout = self.operation_timeout if content_size < 10000 else self.large_document_timeout
             
             logger.info(f"Adding document '{title}' (size: {content_size} chars, timeout: {timeout}s)")
             
-            # 使用异步超时控制插入操作
+            # use async timeout control for insert operation
             await asyncio.wait_for(
                 asyncio.to_thread(self.knowledge_index.insert, doc),
                 timeout=timeout
@@ -248,12 +248,12 @@ class Neo4jKnowledgeService:
             }
     
     async def add_file(self, file_path: str) -> Dict[str, Any]:
-        """添加文件到知识图谱"""
+        """add file to knowledge graph"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 读取文件
+            # read file
             documents = await asyncio.to_thread(
                 lambda: SimpleDirectoryReader(input_files=[file_path]).load_data()
             )
@@ -264,7 +264,7 @@ class Neo4jKnowledgeService:
                     "error": "No documents loaded from file"
                 }
             
-            # 批量插入，每个文档单独处理超时
+            # batch insert, handle timeout for each document
             success_count = 0
             errors = []
             
@@ -310,16 +310,16 @@ class Neo4jKnowledgeService:
                           directory_path: str,
                           recursive: bool = True,
                           file_extensions: List[str] = None) -> Dict[str, Any]:
-        """批量添加目录中的文件"""
+        """batch add files in directory"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 设置文件扩展名过滤
+            # set file extension filter
             if file_extensions is None:
                 file_extensions = [".txt", ".md", ".py", ".js", ".ts", ".sql", ".json", ".yaml", ".yml"]
             
-            # 读取目录
+            # read directory
             reader = SimpleDirectoryReader(
                 input_dir=directory_path,
                 recursive=recursive,
@@ -334,7 +334,7 @@ class Neo4jKnowledgeService:
                     "error": "No documents found in directory"
                 }
             
-            # 批量插入，每个文档单独处理超时
+            # batch insert, handle timeout for each document
             success_count = 0
             errors = []
             
@@ -351,7 +351,7 @@ class Neo4jKnowledgeService:
                     )
                     success_count += 1
                     
-                    if i % 10 == 0:  # 每10个文档记录一次进度
+                    if i % 10 == 0:  # record progress every 10 documents
                         logger.info(f"Progress: {i+1}/{len(documents)} documents processed")
                         
                 except asyncio.TimeoutError:
@@ -383,27 +383,27 @@ class Neo4jKnowledgeService:
     async def query(self, 
                    question: str,
                    mode: str = "hybrid") -> Dict[str, Any]:
-        """查询知识图谱"""
+        """query knowledge graph"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 根据模式创建不同的查询引擎
+            # create different query engines based on mode
             if mode == "hybrid":
-                # 混合模式：图遍历 + 向量搜索
+                # hybrid mode: graph traversal + vector search
                 query_engine = self.knowledge_index.as_query_engine(
                     include_text=True,
                     response_mode="tree_summarize",
                     embedding_mode="hybrid"
                 )
             elif mode == "graph_only":
-                # 仅图遍历
+                # graph only mode
                 query_engine = self.knowledge_index.as_query_engine(
                     include_text=False,
                     response_mode="tree_summarize"
                 )
             elif mode == "vector_only":
-                # 仅向量搜索
+                # vector only mode
                 query_engine = self.knowledge_index.as_query_engine(
                     include_text=True,
                     response_mode="compact",
@@ -412,13 +412,13 @@ class Neo4jKnowledgeService:
             else:
                 query_engine = self.query_engine
             
-            # 执行查询，添加超时控制
+            # execute query, add timeout control
             response = await asyncio.wait_for(
                 asyncio.to_thread(query_engine.query, question),
                 timeout=self.operation_timeout
             )
             
-            # 提取源节点信息
+            # extract source node information
             source_nodes = []
             if hasattr(response, 'source_nodes'):
                 for node in response.source_nodes:
@@ -454,12 +454,12 @@ class Neo4jKnowledgeService:
             }
     
     async def get_graph_schema(self) -> Dict[str, Any]:
-        """获取图谱结构信息"""
+        """get graph schema information"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 获取图谱统计信息，添加超时控制
+            # get graph statistics, add timeout control
             schema_info = await asyncio.wait_for(
                 asyncio.to_thread(self.graph_store.get_schema),
                 timeout=self.connection_timeout
@@ -487,12 +487,12 @@ class Neo4jKnowledgeService:
     async def search_similar_nodes(self, 
                                  query: str, 
                                  top_k: int = 10) -> Dict[str, Any]:
-        """基于向量相似度搜索节点"""
+        """search nodes by vector similarity"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 使用检索器进行向量搜索，添加超时控制
+            # use retriever for vector search, add timeout control
             retriever = self.knowledge_index.as_retriever(
                 similarity_top_k=top_k,
                 include_text=True
@@ -503,7 +503,7 @@ class Neo4jKnowledgeService:
                 timeout=self.operation_timeout
             )
             
-            # 格式化结果
+            # format results
             results = []
             for node in nodes:
                 results.append({
@@ -535,14 +535,14 @@ class Neo4jKnowledgeService:
             }
     
     async def get_statistics(self) -> Dict[str, Any]:
-        """获取知识图谱统计信息"""
+        """get knowledge graph statistics"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 尝试获取基本统计信息，添加超时控制
+            # try to get basic statistics, add timeout control
             try:
-                # 如果图存储支持统计查询
+                # if graph store supports statistics query
                 stats = await asyncio.wait_for(
                     asyncio.to_thread(lambda: {
                         "index_type": "KnowledgeGraphIndex with Neo4j vector store",
@@ -572,12 +572,12 @@ class Neo4jKnowledgeService:
             }
     
     async def clear_knowledge_base(self) -> Dict[str, Any]:
-        """清空知识库"""
+        """clear knowledge base"""
         if not self._initialized:
             raise Exception("Service not initialized")
         
         try:
-            # 重新创建空的索引，添加超时控制
+            # recreate empty index, add timeout control
             storage_context = StorageContext.from_defaults(
                 graph_store=self.graph_store
             )
@@ -591,7 +591,7 @@ class Neo4jKnowledgeService:
                 timeout=self.connection_timeout
             )
             
-            # 重新创建查询引擎
+            # recreate query engine
             self.query_engine = self.knowledge_index.as_query_engine(
                 include_text=True,
                 response_mode="tree_summarize",
@@ -620,17 +620,17 @@ class Neo4jKnowledgeService:
             }
     
     async def close(self):
-        """关闭服务"""
+        """close service"""
         try:
             if self.graph_store:
-                # 如果图存储有关闭方法，调用它
+                # if graph store has close method, call it
                 if hasattr(self.graph_store, 'close'):
                     await asyncio.wait_for(
                         asyncio.to_thread(self.graph_store.close),
                         timeout=self.connection_timeout
                     )
                 elif hasattr(self.graph_store, '_driver') and self.graph_store._driver:
-                    # 关闭 Neo4j 驱动连接
+                    # close Neo4j driver connection
                     await asyncio.wait_for(
                         asyncio.to_thread(self.graph_store._driver.close),
                         timeout=self.connection_timeout
@@ -645,7 +645,7 @@ class Neo4jKnowledgeService:
             logger.error(f"Error closing service: {e}")
     
     def set_timeouts(self, connection_timeout: int = None, operation_timeout: int = None, large_document_timeout: int = None):
-        """动态设置超时参数"""
+        """dynamic set timeout parameters"""
         if connection_timeout is not None:
             self.connection_timeout = connection_timeout
             logger.info(f"Connection timeout set to {connection_timeout}s")
@@ -658,5 +658,5 @@ class Neo4jKnowledgeService:
             self.large_document_timeout = large_document_timeout
             logger.info(f"Large document timeout set to {large_document_timeout}s")
 
-# 全局服务实例
+# global service instance
 neo4j_knowledge_service = Neo4jKnowledgeService() 

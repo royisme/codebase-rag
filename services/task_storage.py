@@ -1,6 +1,6 @@
 """
-基于 SQLite 的任务持久化存储
-确保任务数据不会丢失，支持服务重启后恢复任务状态
+task persistent storage based on SQLite
+ensures task data is not lost, supports task state recovery after service restart
 """
 
 import sqlite3
@@ -63,7 +63,7 @@ class Task:
         )
 
 class TaskStorage:
-    """任务持久化存储管理器"""
+    """task persistent storage manager"""
     
     def __init__(self, db_path: str = "data/tasks.db"):
         self.db_path = Path(db_path)
@@ -72,7 +72,7 @@ class TaskStorage:
         self._init_database()
     
     def _init_database(self):
-        """初始化数据库表结构"""
+        """initialize database table structure"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS tasks (
@@ -90,7 +90,7 @@ class TaskStorage:
                 )
             """)
             
-            # 创建索引
+            # create indexes
             conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(type)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at)")
@@ -314,5 +314,5 @@ class TaskStorage:
             conn.commit()
             return cursor.rowcount
 
-# 全局存储实例
+# global storage instance
 task_storage = TaskStorage() 

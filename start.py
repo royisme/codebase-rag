@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Code Graph Knowledge Service 启动脚本
+Code Graph Knowledge Service
 """
 
 import asyncio
@@ -8,18 +8,17 @@ import sys
 import time
 from pathlib import Path
 
-# 添加项目根目录到路径
+# add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import settings, validate_milvus_connection, validate_neo4j_connection, validate_ollama_connection
+from config import settings,  validate_neo4j_connection, validate_ollama_connection
 from loguru import logger
 
 def check_dependencies():
-    """检查服务依赖"""
-    logger.info("检查服务依赖...")
+    """check service dependencies"""
+    logger.info("check service dependencies...")
     
     checks = [
-        ("Milvus", validate_milvus_connection),
         ("Neo4j", validate_neo4j_connection),
         ("Ollama", validate_ollama_connection)
     ]
@@ -28,85 +27,84 @@ def check_dependencies():
     for service_name, check_func in checks:
         try:
             if check_func():
-                logger.info(f"✓ {service_name} 连接成功")
+                logger.info(f"✓ {service_name} connection successful")
             else:
-                logger.error(f"✗ {service_name} 连接失败")
+                logger.error(f"✗ {service_name} connection failed")
                 all_passed = False
         except Exception as e:
-            logger.error(f"✗ {service_name} 检查出错: {e}")
+            logger.error(f"✗ {service_name} check error: {e}")
             all_passed = False
     
     return all_passed
 
 def wait_for_services(max_retries=30, retry_interval=2):
-    """等待服务启动"""
-    logger.info("等待服务启动...")
+    """wait for services to start"""
+    logger.info("wait for services to start...")
     
     for attempt in range(1, max_retries + 1):
-        logger.info(f"尝试 {attempt}/{max_retries}...")
+        logger.info(f"try {attempt}/{max_retries}...")
         
         if check_dependencies():
-            logger.info("所有服务已就绪!")
+            logger.info("all services are ready!")
             return True
         
         if attempt < max_retries:
-            logger.info(f"等待 {retry_interval} 秒后重试...")
+            logger.info(f"wait {retry_interval} seconds and retry...")
             time.sleep(retry_interval)
     
-    logger.error("服务启动超时!")
+    logger.error("service startup timeout!")
     return False
 
 def print_startup_info():
-    """打印启动信息"""
+    """print startup info"""
     print("\n" + "="*60)
-    print("🚀 Code Graph Knowledge Service")
+    print("Code Graph Knowledge Service")
     print("="*60)
-    print(f"版本: {settings.app_version}")
-    print(f"主机: {settings.host}:{settings.port}")
-    print(f"调试模式: {settings.debug}")
+    print(f"version: {settings.app_version}")
+    print(f"host: {settings.host}:{settings.port}")
+    print(f"debug mode: {settings.debug}")
     print()
-    print("📊 服务配置:")
-    print(f"  Milvus: {settings.milvus_host}:{settings.milvus_port}")
+    print("service config:")
     print(f"  Neo4j: {settings.neo4j_uri}")
     print(f"  Ollama: {settings.ollama_base_url}")
     print()
-    print("🤖 模型配置:")
+    print("model config:")
     print(f"  LLM: {settings.ollama_model}")
     print(f"  Embedding: {settings.embedding_model}")
     print("="*60)
     print()
 
 def main():
-    """主函数"""
+    """main function"""
     print_startup_info()
     
-    # 检查Python版本
+    # check Python version
     if sys.version_info < (3, 8):
-        logger.error("需要Python 3.8或更高版本")
+        logger.error("Python 3.8 or higher is required")
         sys.exit(1)
     
-    # 检查环境变量
-    logger.info("检查环境配置...")
+    # check environment variables
+    logger.info("check environment config...")
     
-    # 可选：等待服务启动（在开发环境中很有用）
-    if not settings.debug or input("是否跳过服务依赖检查? (y/N): ").lower().startswith('y'):
-        logger.info("跳过服务依赖检查")
+    # optional: wait for services to start (useful in development)
+    if not settings.debug or input("skip service dependency check? (y/N): ").lower().startswith('y'):
+        logger.info("skip service dependency check")
     else:
         if not wait_for_services():
-            logger.error("服务依赖检查失败，继续启动可能会遇到问题")
-            if not input("是否继续启动? (y/N): ").lower().startswith('y'):
+            logger.error("service dependency check failed, continue startup may encounter problems")
+            if not input("continue startup? (y/N): ").lower().startswith('y'):
                 sys.exit(1)
     
-    # 启动应用
-    logger.info("启动 FastAPI 应用...")
+    # start application
+    logger.info("start FastAPI application...")
     
     try:
         from main import start_server
         start_server()
     except KeyboardInterrupt:
-        logger.info("服务被用户中断")
+        logger.info("service interrupted by user")
     except Exception as e:
-        logger.error(f"启动失败: {e}")
+        logger.error(f"start failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

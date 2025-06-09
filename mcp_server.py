@@ -1,7 +1,6 @@
 from fastmcp import FastMCP, Context
 from typing import Dict, Any, Optional, List
-import asyncio
-import json
+
 from loguru import logger
 
 from services.neo4j_knowledge_service import Neo4jKnowledgeService

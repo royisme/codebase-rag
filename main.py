@@ -9,15 +9,15 @@ from config import settings
 from core.app import create_app
 from core.logging import setup_logging
 
-# 配置日志
+# setup logging
 setup_logging()
 
-# 创建FastAPI应用
+# create FastAPI app
 app = create_app()
 
-# 启动函数
+# start server
 def start_server():
-    """启动服务器"""
+    """start server"""
     logger.info(f"Starting server on {settings.host}:{settings.port}")
     
     uvicorn.run(

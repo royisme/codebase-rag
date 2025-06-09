@@ -6,19 +6,19 @@ from .pipeline.base import DataSourceType
 from .rag_service import RAGService
 
 class KnowledgeService:
-    """统一的知识库服务"""
+    """knowledge service"""
     
     def __init__(self, vector_service, graph_service, rag_service: RAGService):
         self.vector_service = vector_service
         self.graph_service = graph_service
         self.rag_service = rag_service
         
-        # 创建ETL流水线
+        # create ETL pipeline
         self.pipeline = create_pipeline(
             vector_service=vector_service,
             graph_service=graph_service,
             embedding={
-                "provider": "ollama",  # 使用Ollama作为默认
+                "provider": "ollama",  # use Ollama as default
                 "host": "http://localhost:11434",
                 "model": "nomic-embed-text"
             }
@@ -33,12 +33,12 @@ class KnowledgeService:
                          name: str,
                          doc_type: str = "document",
                          metadata: Dict[str, Any] = None) -> Dict[str, Any]:
-        """添加文档到知识库"""
+        """add document to knowledge base"""
         try:
-            # 检测文档类型
+            # detect document type
             source_type = self._map_doc_type_to_source_type(doc_type)
             
-            # 处理文档
+            # process document
             result = await self.pipeline.process_content(
                 content=content,
                 name=name,
@@ -63,7 +63,7 @@ class KnowledgeService:
             }
     
     async def add_file(self, file_path: str) -> Dict[str, Any]:
-        """添加文件到知识库"""
+        """add file to knowledge base"""
         try:
             result = await self.pipeline.process_file(file_path)
             
@@ -88,7 +88,7 @@ class KnowledgeService:
                           recursive: bool = True,
                           file_patterns: List[str] = None,
                           exclude_patterns: List[str] = None) -> Dict[str, Any]:
-        """批量添加目录中的文件到知识库"""
+        """batch add files from directory to knowledge base"""
         try:
             results = await self.pipeline.process_directory(
                 directory_path=directory_path,
@@ -97,7 +97,7 @@ class KnowledgeService:
                 exclude_patterns=exclude_patterns
             )
             
-            # 统计结果
+            # count results
             successful = sum(1 for r in results if r.success)
             failed = len(results) - successful
             total_chunks = sum(len(r.chunks) for r in results if r.success)
@@ -130,9 +130,9 @@ class KnowledgeService:
             }
     
     async def add_code_repository(self, repo_path: str) -> Dict[str, Any]:
-        """添加代码仓库到知识库"""
+        """add code repository to knowledge base"""
         try:
-            # 专门针对代码仓库的文件模式
+            # special file patterns for code repositories
             code_patterns = [
                 "*.py", "*.js", "*.ts", "*.jsx", "*.tsx", "*.java", "*.cpp", "*.c", "*.h",
                 "*.cs", "*.go", "*.rs", "*.php", "*.rb", "*.scala", "*.kt", "*.swift",
@@ -160,13 +160,13 @@ class KnowledgeService:
                 "error": str(e)
             }
     
-    # 查询方法
+    # query methods
     
     async def query(self, 
                    question: str,
                    search_type: str = "hybrid",
                    top_k: int = 10) -> Dict[str, Any]:
-        """查询知识库"""
+        """query knowledge base"""
         try:
             return await self.rag_service.query(
                 question=question,
@@ -185,7 +185,7 @@ class KnowledgeService:
                              query: str,
                              doc_type: Optional[str] = None,
                              top_k: int = 10) -> Dict[str, Any]:
-        """搜索文档"""
+        """search documents"""
         try:
             return await self.vector_service.search_documents(
                 query=query,
@@ -205,9 +205,9 @@ class KnowledgeService:
                         language: Optional[str] = None,
                         code_type: str = "function",
                         top_k: int = 10) -> Dict[str, Any]:
-        """搜索代码"""
+        """search code"""
         try:
-            # 构建搜索过滤器
+            # build search filters
             filters = {"chunk_type": f"code_{code_type}"}
             if language:
                 filters["language"] = language
@@ -229,9 +229,9 @@ class KnowledgeService:
                              entity: str,
                              relation_type: Optional[str] = None,
                              direction: str = "both") -> Dict[str, Any]:
-        """搜索实体关系"""
+        """search entity relations"""
         try:
-            # 构建Cypher查询
+            # build Cypher query
             if direction == "outgoing":
                 query = f"""
                 MATCH (a)-[r]->(b)
@@ -270,18 +270,18 @@ class KnowledgeService:
                 "error": str(e)
             }
     
-    # 统计和管理方法
+    # statistics and management methods
     
     async def get_statistics(self) -> Dict[str, Any]:
-        """获取知识库统计信息"""
+        """get knowledge base statistics"""
         try:
-            # 获取向量数据库统计
+            # get vector database statistics
             vector_stats = await self.vector_service.get_collection_stats()
             
-            # 获取图数据库统计
+            # get graph database statistics
             graph_stats = await self.graph_service.get_database_stats()
             
-            # 获取流水线统计
+            # get pipeline statistics
             pipeline_stats = self.pipeline.get_stats()
             
             return {
@@ -301,15 +301,15 @@ class KnowledgeService:
             }
     
     async def clear_knowledge_base(self) -> Dict[str, Any]:
-        """清空知识库"""
+        """clear knowledge base"""
         try:
-            # 清空向量数据库
+            # clear vector database
             vector_result = await self.vector_service.clear_collection()
             
-            # 清空图数据库
+            # clear graph database
             graph_result = await self.graph_service.clear_database()
             
-            # 重置流水线统计
+            # reset pipeline statistics
             self.pipeline.reset_stats()
             
             return {
@@ -327,7 +327,7 @@ class KnowledgeService:
             }
     
     def _map_doc_type_to_source_type(self, doc_type: str) -> DataSourceType:
-        """将文档类型映射到数据源类型"""
+        """map document type to data source type"""
         type_mapping = {
             "document": DataSourceType.DOCUMENT,
             "code": DataSourceType.CODE,
