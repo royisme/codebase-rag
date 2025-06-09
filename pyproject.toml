@@ -1,0 +1,37 @@
+[project]
+name = "code-graph"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "sqlglot",
+    "pymilvus",
+    "neo4j",
+    "llama-index",
+    "llama-index-embeddings-huggingface",
+    "llama-index-llms-ollama",
+    "llama-index-vector-stores-milvus",
+    "llama-index-graph-stores-neo4j",
+    "httpx",
+    "aiofiles",
+    "python-jose[cryptography]",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "loguru",
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "isort",
+    "llama-index-vector-stores-neo4jvector>=0.3.0",
+    "llama-index-embeddings-ollama>=0.6.0",
+    "fastmcp>=2.7.1",
+    "llama-index-llms-gemini>=0.5.0",
+    "llama-index-embeddings-gemini>=0.3.2",
+    "google-generativeai>=0.3.0",
+    "matplotlib>=3.10.3",
+]

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "knowledge-graph": {
+      "command": "python",
+      "args": ["mcp_server.py"],
+      "cwd": ".",
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+} 

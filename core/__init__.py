@@ -1,0 +1,1 @@
+# Core module for application initialization and configuration 

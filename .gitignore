@@ -1,0 +1,44 @@
+## Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+.venv/
+.pytest_cache/
+.python-version
+uv.lock
+
+## Environment
+.env
+.env.local
+.env.development.local
+
+## Node
+node_modules/
+
+## Build
+build/
+dist/
+
+## Logs
+logs/
+## data
+data/
+## .DS_Store
+.DS_Store
+
+## .vscode
+.vscode/
+
+## .idea
+.idea/
+
+## .pytest_cache
+.pytest_cache/
+
+## .cursor
+.cursor/
+docs/
+tests/
