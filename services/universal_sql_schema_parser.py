@@ -57,6 +57,147 @@ class UniversalSQLSchemaParser:
         self.tables: Dict[str, TableInfo] = {}
         
     @classmethod
+    def auto_detect(cls, schema_content: str = None, file_path: str = None):
+        """Auto-detect best configuration based on schema content"""
+        if file_path:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            content = schema_content or ""
+        
+        # Smart detection logic
+        config = cls._detect_sql_dialect(content)
+        business_domains = cls._detect_business_domains(content)
+        config.business_domains = business_domains
+        
+        return cls(config)
+    
+    @classmethod
+    def _detect_sql_dialect(cls, content: str) -> ParsingConfig:
+        """Detect SQL dialect and set appropriate configuration"""
+        content_lower = content.lower()
+        
+        # Oracle detection
+        if any(keyword in content_lower for keyword in ['varchar2', 'number(', 'sysdate', 'dual', 'rownum']):
+            return ParsingConfig(
+                statement_separator="/",
+                table_name_pattern=r'create\s+table\s+(\w+)\.(\w+)',
+                comment_patterns=[r'--.*$', r'/\*.*?\*/']
+            )
+        
+        # MySQL detection  
+        elif any(keyword in content_lower for keyword in ['auto_increment', 'tinyint', 'mediumtext', 'longtext']):
+            return ParsingConfig(
+                statement_separator=";",
+                table_name_pattern=r'create\s+table\s+(?:(\w+)\.)?(\w+)',
+                comment_patterns=[r'--.*$', r'/\*.*?\*/', r'#.*$']
+            )
+        
+        # PostgreSQL detection
+        elif any(keyword in content_lower for keyword in ['serial', 'bigserial', 'text[]', 'jsonb', 'uuid']):
+            return ParsingConfig(
+                statement_separator=";",
+                table_name_pattern=r'create\s+table\s+(?:(\w+)\.)?(\w+)',
+                comment_patterns=[r'--.*$', r'/\*.*?\*/']
+            )
+        
+        # SQL Server detection
+        elif any(keyword in content_lower for keyword in ['identity', 'nvarchar', 'datetime2', 'uniqueidentifier']):
+            return ParsingConfig(
+                statement_separator=";",
+                table_name_pattern=r'create\s+table\s+(?:\[?(\w+)\]?\.)?\[?(\w+)\]?',
+                comment_patterns=[r'--.*$', r'/\*.*?\*/']
+            )
+        
+        # Default to generic SQL
+        else:
+            return ParsingConfig(
+                statement_separator=";",
+                table_name_pattern=r'create\s+table\s+(?:(\w+)\.)?(\w+)',
+                comment_patterns=[r'--.*$', r'/\*.*?\*/']
+            )
+    
+    @classmethod
+    def _detect_business_domains(cls, content: str) -> Dict[str, List[str]]:
+        """Smart detection of business domains based on table names in content"""
+        content_upper = content.upper()
+        
+        # Extract potential table names
+        table_matches = re.findall(r'CREATE\s+TABLE\s+(?:\w+\.)?(\w+)', content_upper)
+        table_names = [name.upper() for name in table_matches]
+        
+        if not table_names:
+            return {}
+        
+        # Score different industry templates
+        scores = {
+            'insurance': cls._score_industry_match(table_names, BusinessDomainTemplates.INSURANCE),
+            'ecommerce': cls._score_industry_match(table_names, BusinessDomainTemplates.ECOMMERCE),
+            'banking': cls._score_industry_match(table_names, BusinessDomainTemplates.BANKING),
+            'healthcare': cls._score_industry_match(table_names, BusinessDomainTemplates.HEALTHCARE)
+        }
+        
+        # Find best match
+        best_industry = max(scores.items(), key=lambda x: x[1])
+        
+        # If score is high enough, use the template
+        if best_industry[1] > 0.2:  # At least 20% match
+            templates = {
+                'insurance': BusinessDomainTemplates.INSURANCE,
+                'ecommerce': BusinessDomainTemplates.ECOMMERCE, 
+                'banking': BusinessDomainTemplates.BANKING,
+                'healthcare': BusinessDomainTemplates.HEALTHCARE
+            }
+            return templates[best_industry[0]]
+        
+        # Otherwise, create generic domains
+        return cls._create_generic_domains(table_names)
+    
+    @classmethod
+    def _score_industry_match(cls, table_names: List[str], template: Dict[str, List[str]]) -> float:
+        """Score how well table names match an industry template"""
+        total_keywords = sum(len(keywords) for keywords in template.values())
+        if total_keywords == 0:
+            return 0.0
+        
+        matches = 0
+        for table_name in table_names:
+            for domain, keywords in template.items():
+                for keyword in keywords:
+                    if keyword in table_name:
+                        matches += 1
+                        break
+        
+        return matches / len(table_names) if table_names else 0.0
+    
+    @classmethod
+    def _create_generic_domains(cls, table_names: List[str]) -> Dict[str, List[str]]:
+        """Create generic business domains based on common patterns"""
+        domains = {
+            'user_management': [],
+            'data_management': [],
+            'system_configuration': [],
+            'audit_logging': [],
+            'reporting': []
+        }
+        
+        # Categorize based on common patterns
+        for table_name in table_names:
+            if any(keyword in table_name for keyword in ['USER', 'CUSTOMER', 'CLIENT', 'PERSON', 'CONTACT']):
+                domains['user_management'].append(table_name)
+            elif any(keyword in table_name for keyword in ['CONFIG', 'SETTING', 'TYPE', 'STATUS', 'PARAM']):
+                domains['system_configuration'].append(table_name)
+            elif any(keyword in table_name for keyword in ['LOG', 'AUDIT', 'HISTORY', 'TRACE']):
+                domains['audit_logging'].append(table_name)
+            elif any(keyword in table_name for keyword in ['REPORT', 'STAT', 'ANALYTICS', 'SUMMARY']):
+                domains['reporting'].append(table_name)
+            else:
+                domains['data_management'].append(table_name)
+        
+        # Remove empty domains
+        return {k: v for k, v in domains.items() if v}
+    
+    @classmethod
     def from_config_file(cls, config_path: str):
         """Create parser from configuration file"""
         config_path = Path(config_path)
@@ -438,3 +579,44 @@ def create_healthcare_parser() -> UniversalSQLSchemaParser:
         business_domains=BusinessDomainTemplates.HEALTHCARE
     )
     return UniversalSQLSchemaParser(config)
+
+def parse_sql_schema_smart(schema_content: str = None, file_path: str = None) -> Dict[str, Any]:
+    """
+    Smart SQL schema parsing with auto-detection (MCP-friendly)
+    
+    Args:
+        schema_content: SQL schema content as string
+        file_path: Path to SQL schema file
+    
+    Returns:
+        Complete analysis dictionary with tables, domains, and statistics
+    
+    Example:
+        # Parse from string
+        analysis = parse_sql_schema_smart(schema_content="CREATE TABLE users (id INT PRIMARY KEY);")
+        
+        # Parse from file  
+        analysis = parse_sql_schema_smart(file_path="schema.sql")
+    """
+    if not schema_content and not file_path:
+        raise ValueError("Either schema_content or file_path must be provided")
+    
+    # Auto-detect configuration
+    parser = UniversalSQLSchemaParser.auto_detect(schema_content=schema_content, file_path=file_path)
+    
+    # Parse schema
+    if file_path:
+        return parser.parse_schema_file(file_path)
+    else:
+        # Create temporary file for parsing
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False, encoding='utf-8') as f:
+            f.write(schema_content)
+            temp_path = f.name
+        
+        try:
+            return parser.parse_schema_file(temp_path)
+        finally:
+            os.unlink(temp_path)

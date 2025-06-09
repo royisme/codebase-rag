@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from services.sql_parser import sql_analyzer
 from services.graph_service import graph_service
 from services.neo4j_knowledge_service import Neo4jKnowledgeService
+from services.universal_sql_schema_parser import parse_sql_schema_smart
 from services.task_queue import task_queue
 from config import settings
 from loguru import logger
@@ -47,6 +48,10 @@ class QueryRequest(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     top_k: int = 10
+
+class SQLSchemaParseRequest(BaseModel):
+    schema_content: Optional[str] = None
+    file_path: Optional[str] = None
 
 # health check
 @router.get("/health", response_model=HealthResponse)
@@ -239,6 +244,29 @@ async def clear_knowledge_base():
             
     except Exception as e:
         logger.error(f"Clear knowledge base failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sql/parse-schema")
+async def parse_sql_schema(request: SQLSchemaParseRequest):
+    """
+    Parse SQL schema with smart auto-detection
+    
+    Automatically detects:
+    - SQL dialect (Oracle, MySQL, PostgreSQL, SQL Server)  
+    - Business domain classification
+    - Table relationships and statistics
+    """
+    try:
+        if not request.schema_content and not request.file_path:
+            raise HTTPException(status_code=400, detail="Either schema_content or file_path must be provided")
+        
+        analysis = parse_sql_schema_smart(
+            schema_content=request.schema_content,
+            file_path=request.file_path
+        )
+        return analysis
+    except Exception as e:
+        logger.error(f"Error parsing SQL schema: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/config")
