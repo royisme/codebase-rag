@@ -8,31 +8,31 @@ from services.task_queue import task_queue, TaskStatus, submit_document_processi
 from services.task_processors import processor_registry
 from config import settings, get_current_model_info
 
-# 初始化MCP服务器
+# initialize MCP server
 mcp = FastMCP("Neo4j Knowledge Graph MCP Server")
 
-# 初始化Neo4j知识库服务
+# initialize Neo4j knowledge service
 knowledge_service = Neo4jKnowledgeService()
 
-# 服务初始化状态
+# service initialization status
 _service_initialized = False
 
 async def ensure_service_initialized():
-    """确保服务已初始化"""
+    """ensure service is initialized"""
     global _service_initialized
     if not _service_initialized:
         success = await knowledge_service.initialize()
         if success:
             _service_initialized = True
-            # 启动任务队列
+            # start task queue
             await task_queue.start()
-            # 初始化任务处理器
+            # initialize task processors
             processor_registry.initialize_default_processors(knowledge_service)
             logger.info("Neo4j Knowledge Service, Task Queue, and Processors initialized for MCP")
         else:
             raise Exception("Failed to initialize Neo4j Knowledge Service")
 
-# MCP工具：通用知识查询
+# MCP tool: query knowledge
 @mcp.tool
 async def query_knowledge(
     question: str,
@@ -76,7 +76,7 @@ async def query_knowledge(
             "error": error_msg
         }
 
-# MCP工具：搜索相似节点
+# MCP tool: search similar nodes
 @mcp.tool
 async def search_similar_nodes(
     query: str,
@@ -119,7 +119,7 @@ async def search_similar_nodes(
             "error": error_msg
         }
 
-# MCP工具：添加文档（同步版本，小文档）
+# MCP tool: add document (synchronous version, small document)
 @mcp.tool
 async def add_document(
     content: str,
@@ -144,7 +144,7 @@ async def add_document(
         if ctx:
             await ctx.info(f"Adding document: {title}")
         
-        # 对于小文档（<10KB），直接同步处理
+        # for small documents (<10KB), process directly synchronously
         if len(content) < 10240:
             result = await knowledge_service.add_document(
                 content=content,
@@ -158,7 +158,7 @@ async def add_document(
             
             return result
         else:
-            # 大文档使用异步任务队列
+            # for large documents, use asynchronous task queue
             task_id = await submit_document_processing_task(
                 knowledge_service.add_document,
                 content=content,
@@ -187,7 +187,7 @@ async def add_document(
             "error": error_msg
         }
 
-# MCP工具：添加文件（异步任务）
+# MCP tool: add file (asynchronous task)
 @mcp.tool
 async def add_file(
     file_path: str,
@@ -234,7 +234,7 @@ async def add_file(
             "error": error_msg
         }
 
-# MCP工具：添加目录（异步任务）
+# MCP tool: add directory (asynchronous task)
 @mcp.tool
 async def add_directory(
     directory_path: str,
@@ -288,7 +288,7 @@ async def add_directory(
             "error": error_msg
         }
 
-# MCP工具：获取任务状态
+# MCP tool: get task status
 @mcp.tool
 async def get_task_status(
     task_id: str,
@@ -341,7 +341,7 @@ async def get_task_status(
             "error": error_msg
         }
 
-# MCP工具：列出所有任务
+# MCP tool: list all tasks
 @mcp.tool
 async def list_tasks(
     status_filter: Optional[str] = None,
@@ -364,7 +364,7 @@ async def list_tasks(
         if ctx:
             await ctx.info(f"Listing tasks (filter: {status_filter}, limit: {limit})")
         
-        # 转换状态过滤器
+        # convert status filter
         status_enum = None
         if status_filter:
             try:
@@ -377,7 +377,7 @@ async def list_tasks(
         
         tasks = task_queue.get_all_tasks(status_filter=status_enum, limit=limit)
         
-        # 转换为可序列化的格式
+        # convert to serializable format
         task_list = []
         for task in tasks:
             task_list.append({
@@ -407,7 +407,7 @@ async def list_tasks(
             "error": error_msg
         }
 
-# MCP工具：取消任务
+# MCP tool: cancel task
 @mcp.tool
 async def cancel_task(
     task_id: str,
@@ -451,7 +451,7 @@ async def cancel_task(
             "error": error_msg
         }
 
-# MCP工具：获取队列统计
+# MCP tool: get queue statistics
 @mcp.tool
 async def get_queue_stats(ctx: Context = None) -> Dict[str, Any]:
     """
@@ -483,7 +483,7 @@ async def get_queue_stats(ctx: Context = None) -> Dict[str, Any]:
             "error": error_msg
         }
 
-# MCP工具：获取图谱结构
+# MCP tool: get graph schema
 @mcp.tool
 async def get_graph_schema(ctx: Context = None) -> Dict[str, Any]:
     """
@@ -515,7 +515,7 @@ async def get_graph_schema(ctx: Context = None) -> Dict[str, Any]:
             "error": error_msg
         }
 
-# MCP工具：获取统计信息
+# MCP tool: get statistics
 @mcp.tool
 async def get_statistics(ctx: Context = None) -> Dict[str, Any]:
     """
@@ -547,7 +547,7 @@ async def get_statistics(ctx: Context = None) -> Dict[str, Any]:
             "error": error_msg
         }
 
-# MCP工具：清空知识库
+# MCP tool: clear knowledge base
 @mcp.tool
 async def clear_knowledge_base(ctx: Context = None) -> Dict[str, Any]:
     """
@@ -579,7 +579,7 @@ async def clear_knowledge_base(ctx: Context = None) -> Dict[str, Any]:
             "error": error_msg
         }
 
-# MCP资源：知识库配置
+# MCP resource: knowledge base config
 @mcp.resource("knowledge://config")
 async def get_knowledge_config() -> Dict[str, Any]:
     """Get knowledge base configuration and settings."""
@@ -603,7 +603,7 @@ async def get_knowledge_config() -> Dict[str, Any]:
         }
     }
 
-# MCP资源：系统状态
+# MCP resource: system status
 @mcp.resource("knowledge://status")
 async def get_system_status() -> Dict[str, Any]:
     """Get current system status and health."""
@@ -616,7 +616,7 @@ async def get_system_status() -> Dict[str, Any]:
             "status": "healthy" if stats.get("success") else "degraded",
             "services": {
                 "neo4j_knowledge_service": _service_initialized,
-                "neo4j_connection": True,  # 如果能初始化说明连接正常
+                "neo4j_connection": True,  # if initialized, connection is healthy
             },
             "current_models": model_info,
             "statistics": stats
@@ -631,14 +631,14 @@ async def get_system_status() -> Dict[str, Any]:
             }
         }
 
-# MCP资源：最近添加的文档
+# MCP resource: recent documents
 @mcp.resource("knowledge://recent-documents/{limit}")
 async def get_recent_documents(limit: int = 10) -> Dict[str, Any]:
     """Get recently added documents."""
     try:
         await ensure_service_initialized()
-        # 这里可以扩展为从图数据库查询最近添加的文档
-        # 目前返回占位符信息
+        # here can be extended to query recent documents from graph database
+        # currently return placeholder information
         return {
             "message": f"Recent {limit} documents endpoint",
             "note": "This feature can be extended to query Neo4j for recently added documents",
@@ -650,7 +650,7 @@ async def get_recent_documents(limit: int = 10) -> Dict[str, Any]:
             "error": str(e)
         }
 
-# MCP提示：生成查询建议
+# MCP prompt: generate query suggestions
 @mcp.prompt
 def suggest_queries(domain: str = "general") -> str:
     """
@@ -706,5 +706,5 @@ Available query modes:
 You can use the query_knowledge tool with any of these questions or create your own queries."""
 
 if __name__ == "__main__":
-    # 运行MCP服务器
+    # run MCP server
     mcp.run() 

@@ -25,7 +25,7 @@ def setup_logging():
     if hasattr(settings, 'log_file') and settings.log_file:
         logger.add(
             settings.log_file,
-            level="INFO",
+            level=settings.log_level,
             format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
             rotation="1 day",
             retention="30 days",

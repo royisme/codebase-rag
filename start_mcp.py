@@ -7,6 +7,7 @@ Provide knowledge graph query service for AI
 import sys
 from pathlib import Path
 from loguru import logger
+from config import settings,get_current_model_info
 
 # add project root to Python path
 project_root = Path(__file__).parent
@@ -74,7 +75,7 @@ def print_mcp_info():
     logger.info(f"Version: {settings.app_version}")
     logger.info(f"Neo4j URI: {settings.neo4j_uri}")
     logger.info(f"Ollama URL: {settings.ollama_base_url}")
-    logger.info(f"Embedding Model: {settings.embedding_model}")
+    logger.info(f"Model: {get_current_model_info()}")
     logger.info("=" * 60)
     
     logger.info("Available MCP Tools:")

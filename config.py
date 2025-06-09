@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "Code Graph Knowledge Service"
     app_version: str = "1.0.0"
     debug: bool = False
+    # server settings
     host: str = Field(default="0.0.0.0", description="Host", alias="HOST")
     port: int = Field(default=8123, description="Port", alias="PORT")
     
@@ -76,6 +77,10 @@ class Settings(BaseSettings):
     # API Settings
     cors_origins: list = Field(default=["*"], description="CORS allowed origins")
     api_key: Optional[str] = Field(default=None, description="API authentication key")
+    
+    # logging
+    log_file: Optional[str] = Field(default="app.log", description="Log file path")
+    log_level: str = Field(default="INFO", description="Log level")
     
     class Config:
         env_file = ".env"
