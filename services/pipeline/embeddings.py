@@ -166,7 +166,7 @@ class OllamaEmbeddingGenerator(EmbeddingGenerator):
         
         url = f"{self.host}/api/embeddings"
         payload = {
-            "model":極model,
+            "model": self.model,
             "prompt": text
         }
         
@@ -289,7 +289,7 @@ class EmbeddingGeneratorFactory:
             raise ValueError(f"Unsupported embedding provider: {provider}")
 
 # default embedding generator (can be modified through configuration)
-default极embedding_generator = None
+default_embedding_generator = None
 
 def get_default_embedding_generator() -> EmbeddingGenerator:
     """get default embedding generator"""

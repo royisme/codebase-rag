@@ -11,7 +11,7 @@ from pathlib import Path
 # add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import settings,  validate_neo4j_connection, validate_ollama_connection, validate_openrouter_connection
+from config import settings,  validate_neo4j_connection, validate_ollama_connection, validate_openrouter_connection, get_current_model_info
 from loguru import logger
 
 def check_dependencies():
@@ -75,9 +75,10 @@ def print_startup_info():
     print(f"  Neo4j: {settings.neo4j_uri}")
     print(f"  Ollama: {settings.ollama_base_url}")
     print()
+    model_info = get_current_model_info()
     print("model config:")
-    print(f"  LLM: {settings.ollama_model}")
-    print(f"  Embedding: {settings.embedding_model}")
+    print(f"  LLM: {model_info['llm_model']}")
+    print(f"  Embedding: {model_info['embedding_model']}")
     print("="*60)
     print()
 
