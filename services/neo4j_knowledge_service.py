@@ -90,7 +90,7 @@ class Neo4jKnowledgeService:
             return OpenAI(
                 model=settings.openrouter_model,
                 api_key=settings.openrouter_api_key,
-                api_base=settings.openrouter_base_url,
+                base_url=settings.openrouter_base_url,
                 temperature=settings.temperature,
                 max_tokens=settings.openrouter_max_tokens,
                 timeout=self.operation_timeout

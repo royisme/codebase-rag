@@ -166,7 +166,7 @@ class OllamaEmbeddingGenerator(EmbeddingGenerator):
         
         url = f"{self.host}/api/embeddings"
         payload = {
-            "model": self.model,
+            "model":極model,
             "prompt": text
         }
         
@@ -195,6 +195,63 @@ class OllamaEmbeddingGenerator(EmbeddingGenerator):
             
         except Exception as e:
             logger.error(f"Failed to generate Ollama embeddings: {e}")
+            raise
+
+class OpenRouterEmbeddingGenerator(EmbeddingGenerator):
+    """OpenRouter embedding generator"""
+    
+    def __init__(self, api_key: str, model: str = "text-embedding-ada-002"):
+        self.api_key = api_key
+        self.model = model
+        self.client = None
+    
+    async def _get_client(self):
+        """get OpenRouter client (which is the same as OpenAI client)"""
+        if self.client is None:
+            try:
+                from openai import AsyncOpenAI
+                self.client = AsyncOpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=self.api_key,
+                    # OpenRouter requires the HTTP referer header to be set
+                    # We set the referer to the application's name, or use a default
+                    default_headers={
+                        "HTTP-Referer": "CodeGraphKnowledgeService",
+                        "X-Title": "CodeGraph Knowledge Service"
+                    }
+                )
+            except ImportError:
+                raise ImportError("Please install openai: pip install openai")
+        return self.client
+    
+    async def generate_embedding(self, text: str) -> List[float]:
+        """generate single text embedding vector"""
+        client = await self._get_client()
+        
+        try:
+            response = await client.embeddings.create(
+                input=text,
+                model=self.model
+            )
+            return response.data[0].embedding
+            
+        except Exception as e:
+            logger.error(f"Failed to generate OpenRouter embedding: {e}")
+            raise
+    
+    async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """batch generate embedding vectors"""
+        client = await self._get_client()
+        
+        try:
+            response = await client.embeddings.create(
+                input=texts,
+                model=self.model
+            )
+            return [data.embedding for data in response.data]
+            
+        except Exception as e:
+            logger.error(f"Failed to generate OpenRouter embeddings: {e}")
             raise
 
 class EmbeddingGeneratorFactory:
@@ -232,7 +289,7 @@ class EmbeddingGeneratorFactory:
             raise ValueError(f"Unsupported embedding provider: {provider}")
 
 # default embedding generator (can be modified through configuration)
-default_embedding_generator = None
+default极embedding_generator = None
 
 def get_default_embedding_generator() -> EmbeddingGenerator:
     """get default embedding generator"""

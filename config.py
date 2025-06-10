@@ -169,6 +169,26 @@ def validate_gemini_connection():
         print(f"Gemini connection failed: {e}")
         return False
 
+def validate_openrouter_connection():
+    """Validate OpenRouter API connection"""
+    if not settings.openrouter_api_key:
+        print("OpenRouter API key not provided")
+        return False
+    try:
+        import httpx
+        # We'll use the models endpoint to check the connection
+        headers = {
+            "Authorization": f"Bearer {settings.openrouter_api_key}",
+            # OpenRouter requires these headers for identification
+            "HTTP-Referer": "CodeGraphKnowledgeService",
+            "X-Title": "CodeGraph Knowledge Service"
+        }
+        response = httpx.get("https://openrouter.ai/api/v1/models", headers=headers)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"OpenRouter connection failed: {e}")
+        return False
+
 def get_current_model_info():
     """Get information about currently configured models"""
     return {
