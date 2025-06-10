@@ -20,9 +20,16 @@ def check_dependencies():
     
     checks = [
         ("Neo4j", validate_neo4j_connection),
-        ("Ollama", validate_ollama_connection)
     ]
     
+    # Conditionally add Ollama if it is the selected LLM or embedding provider
+    if settings.llm_provider == "ollama" or settings.embedding_provider == "ollama":
+        checks.append(("Ollama", validate_ollama_connection))
+        
+    # Conditionally add OpenRouter if it is the selected LLM or embedding provider
+    if settings.llm_provider == "openrouter" or settings.embedding_provider == "openrouter":
+        checks.append(("OpenRouter", validate_openrouter_connection))
+        
     all_passed = True
     for service_name, check_func in checks:
         try:
