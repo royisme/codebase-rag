@@ -128,6 +128,15 @@ class Neo4jKnowledgeService:
             return HuggingFaceEmbedding(
                 model_name=settings.huggingface_embedding_model
             )
+        elif provider == "openrouter":
+            if not settings.openrouter_api_key:
+                raise ValueError("OpenRouter API key is required for OpenRouter embedding provider")
+            return OpenAIEmbedding(
+                model=settings.openrouter_embedding_model,
+                api_key=settings.openrouter_api_key,
+                api_base=settings.openrouter_base_url,
+                timeout=self.operation_timeout
+            )
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
     
