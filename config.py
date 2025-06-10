@@ -176,13 +176,15 @@ def get_current_model_info():
         "llm_model": {
             "ollama": settings.ollama_model,
             "openai": settings.openai_model,
-            "gemini": settings.gemini_model
+            "gemini": settings.gemini_model,
+            "openrouter": settings.openrouter_model
         }.get(settings.llm_provider),
         "embedding_provider": settings.embedding_provider,
         "embedding_model": {
             "ollama": settings.ollama_embedding_model,
             "openai": settings.openai_embedding_model,
             "gemini": settings.gemini_embedding_model,
-            "huggingface": settings.huggingface_embedding_model
+            "huggingface": settings.huggingface_embedding_model,
+            "openrouter": settings.openrouter_embedding_model
         }.get(settings.embedding_provider)
-    } 
+    }

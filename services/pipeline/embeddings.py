@@ -206,7 +206,7 @@ class EmbeddingGeneratorFactory:
         provider = config.get("provider", "huggingface").lower()
         
         if provider == "huggingface":
-            model_name = config.get("model_name", "BAAI/bge-small-zh-v1.5")
+            model_name = config.get("model_name", "BAAI/bge-small-zh-v1.05")
             return HuggingFaceEmbeddingGenerator(model_name=model_name)
         
         elif provider == "openai":
@@ -220,6 +220,13 @@ class EmbeddingGeneratorFactory:
             host = config.get("host", "http://localhost:11434")
             model = config.get("model", "nomic-embed-text")
             return OllamaEmbeddingGenerator(host=host, model=model)
+        
+        elif provider == "openrouter":
+            api_key = config.get("api_key")
+            if not api_key:
+                raise ValueError("OpenRouter API key is required")
+            model = config.get("model", "text-embedding-ada-002")
+            return OpenRouterEmbeddingGenerator(api_key=api_key, model=model)
         
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
