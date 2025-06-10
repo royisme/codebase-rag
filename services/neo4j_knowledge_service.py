@@ -84,6 +84,17 @@ class Neo4jKnowledgeService:
                 temperature=settings.temperature,
                 max_tokens=settings.max_tokens
             )
+        elif provider == "openrouter":
+            if not settings.openrouter_api_key:
+                raise ValueError("OpenRouter API key is required for OpenRouter provider")
+            return OpenAI(
+                model=settings.openrouter_model,
+                api_key=settings.openrouter_api_key,
+                api_base=settings.openrouter_base_url,
+                temperature=settings.temperature,
+                max_tokens=settings.openrouter_max_tokens,
+                timeout=self.operation_timeout
+            )
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
     

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     neo4j_database: str = Field(default="neo4j", description="Neo4j database name")
     
     # LLM Provider Configuration
-    llm_provider: Literal["ollama", "openai", "gemini"] = Field(
+    llm_provider: Literal["ollama", "openai", "gemini", "openrouter"] = Field(
         default="ollama", 
         description="LLM provider to use", 
         alias="LLM_PROVIDER"
@@ -45,8 +45,14 @@ class Settings(BaseSettings):
     google_api_key: Optional[str] = Field(default=None, description="Google API key", alias="GOOGLE_API_KEY")
     gemini_model: str = Field(default="gemini-pro", description="Gemini model name", alias="GEMINI_MODEL")
     
+    # OpenRouter Configuration
+    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key", alias="OPENROUTER_API_KEY")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1", description="OpenRouter API base URL", alias="OPENROUTER_BASE_URL")
+    openrouter_model: Optional[str] = Field(default="openai/gpt-3.5-turbo", description="OpenRouter model", alias="OPENROUTER_MODEL")
+    openrouter_max_tokens: int = Field(default=2048, description="OpenRouter max tokens for completion", alias="OPENROUTER_MAX_TOKENS")
+    
     # Embedding Provider Configuration
-    embedding_provider: Literal["ollama", "openai", "gemini", "huggingface"] = Field(
+    embedding_provider: Literal["ollama", "openai", "gemini", "huggingface", "openrouter"] = Field(
         default="ollama", 
         description="Embedding provider to use", 
         alias="EMBEDDING_PROVIDER"
@@ -63,6 +69,9 @@ class Settings(BaseSettings):
     
     # HuggingFace Embedding
     huggingface_embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", description="HuggingFace embedding model", alias="HF_EMBEDDING_MODEL")
+    
+    # OpenRouter Embedding
+    openrouter_embedding_model: str = Field(default="text-embedding-ada-002", description="OpenRouter embedding model", alias="OPENROUTER_EMBEDDING_MODEL")
     
     # Model Parameters
     temperature: float = Field(default=0.1, description="LLM temperature")
