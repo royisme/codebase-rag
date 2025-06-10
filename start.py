@@ -11,7 +11,7 @@ from pathlib import Path
 # add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import settings,  validate_neo4j_connection, validate_ollama_connection
+from config import settings,  validate_neo4j_connection, validate_ollama_connection, validate_openrouter_connection
 from loguru import logger
 
 def check_dependencies():
