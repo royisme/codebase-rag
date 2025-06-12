@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     operation_timeout: int = Field(default=120, description="Operation timeout in seconds")
     large_document_timeout: int = Field(default=300, description="Large document processing timeout in seconds")
     
+    # Document Processing Settings
+    max_document_size: int = Field(default=10 * 1024 * 1024, description="Maximum document size in bytes (10MB)")
+    max_payload_size: int = Field(default=50 * 1024 * 1024, description="Maximum task payload size for storage (50MB)")
+    
     # API Settings
     cors_origins: list = Field(default=["*"], description="CORS allowed origins")
     api_key: Optional[str] = Field(default=None, description="API authentication key")

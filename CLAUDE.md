@@ -35,6 +35,10 @@ python start.py
 # Start MCP server (for AI assistant integration)
 python start_mcp.py
 
+# Using script entry points (after uv sync)
+uv run server
+uv run mcp_client
+
 # Direct FastAPI startup
 python main.py
 ```
@@ -122,8 +126,39 @@ The system uses LlamaIndex's `KnowledgeGraphIndex` with Neo4j backend. Global se
 - `/api/v1/documents/*`: Document management
 - `/api/v1/sql/*`: SQL parsing and analysis
 
-### Monitoring Interface
-When `ENABLE_MONITORING=true`, NiceGUI monitoring interface is available at `/ui/monitor` for task queue monitoring.
+### Real-time Task Monitoring
+The system provides multiple approaches for real-time task monitoring:
+
+#### Web UI Monitoring (`/ui/monitor`)
+When `ENABLE_MONITORING=true`, NiceGUI monitoring interface is available with:
+- Real-time task status updates via WebSocket
+- File upload functionality (50KB size limit)
+- Directory batch processing
+- Task progress visualization
+
+#### Server-Sent Events (SSE) API
+SSE endpoints for streaming real-time updates:
+- `/api/v1/sse/task/{task_id}`: Monitor single task progress
+- `/api/v1/sse/tasks`: Monitor all tasks with optional status filtering
+- `/api/v1/sse/stats`: Get active SSE connection statistics
+
+#### MCP Real-time Tools
+MCP server provides real-time monitoring tools:
+- `watch_task`: Monitor single task with progress history
+- `watch_tasks`: Monitor multiple tasks until completion
+- Supports custom timeouts and update intervals
+- **Note**: These are MCP protocol tools, not HTTP endpoints
+
+#### Client Implementation Examples
+- `examples/pure_mcp_client.py`: Pure MCP client using `watch_task` tools
+- `examples/hybrid_http_sse_client.py`: HTTP + SSE hybrid approach
+
+### Large File Handling Strategy
+The system handles large documents through multiple approaches:
+- **Small files (<10KB)**: Direct synchronous processing
+- **Medium files (10-50KB)**: Temporary file strategy with background processing
+- **Large files (>50KB)**: UI prompts for directory processing or MCP client usage
+- **MCP client**: Automatic temporary file creation for large documents
 
 ## Testing Approach
 

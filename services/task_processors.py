@@ -4,15 +4,13 @@ define the specific execution logic for different types of tasks
 """
 
 import asyncio
-import logging
 from typing import Dict, Any, Optional, Callable
 from abc import ABC, abstractmethod
 from pathlib import Path
 import json
+from loguru import logger
 
 from .task_storage import TaskType, Task
-
-logger = logging.getLogger(__name__)
 
 class TaskProcessor(ABC):
     """task processor base class"""
@@ -38,14 +36,26 @@ class DocumentProcessingProcessor(TaskProcessor):
         payload = task.payload
         
         try:
+            logger.info(f"Task {task.id} - Starting document processing")
             self._update_progress(progress_callback, 10, "Starting document processing")
             
-            # extract parameters from payload
-            document_content = payload.get("document_content")
-            document_path = payload.get("document_path")
-            document_type = payload.get("document_type", "text")
+            # extract parameters from payload (parameters are nested under "kwargs")
+            kwargs = payload.get("kwargs", {})
+            document_content = kwargs.get("document_content")
+            document_path = kwargs.get("document_path")
+            document_type = kwargs.get("document_type", "text")
+            temp_file_cleanup = kwargs.get("_temp_file", False)
+            
+            # Debug logging for large document issues
+            logger.info(f"Task {task.id} - Content length: {len(document_content) if document_content else 'None'}")
+            logger.info(f"Task {task.id} - Path provided: {document_path}")
+            logger.info(f"Task {task.id} - Available kwargs keys: {list(kwargs.keys())}")
+            logger.info(f"Task {task.id} - Full payload structure: task_name={payload.get('task_name')}, has_kwargs={bool(kwargs)}")
             
             if not document_content and not document_path:
+                logger.error(f"Task {task.id} - Missing document content/path. Payload keys: {list(payload.keys())}")
+                logger.error(f"Task {task.id} - Kwargs content: {kwargs}")
+                logger.error(f"Task {task.id} - Document content type: {type(document_content)}, Path type: {type(document_path)}")
                 raise ValueError("Either document_content or document_path must be provided")
             
             # if path is provided, read file content
@@ -84,6 +94,16 @@ class DocumentProcessingProcessor(TaskProcessor):
         except Exception as e:
             logger.error(f"Document processing failed: {e}")
             raise
+        finally:
+            # Clean up temporary file if it was created
+            if temp_file_cleanup and document_path:
+                try:
+                    import os
+                    if os.path.exists(document_path):
+                        os.unlink(document_path)
+                        logger.info(f"Cleaned up temporary file: {document_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to clean up temporary file {document_path}: {cleanup_error}")
     
     async def _process_with_neo4j(self, content: str, doc_type: str, progress_callback: Optional[Callable]) -> Dict[str, Any]:
         """use Neo4j service to process document"""
@@ -136,10 +156,11 @@ class SchemaParsingProcessor(TaskProcessor):
         try:
             self._update_progress(progress_callback, 10, "Starting schema parsing")
             
-            # extract parameters from payload
-            schema_content = payload.get("schema_content")
-            schema_path = payload.get("schema_path")
-            schema_type = payload.get("schema_type", "sql")
+            # extract parameters from payload (parameters are nested under "kwargs")
+            kwargs = payload.get("kwargs", {})
+            schema_content = kwargs.get("schema_content")
+            schema_path = kwargs.get("schema_path")
+            schema_type = kwargs.get("schema_type", "sql")
             
             if not schema_content and not schema_path:
                 raise ValueError("Either schema_content or schema_path must be provided")
@@ -236,9 +257,10 @@ class KnowledgeGraphConstructionProcessor(TaskProcessor):
         try:
             self._update_progress(progress_callback, 10, "Starting knowledge graph construction")
             
-            # extract parameters from payload
-            data_sources = payload.get("data_sources", [])
-            construction_type = payload.get("construction_type", "full")
+            # extract parameters from payload (parameters are nested under "kwargs")
+            kwargs = payload.get("kwargs", {})
+            data_sources = kwargs.get("data_sources", [])
+            construction_type = kwargs.get("construction_type", "full")
             
             if not data_sources:
                 raise ValueError("No data sources provided for knowledge graph construction")
@@ -331,10 +353,11 @@ class BatchProcessingProcessor(TaskProcessor):
         try:
             self._update_progress(progress_callback, 10, "Starting batch processing")
             
-            # extract parameters from payload
-            directory_path = payload.get("directory_path")
-            file_patterns = payload.get("file_patterns", ["*.txt", "*.md", "*.sql"])
-            batch_size = payload.get("batch_size", 10)
+            # extract parameters from payload (parameters are nested under "kwargs")
+            kwargs = payload.get("kwargs", {})
+            directory_path = kwargs.get("directory_path")
+            file_patterns = kwargs.get("file_patterns", ["*.txt", "*.md", "*.sql"])
+            batch_size = kwargs.get("batch_size", 10)
             
             if not directory_path:
                 raise ValueError("Directory path is required for batch processing")

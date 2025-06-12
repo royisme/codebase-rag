@@ -22,6 +22,7 @@ from llama_index.core import (
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.openai import OpenAI
 from llama_index.llms.gemini import Gemini
+from llama_index.llms.openrouter import OpenRouter
 
 # Embedding Providers
 from llama_index.embeddings.ollama import OllamaEmbedding
@@ -87,10 +88,9 @@ class Neo4jKnowledgeService:
         elif provider == "openrouter":
             if not settings.openrouter_api_key:
                 raise ValueError("OpenRouter API key is required for OpenRouter provider")
-            return OpenAI(
+            return OpenRouter(
                 model=settings.openrouter_model,
                 api_key=settings.openrouter_api_key,
-                base_url=settings.openrouter_base_url,
                 temperature=settings.temperature,
                 max_tokens=settings.openrouter_max_tokens,
                 timeout=self.operation_timeout

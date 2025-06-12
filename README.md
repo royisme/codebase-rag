@@ -14,11 +14,15 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 - **Universal SQL Schema Parser**: Configurable database schema analysis with industry-specific templates
 - **Intelligent Query Engine**: Hybrid search combining vector similarity and graph traversal
 - **Asynchronous Task Processing**: Background processing for large document collections with real-time monitoring
-- **Web-based Monitoring Dashboard**: Real-time task queue monitoring with NiceGUI interface
+- **Real-time Task Monitoring**: Multiple real-time monitoring solutions
+  - Web UI Monitoring: NiceGUI interface with file upload and directory batch processing
+  - SSE Streaming API: HTTP Server-Sent Events for real-time task progress updates
+  - MCP Real-time Tools: AI assistant integrated task monitoring tools
 - **Multi-Database Support**: Oracle, MySQL, PostgreSQL, SQL Server schema parsing and analysis
 - **RESTful API**: Complete API endpoints for document management and knowledge querying
 - **MCP Protocol Support**: Model Context Protocol integration for AI assistant compatibility
-- **Multi-provider LLM Support**: Compatible with Ollama, OpenAI, and Gemini models
+- **Multi-provider LLM Support**: Compatible with Ollama, OpenAI, Gemini, and OpenRouter models
+- **Large File Handling Strategy**: Intelligent file size detection with multiple processing approaches
 
 ### Technical Architecture
 - **FastAPI Backend**: High-performance async web framework
@@ -105,12 +109,21 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 
 5. **Run the Application**
    ```bash
+   # Start main service
    python start.py
+   # or use script entry points
+   uv run server
+   
+   # Start MCP service (optional)
+   python start_mcp.py
+   # or use script entry points
+   uv run mcp_client
    ```
 
 6. **Access the Interface**
    - API Documentation: http://localhost:8000/docs
    - Task Monitor: http://localhost:8000/ui/monitor
+   - Real-time SSE Monitor: http://localhost:8000/api/v1/sse/tasks
    - Health Check: http://localhost:8000/api/v1/health
 
 ## API Usage
@@ -154,6 +167,53 @@ response = httpx.post("http://localhost:8000/api/v1/knowledge/search", json={
 })
 ```
 
+## Real-time Task Monitoring
+
+The system provides three real-time task monitoring approaches:
+
+### 1. Web UI Monitoring Interface
+Access http://localhost:8000/ui/monitor for graphical monitoring:
+- Real-time task status updates
+- File upload functionality (50KB size limit)
+- Directory batch processing
+- Task progress visualization
+
+### 2. Server-Sent Events (SSE) API
+Real-time monitoring via HTTP streaming endpoints:
+
+```javascript
+// Monitor single task
+const eventSource = new EventSource('/api/v1/sse/task/task-id');
+eventSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    console.log('Task progress:', data.progress);
+};
+
+// Monitor all tasks
+const allTasksSource = new EventSource('/api/v1/sse/tasks');
+```
+
+### 3. MCP Real-time Tools
+Task monitoring via MCP protocol:
+
+```python
+# Use pure MCP client monitoring
+# See examples/pure_mcp_client.py
+
+# Monitor single task
+result = await session.call_tool("watch_task", {
+    "task_id": task_id,
+    "timeout": 300,
+    "interval": 1.0
+})
+
+# Monitor multiple tasks
+result = await session.call_tool("watch_tasks", {
+    "task_ids": [task1, task2, task3],
+    "timeout": 300
+})
+```
+
 ## MCP Integration
 
 The system supports Model Context Protocol (MCP) for seamless integration with AI assistants:
@@ -173,6 +233,10 @@ python start_mcp.py
   }
 }
 ```
+
+### Client Implementation Examples
+- `examples/pure_mcp_client.py`: Pure MCP client using MCP tools for monitoring
+- `examples/hybrid_http_sse_client.py`: HTTP + SSE hybrid approach
 
 ## Configuration
 

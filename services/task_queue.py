@@ -11,9 +11,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime
 import json
-import logging
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 class TaskStatus(Enum):
     PENDING = "pending"
@@ -47,6 +45,7 @@ class TaskQueue:
         self._cleanup_task = None
         self._storage = None  # delay initialization to avoid circular import
         self._worker_id = str(uuid.uuid4())  # unique worker ID for locking
+        self._task_worker = None  # task processing worker
         
     async def start(self):
         """start task queue"""
@@ -61,7 +60,21 @@ class TaskQueue:
             self._cleanup_task = asyncio.create_task(self._cleanup_completed_tasks())
         
         # start worker to process pending tasks
-        asyncio.create_task(self._process_pending_tasks())
+        logger.info("About to start task processing worker...")
+        task_worker = asyncio.create_task(self._process_pending_tasks())
+        logger.info("Task processing worker started")
+        
+        # Store the task worker reference to keep it alive
+        self._task_worker = task_worker
+        
+        # Test if we can get pending tasks immediately
+        try:
+            test_tasks = await self._storage.get_pending_tasks(limit=5)
+            logger.info(f"Initial pending tasks check: found {len(test_tasks)} tasks")
+            for task in test_tasks:
+                logger.info(f"  - Task {task.id}: {task.type.value}")
+        except Exception as e:
+            logger.error(f"Failed to get initial pending tasks: {e}")
         
         logger.info(f"Task queue started with max {self.max_concurrent_tasks} concurrent tasks")
     
@@ -74,6 +87,11 @@ class TaskQueue:
                 await self._storage.update_task_status(task_id, TaskStatus.CANCELLED)
             if task_id in self.tasks:
                 self.tasks[task_id].status = TaskStatus.CANCELLED
+        
+        # stop task worker
+        if hasattr(self, '_task_worker') and self._task_worker:
+            self._task_worker.cancel()
+            self._task_worker = None
         
         # stop cleanup task
         if self._cleanup_task:
@@ -90,6 +108,7 @@ class TaskQueue:
         try:
             # restore all incomplete tasks
             stored_tasks = await self._storage.list_tasks(limit=1000)
+            logger.info(f"Restoring {len(stored_tasks)} tasks from storage")
             
             for task in stored_tasks:
                 # create TaskResult object for memory management
@@ -178,37 +197,60 @@ class TaskQueue:
     
     async def _process_pending_tasks(self):
         """continuously process pending tasks"""
+        logger.info("Task processing loop started")
+        loop_count = 0
         while True:
+            loop_count += 1
+            if loop_count % 60 == 1:  # Log every 60 iterations (every minute)
+                logger.debug(f"Task processing loop iteration {loop_count}")
             try:
+                if not self._storage:
+                    if loop_count % 50 == 1:  # Log storage issue every 50 iterations
+                        logger.warning("No storage available for task processing")
+                    await asyncio.sleep(1)
+                    continue
+                    
                 if self._storage:
                     # 获取待处理的任务
                     pending_tasks = await self._storage.get_pending_tasks(
                         limit=self.max_concurrent_tasks
                     )
                     
+                    if loop_count % 10 == 1 and pending_tasks:  # Log every 10 iterations if tasks found
+                        logger.info(f"Found {len(pending_tasks)} pending tasks")
+                    elif pending_tasks:  # Always log when tasks are found
+                        logger.debug(f"Found {len(pending_tasks)} pending tasks")
+                    
                     for task in pending_tasks:
                         # 检查是否已经在运行
                         if task.id in self.running_tasks:
+                            logger.debug(f"Task {task.id} already running, skipping")
                             continue
                         
+                        logger.info(f"Attempting to acquire lock for task {task.id}")
                         # 尝试获取任务锁
                         if await self._storage.acquire_task_lock(task.id, self._worker_id):
+                            logger.info(f"Lock acquired, starting execution for task {task.id}")
                             # 启动任务执行
                             async_task = asyncio.create_task(
                                 self._execute_stored_task(task)
                             )
                             self.running_tasks[task.id] = async_task
+                        else:
+                            logger.debug(f"Failed to acquire lock for task {task.id}")
                 
                 # 等待一段时间再检查
                 await asyncio.sleep(1)
                 
             except Exception as e:
                 logger.error(f"Error in task processing loop: {e}")
+                logger.exception(f"Full traceback for task processing loop error:")
                 await asyncio.sleep(5)
     
     async def _execute_stored_task(self, task):
         """execute stored task"""
         task_id = task.id
+        logger.info(f"Starting execution of stored task {task_id}")
         task_result = self.tasks.get(task_id)
         
         if not task_result:
@@ -241,7 +283,9 @@ class TaskQueue:
             
             # here we need to dynamically restore task function based on task type
             # for now, we use a placeholder, actual implementation needs task registration mechanism
+            logger.info(f"Task {task_id} about to execute by type: {task.type}")
             result = await self._execute_task_by_type(task)
+            logger.info(f"Task {task_id} execution completed with result: {type(result)}")
             
             # task completed
             task_result.status = TaskStatus.SUCCESS
@@ -467,9 +511,9 @@ async def submit_document_processing_task(
 ) -> str:
     """submit document processing task"""
     return await task_queue.submit_task(
-        service_method,
-        args,
-        kwargs,
+        task_func=service_method,
+        task_args=args,
+        task_kwargs=kwargs,
         task_name=task_name,
         task_type="document_processing"
     )
@@ -482,9 +526,9 @@ async def submit_directory_processing_task(
 ) -> str:
     """submit directory processing task"""
     return await task_queue.submit_task(
-        service_method,
-        (directory_path,),
-        kwargs,
+        task_func=service_method,
+        task_args=(directory_path,),
+        task_kwargs=kwargs,
         task_name=task_name,
         task_type="batch_processing"
     ) 

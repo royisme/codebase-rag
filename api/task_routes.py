@@ -12,6 +12,7 @@ from datetime import datetime
 from services.task_queue import task_queue, TaskStatus
 from services.task_storage import TaskType
 from loguru import logger
+from config import settings
 
 router = APIRouter(prefix="/tasks", tags=["Task Management"])
 
@@ -67,6 +68,25 @@ async def create_task(request: CreateTaskRequest):
         task_kwargs = request.payload.copy()
         if request.metadata:
             task_kwargs.update(request.metadata)
+        
+        # Handle large documents by storing them temporarily
+        if request.task_type == "document_processing":
+            document_content = task_kwargs.get("document_content")
+            if document_content and len(document_content) > settings.max_document_size:
+                import tempfile
+                import os
+                
+                # Create temporary file for large document
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp_file:
+                    tmp_file.write(document_content)
+                    temp_path = tmp_file.name
+                
+                logger.info(f"Large document ({len(document_content)} bytes) saved to temporary file: {temp_path}")
+                
+                # Replace content with path reference
+                task_kwargs["document_path"] = temp_path
+                task_kwargs["document_content"] = None  # Clear large content
+                task_kwargs["_temp_file"] = True  # Mark as temporary file for cleanup
         
         # select processing function based on task type
         task_func = None
