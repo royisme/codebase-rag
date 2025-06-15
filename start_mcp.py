@@ -42,7 +42,7 @@ def check_dependencies():
 
 def check_services():
     """check necessary services"""
-    from config import validate_neo4j_connection, validate_ollama_connection
+    from config import validate_neo4j_connection, validate_ollama_connection, validate_openrouter_connection, settings
     
     logger.info("Checking service connections...")
     
@@ -54,13 +54,22 @@ def check_services():
         logger.error("Please ensure Neo4j is running and accessible")
         return False
     
-    # check Ollama connection
-    if validate_ollama_connection():
-        logger.info("✓ Ollama connection successful")
-    else:
-        logger.error("✗ Ollama connection failed")
-        logger.error("Please ensure Ollama is running and accessible")
-        return False
+    # Conditionally check LLM provider connections
+    if settings.llm_provider == "ollama" or settings.embedding_provider == "ollama":
+        if validate_ollama_connection():
+            logger.info("✓ Ollama connection successful")
+        else:
+            logger.error("✗ Ollama connection failed")
+            logger.error("Please ensure Ollama is running and accessible")
+            return False
+    
+    if settings.llm_provider == "openrouter" or settings.embedding_provider == "openrouter":
+        if validate_openrouter_connection():
+            logger.info("✓ OpenRouter connection successful")
+        else:
+            logger.error("✗ OpenRouter connection failed")
+            logger.error("Please ensure OpenRouter API key is configured correctly")
+            return False
     
     return True
 

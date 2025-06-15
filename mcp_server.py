@@ -158,14 +158,31 @@ async def add_document(
             
             return result
         else:
-            # for large documents, use asynchronous task queue
-            task_id = await submit_document_processing_task(
-                knowledge_service.add_document,
-                content=content,
-                title=title,
-                metadata=metadata,
-                task_name=f"Add Document: {title}"
-            )
+            # for large documents (>=10KB), save to temporary file first
+            import tempfile
+            import os
+            
+            temp_fd, temp_path = tempfile.mkstemp(suffix=f"_{title.replace('/', '_')}.txt", text=True)
+            try:
+                with os.fdopen(temp_fd, 'w', encoding='utf-8') as temp_file:
+                    temp_file.write(content)
+                
+                # use file path instead of content to avoid payload size issues
+                task_id = await submit_document_processing_task(
+                    knowledge_service.add_file,  # Use add_file instead of add_document
+                    temp_path,
+                    task_name=f"Add Large Document: {title}",
+                    # Add metadata to track this is a temp file that should be cleaned up
+                    _temp_file=True,
+                    _original_title=title,
+                    _original_metadata=metadata
+                )
+            except:
+                # Clean up on error
+                os.close(temp_fd)
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                raise
             
             if ctx:
                 await ctx.info(f"Large document queued for processing. Task ID: {task_id}")
@@ -339,6 +356,239 @@ async def get_task_status(
         return {
             "success": False,
             "error": error_msg
+        }
+
+# MCP tool: watch task (real-time task monitoring)
+@mcp.tool
+async def watch_task(
+    task_id: str,
+    timeout: int = 300,
+    interval: float = 1.0,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Watch a task progress with real-time updates until completion.
+    
+    Args:
+        task_id: The task ID to watch
+        timeout: Maximum time to wait in seconds (default: 300)
+        interval: Check interval in seconds (default: 1.0)
+    
+    Returns:
+        Dict containing final task status and progress history
+    """
+    try:
+        await ensure_service_initialized()
+        
+        if ctx:
+            await ctx.info(f"Watching task: {task_id} (timeout: {timeout}s, interval: {interval}s)")
+        
+        import asyncio
+        start_time = asyncio.get_event_loop().time()
+        progress_history = []
+        last_progress = -1
+        last_status = None
+        
+        while True:
+            current_time = asyncio.get_event_loop().time()
+            if current_time - start_time > timeout:
+                return {
+                    "success": False,
+                    "error": "Watch timeout exceeded",
+                    "progress_history": progress_history
+                }
+            
+            task_result = task_queue.get_task_status(task_id)
+            
+            if task_result is None:
+                return {
+                    "success": False,
+                    "error": "Task not found",
+                    "progress_history": progress_history
+                }
+            
+            # Record progress changes
+            if (task_result.progress != last_progress or 
+                task_result.status.value != last_status):
+                
+                progress_entry = {
+                    "timestamp": asyncio.get_event_loop().time(),
+                    "progress": task_result.progress,
+                    "status": task_result.status.value,
+                    "message": task_result.message
+                }
+                progress_history.append(progress_entry)
+                
+                # Send real-time updates to client
+                if ctx:
+                    await ctx.info(f"Progress: {task_result.progress:.1f}% - {task_result.message}")
+                
+                last_progress = task_result.progress
+                last_status = task_result.status.value
+            
+            # Check if task is completed
+            if task_result.status.value in ['success', 'failed', 'cancelled']:
+                final_result = {
+                    "success": True,
+                    "task_id": task_result.task_id,
+                    "final_status": task_result.status.value,
+                    "final_progress": task_result.progress,
+                    "final_message": task_result.message,
+                    "created_at": task_result.created_at.isoformat(),
+                    "started_at": task_result.started_at.isoformat() if task_result.started_at else None,
+                    "completed_at": task_result.completed_at.isoformat() if task_result.completed_at else None,
+                    "result": task_result.result,
+                    "error": task_result.error,
+                    "progress_history": progress_history,
+                    "total_watch_time": current_time - start_time
+                }
+                
+                if ctx:
+                    if task_result.status.value == 'success':
+                        await ctx.info(f"Task completed successfully in {current_time - start_time:.1f}s")
+                    else:
+                        await ctx.error(f"Task {task_result.status.value}: {task_result.error or task_result.message}")
+                
+                return final_result
+            
+            # Wait for next check
+            await asyncio.sleep(interval)
+            
+    except Exception as e:
+        error_msg = f"Watch task failed: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg,
+            "progress_history": progress_history if 'progress_history' in locals() else []
+        }
+
+# MCP tool: watch multiple tasks (batch monitoring)
+@mcp.tool
+async def watch_tasks(
+    task_ids: List[str],
+    timeout: int = 300,
+    interval: float = 2.0,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Watch multiple tasks progress with real-time updates until all complete.
+    
+    Args:
+        task_ids: List of task IDs to watch
+        timeout: Maximum time to wait in seconds (default: 300)
+        interval: Check interval in seconds (default: 2.0)
+    
+    Returns:
+        Dict containing all task statuses and progress histories
+    """
+    try:
+        await ensure_service_initialized()
+        
+        if ctx:
+            await ctx.info(f"Watching {len(task_ids)} tasks (timeout: {timeout}s, interval: {interval}s)")
+        
+        import asyncio
+        start_time = asyncio.get_event_loop().time()
+        tasks_progress = {task_id: [] for task_id in task_ids}
+        completed_tasks = set()
+        
+        while True:
+            current_time = asyncio.get_event_loop().time()
+            if current_time - start_time > timeout:
+                return {
+                    "success": False,
+                    "error": "Watch timeout exceeded",
+                    "tasks_progress": tasks_progress,
+                    "completed_tasks": list(completed_tasks),
+                    "pending_tasks": list(set(task_ids) - completed_tasks)
+                }
+            
+            # Check all tasks
+            active_tasks = []
+            for task_id in task_ids:
+                if task_id in completed_tasks:
+                    continue
+                    
+                task_result = task_queue.get_task_status(task_id)
+                if task_result is None:
+                    completed_tasks.add(task_id)
+                    continue
+                
+                # Record progress
+                progress_entry = {
+                    "timestamp": current_time,
+                    "progress": task_result.progress,
+                    "status": task_result.status.value,
+                    "message": task_result.message
+                }
+                
+                # Only record changed progress
+                if (not tasks_progress[task_id] or 
+                    tasks_progress[task_id][-1]["progress"] != task_result.progress or
+                    tasks_progress[task_id][-1]["status"] != task_result.status.value):
+                    
+                    tasks_progress[task_id].append(progress_entry)
+                    
+                    if ctx:
+                        await ctx.info(f"Task {task_id}: {task_result.progress:.1f}% - {task_result.message}")
+                
+                # Check if completed
+                if task_result.status.value in ['success', 'failed', 'cancelled']:
+                    completed_tasks.add(task_id)
+                    if ctx:
+                        await ctx.info(f"Task {task_id} completed: {task_result.status.value}")
+                else:
+                    active_tasks.append(task_id)
+            
+            # All tasks completed
+            if len(completed_tasks) == len(task_ids):
+                final_results = {}
+                for task_id in task_ids:
+                    task_result = task_queue.get_task_status(task_id)
+                    if task_result:
+                        final_results[task_id] = {
+                            "status": task_result.status.value,
+                            "progress": task_result.progress,
+                            "message": task_result.message,
+                            "result": task_result.result,
+                            "error": task_result.error
+                        }
+                
+                if ctx:
+                    success_count = sum(1 for task_id in task_ids 
+                                     if task_queue.get_task_status(task_id) and 
+                                     task_queue.get_task_status(task_id).status.value == 'success')
+                    await ctx.info(f"All tasks completed! {success_count}/{len(task_ids)} successful")
+                
+                return {
+                    "success": True,
+                    "tasks_progress": tasks_progress,
+                    "final_results": final_results,
+                    "completed_tasks": list(completed_tasks),
+                    "total_watch_time": current_time - start_time,
+                    "summary": {
+                        "total_tasks": len(task_ids),
+                        "successful": sum(1 for r in final_results.values() if r["status"] == "success"),
+                        "failed": sum(1 for r in final_results.values() if r["status"] == "failed"),
+                        "cancelled": sum(1 for r in final_results.values() if r["status"] == "cancelled")
+                    }
+                }
+            
+            # Wait for next check
+            await asyncio.sleep(interval)
+            
+    except Exception as e:
+        error_msg = f"Watch tasks failed: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg,
+            "tasks_progress": tasks_progress if 'tasks_progress' in locals() else {}
         }
 
 # MCP tool: list all tasks

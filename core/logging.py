@@ -10,9 +10,15 @@ from config import settings
 
 def setup_logging():
     """configure logging system"""
+    import logging
     
     # remove default log handler
     logger.remove()
+    
+    # Suppress NiceGUI WebSocket debug logs
+    logging.getLogger("websockets").setLevel(logging.WARNING)
+    logging.getLogger("socketio").setLevel(logging.WARNING)
+    logging.getLogger("engineio").setLevel(logging.WARNING)
     
     # add console log handler
     logger.add(

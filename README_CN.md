@@ -13,10 +13,14 @@
 - **Neo4j GraphRAG 集成**：使用 Neo4j 原生向量索引的高级图检索增强生成
 - **智能查询引擎**：结合向量相似度和图遍历的混合搜索
 - **异步任务处理**：支持大型文档集合的后台处理和实时监控
-- **基于Web的监控仪表板**：使用 NiceGUI 界面进行实时任务队列监控
+- **实时任务监控**：多种实时监控方案
+  - Web UI监控：NiceGUI界面，支持文件上传和目录批处理
+  - SSE流式API：HTTP Server-Sent Events实时任务进度推送
+  - MCP实时工具：AI助手集成的任务监控工具
 - **RESTful API**：完整的文档管理和知识查询 API 端点
 - **MCP 协议支持**：模型上下文协议集成，兼容 AI 助手
-- **多提供商LLM支持**：兼容 Ollama、OpenAI 和 Gemini 模型
+- **多提供商LLM支持**：兼容 Ollama、OpenAI、Gemini 和 OpenRouter 模型
+- **大文件处理策略**：智能文件大小检测和多种处理方案
 
 ### 技术架构
 - **FastAPI 后端**：高性能异步网络框架
@@ -92,12 +96,21 @@
 
 5. **运行应用程序**
    ```bash
+   # 启动主服务
    python start.py
+   # 或使用脚本入口点
+   uv run server
+   
+   # 启动MCP服务（可选）
+   python start_mcp.py
+   # 或使用脚本入口点
+   uv run mcp_client
    ```
 
 6. **访问界面**
    - API 文档：http://localhost:8000/docs
    - 任务监控：http://localhost:8000/ui/monitor
+   - 实时监控SSE：http://localhost:8000/api/v1/sse/tasks
    - 健康检查：http://localhost:8000/api/v1/health
 
 ## API 使用
@@ -141,6 +154,53 @@ response = httpx.post("http://localhost:8000/api/v1/knowledge/search", json={
 })
 ```
 
+## 实时任务监控
+
+系统提供三种实时任务监控方案：
+
+### 1. Web UI 监控界面
+访问 http://localhost:8000/ui/monitor 使用图形界面：
+- 实时任务状态更新
+- 文件上传功能（50KB大小限制）
+- 目录批量处理
+- 任务进度可视化
+
+### 2. Server-Sent Events (SSE) API
+通过 HTTP 流式端点进行实时监控：
+
+```javascript
+// 监控单个任务
+const eventSource = new EventSource('/api/v1/sse/task/task-id');
+eventSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    console.log('Task progress:', data.progress);
+};
+
+// 监控所有任务
+const allTasksSource = new EventSource('/api/v1/sse/tasks');
+```
+
+### 3. MCP 实时工具
+通过 MCP 协议进行任务监控：
+
+```python
+# 使用纯MCP客户端监控
+# 参见 examples/pure_mcp_client.py
+
+# 监控单个任务
+result = await session.call_tool("watch_task", {
+    "task_id": task_id,
+    "timeout": 300,
+    "interval": 1.0
+})
+
+# 监控多个任务
+result = await session.call_tool("watch_tasks", {
+    "task_ids": [task1, task2, task3],
+    "timeout": 300
+})
+```
+
 ## MCP 集成
 
 系统支持模型上下文协议（MCP），可与 AI 助手无缝集成：
@@ -160,6 +220,10 @@ python start_mcp.py
   }
 }
 ```
+
+### 客户端实现示例
+- `examples/pure_mcp_client.py`: 纯MCP客户端，使用MCP工具进行监控
+- `examples/hybrid_http_sse_client.py`: HTTP + SSE 混合方案
 
 ## 配置
 

@@ -21,6 +21,7 @@ node_modules/
 ## Build
 build/
 dist/
+*.egg-info/
 
 ## Logs
 logs/
@@ -42,3 +43,4 @@ data/
 .cursor/
 docs/
 tests/
+.aider*

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     neo4j_database: str = Field(default="neo4j", description="Neo4j database name")
     
     # LLM Provider Configuration
-    llm_provider: Literal["ollama", "openai", "gemini"] = Field(
+    llm_provider: Literal["ollama", "openai", "gemini", "openrouter"] = Field(
         default="ollama", 
         description="LLM provider to use", 
         alias="LLM_PROVIDER"
@@ -45,8 +45,14 @@ class Settings(BaseSettings):
     google_api_key: Optional[str] = Field(default=None, description="Google API key", alias="GOOGLE_API_KEY")
     gemini_model: str = Field(default="gemini-pro", description="Gemini model name", alias="GEMINI_MODEL")
     
+    # OpenRouter Configuration
+    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key", alias="OPENROUTER_API_KEY")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1", description="OpenRouter API base URL", alias="OPENROUTER_BASE_URL")
+    openrouter_model: Optional[str] = Field(default="openai/gpt-3.5-turbo", description="OpenRouter model", alias="OPENROUTER_MODEL")
+    openrouter_max_tokens: int = Field(default=2048, description="OpenRouter max tokens for completion", alias="OPENROUTER_MAX_TOKENS")
+    
     # Embedding Provider Configuration
-    embedding_provider: Literal["ollama", "openai", "gemini", "huggingface"] = Field(
+    embedding_provider: Literal["ollama", "openai", "gemini", "huggingface", "openrouter"] = Field(
         default="ollama", 
         description="Embedding provider to use", 
         alias="EMBEDDING_PROVIDER"
@@ -64,6 +70,9 @@ class Settings(BaseSettings):
     # HuggingFace Embedding
     huggingface_embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", description="HuggingFace embedding model", alias="HF_EMBEDDING_MODEL")
     
+    # OpenRouter Embedding
+    openrouter_embedding_model: str = Field(default="text-embedding-ada-002", description="OpenRouter embedding model", alias="OPENROUTER_EMBEDDING_MODEL")
+    
     # Model Parameters
     temperature: float = Field(default=0.1, description="LLM temperature")
     max_tokens: int = Field(default=2048, description="Maximum tokens for LLM response")
@@ -77,6 +86,10 @@ class Settings(BaseSettings):
     connection_timeout: int = Field(default=30, description="Connection timeout in seconds")
     operation_timeout: int = Field(default=120, description="Operation timeout in seconds")
     large_document_timeout: int = Field(default=300, description="Large document processing timeout in seconds")
+    
+    # Document Processing Settings
+    max_document_size: int = Field(default=10 * 1024 * 1024, description="Maximum document size in bytes (10MB)")
+    max_payload_size: int = Field(default=50 * 1024 * 1024, description="Maximum task payload size for storage (50MB)")
     
     # API Settings
     cors_origins: list = Field(default=["*"], description="CORS allowed origins")
@@ -160,6 +173,26 @@ def validate_gemini_connection():
         print(f"Gemini connection failed: {e}")
         return False
 
+def validate_openrouter_connection():
+    """Validate OpenRouter API connection"""
+    if not settings.openrouter_api_key:
+        print("OpenRouter API key not provided")
+        return False
+    try:
+        import httpx
+        # We'll use the models endpoint to check the connection
+        headers = {
+            "Authorization": f"Bearer {settings.openrouter_api_key}",
+            # OpenRouter requires these headers for identification
+            "HTTP-Referer": "CodeGraphKnowledgeService",
+            "X-Title": "CodeGraph Knowledge Service"
+        }
+        response = httpx.get("https://openrouter.ai/api/v1/models", headers=headers)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"OpenRouter connection failed: {e}")
+        return False
+
 def get_current_model_info():
     """Get information about currently configured models"""
     return {
@@ -167,13 +200,15 @@ def get_current_model_info():
         "llm_model": {
             "ollama": settings.ollama_model,
             "openai": settings.openai_model,
-            "gemini": settings.gemini_model
+            "gemini": settings.gemini_model,
+            "openrouter": settings.openrouter_model
         }.get(settings.llm_provider),
         "embedding_provider": settings.embedding_provider,
         "embedding_model": {
             "ollama": settings.ollama_embedding_model,
             "openai": settings.openai_embedding_model,
             "gemini": settings.gemini_embedding_model,
-            "huggingface": settings.huggingface_embedding_model
+            "huggingface": settings.huggingface_embedding_model,
+            "openrouter": settings.openrouter_embedding_model
         }.get(settings.embedding_provider)
-    } 
+    }

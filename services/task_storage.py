@@ -13,6 +13,7 @@ from enum import Enum
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from loguru import logger
+from config import settings
 
 from .task_queue import TaskResult, TaskStatus
 
@@ -43,16 +44,52 @@ class Task:
         data['created_at'] = self.created_at.isoformat()
         data['started_at'] = self.started_at.isoformat() if self.started_at else None
         data['completed_at'] = self.completed_at.isoformat() if self.completed_at else None
-        data['payload'] = json.dumps(self.payload)
+        
+        # Add error handling for large payload serialization
+        try:
+            payload_json = json.dumps(self.payload)
+            # Check if payload is too large
+            if len(payload_json) > settings.max_payload_size:
+                logger.warning(f"Task {self.id} payload is very large ({len(payload_json)} bytes)")
+                # For very large payloads, store a summary instead
+                summary_payload = {
+                    "error": "Payload too large for storage",
+                    "original_size": len(payload_json),
+                    "original_keys": list(self.payload.keys()) if isinstance(self.payload, dict) else str(type(self.payload)),
+                    "truncated_sample": str(self.payload)[:1000] + "..." if len(str(self.payload)) > 1000 else str(self.payload)
+                }
+                data['payload'] = json.dumps(summary_payload)
+            else:
+                data['payload'] = payload_json
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize payload for task {self.id}: {e}")
+            # Store a truncated version for debugging
+            data['payload'] = json.dumps({
+                "error": "Payload too large to serialize",
+                "original_keys": list(self.payload.keys()) if isinstance(self.payload, dict) else str(type(self.payload)),
+                "serialization_error": str(e)
+            })
+        
         return data
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Task':
+        # Handle payload deserialization with error handling
+        payload = {}
+        try:
+            if isinstance(data['payload'], str):
+                payload = json.loads(data['payload'])
+            else:
+                payload = data['payload']
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Failed to deserialize payload for task {data['id']}: {e}")
+            payload = {"error": "Failed to deserialize payload", "raw_payload": str(data['payload'])[:1000]}
+        
         return cls(
             id=data['id'],
             type=TaskType(data['type']),
             status=TaskStatus(data['status']),
-            payload=json.loads(data['payload']) if isinstance(data['payload'], str) else data['payload'],
+            payload=payload,
             created_at=datetime.fromisoformat(data['created_at']),
             started_at=datetime.fromisoformat(data['started_at']) if data['started_at'] else None,
             completed_at=datetime.fromisoformat(data['completed_at']) if data['completed_at'] else None,

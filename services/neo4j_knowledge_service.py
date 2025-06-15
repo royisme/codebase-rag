@@ -22,6 +22,7 @@ from llama_index.core import (
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.openai import OpenAI
 from llama_index.llms.gemini import Gemini
+from llama_index.llms.openrouter import OpenRouter
 
 # Embedding Providers
 from llama_index.embeddings.ollama import OllamaEmbedding
@@ -84,6 +85,16 @@ class Neo4jKnowledgeService:
                 temperature=settings.temperature,
                 max_tokens=settings.max_tokens
             )
+        elif provider == "openrouter":
+            if not settings.openrouter_api_key:
+                raise ValueError("OpenRouter API key is required for OpenRouter provider")
+            return OpenRouter(
+                model=settings.openrouter_model,
+                api_key=settings.openrouter_api_key,
+                temperature=settings.temperature,
+                max_tokens=settings.openrouter_max_tokens,
+                timeout=self.operation_timeout
+            )
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
     
@@ -116,6 +127,15 @@ class Neo4jKnowledgeService:
         elif provider == "huggingface":
             return HuggingFaceEmbedding(
                 model_name=settings.huggingface_embedding_model
+            )
+        elif provider == "openrouter":
+            if not settings.openrouter_api_key:
+                raise ValueError("OpenRouter API key is required for OpenRouter embedding provider")
+            return OpenAIEmbedding(
+                model=settings.openrouter_embedding_model,
+                api_key=settings.openrouter_api_key,
+                api_base=settings.openrouter_base_url,
+                timeout=self.operation_timeout
             )
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
