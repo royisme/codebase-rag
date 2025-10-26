@@ -41,6 +41,6 @@ data/
 
 ## .cursor
 .cursor/
-docs/
 tests/
 .aider*
+*.log

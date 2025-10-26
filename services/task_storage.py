@@ -22,6 +22,7 @@ class TaskType(Enum):
     SCHEMA_PARSING = "schema_parsing"
     KNOWLEDGE_GRAPH_CONSTRUCTION = "knowledge_graph_construction"
     BATCH_PROCESSING = "batch_processing"
+    KNOWLEDGE_SOURCE_SYNC = "knowledge_source_sync"
 
 @dataclass
 class Task:

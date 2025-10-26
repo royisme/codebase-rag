@@ -18,6 +18,7 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
   - Web UI Monitoring: NiceGUI interface with file upload and directory batch processing
   - SSE Streaming API: HTTP Server-Sent Events for real-time task progress updates
   - MCP Real-time Tools: AI assistant integrated task monitoring tools
+- **身份认证与 RBAC**：基于 FastAPI Users + Casbin 的账号体系，提供管理员策略管理、默认角色与访问控制
 - **Multi-Database Support**: Oracle, MySQL, PostgreSQL, SQL Server schema parsing and analysis
 - **RESTful API**: Complete API endpoints for document management and knowledge querying
 - **MCP Protocol Support**: Model Context Protocol integration for AI assistant compatibility
@@ -30,6 +31,70 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 - **LlamaIndex Integration**: Advanced document processing and retrieval pipeline
 - **Flexible Embedding Models**: Support for HuggingFace and Ollama embedding models
 - **Modular Design**: Clean separation of concerns with pluggable components
+
+## API 文档与示例
+
+- **Swagger / OpenAPI**：启动服务后将环境变量 `DEBUG=true`，即可通过 `http://localhost:8123/docs` 查看自动生成的接口文档；生产环境可通过 `docs/openapi.json` 导出静态规格。
+- **创建知识源**：
+
+  ```bash
+  curl -X POST http://localhost:8123/api/v1/admin/sources \
+    -H "Authorization: Bearer <token>" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "Customer DB",
+      "source_type": "database",
+      "connection_config": {"host": "db.internal", "port": 5432},
+      "metadata": {"department": "sales"},
+      "is_active": true,
+      "sync_frequency_minutes": 60
+    }'
+  ```
+
+- **GraphRAG 查询**：
+
+  ```bash
+  curl -X POST http://localhost:8123/api/v1/knowledge/query \
+    -H "Authorization: Bearer <token>" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "query": "总结客户资料导入流程的关键表结构",
+      "max_results": 5,
+      "include_evidence": true,
+      "timeout_seconds": 20
+    }'
+  ```
+
+  成功响应示例（部分字段）：
+
+  ```json
+  {
+    "answer": "导入流程分为数据校验、暂存、入库三个阶段……",
+    "confidence_score": 0.78,
+    "evidence_anchors": [
+      {
+        "source_id": "550e8400-e29b-41d4-a716-446655440000",
+        "source_name": "客户数据库 · customer_orders 表",
+        "content_snippet": "导入流程会先校验客户编号是否存在于 customer_core 表……",
+        "relevance_score": 0.87
+      }
+    ],
+    "sources_queried": ["550e8400-e29b-41d4-a716-446655440000"],
+    "processing_time_ms": 1432,
+    "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3"
+  }
+  ```
+
+  当权限不足或超时时将返回 `GraphRAGErrorResponse`，例如 408：
+
+  ```json
+  {
+    "error_code": "TIMEOUT",
+    "error_message": "查询超时，请尝试简化查询或增加超时时间",
+    "processing_time_ms": 30050,
+    "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3"
+  }
+  ```
 
 ## Project Roadmap
 
@@ -72,6 +137,7 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 
 ### Prerequisites
 - Python 3.13 or higher
+- PostgreSQL 14 or higher
 - Neo4j 5.0 or higher
 - Ollama (optional, for local LLM support)
 
@@ -125,6 +191,9 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
    - Task Monitor: http://localhost:8000/ui/monitor
    - Real-time SSE Monitor: http://localhost:8000/api/v1/sse/tasks
    - Health Check: http://localhost:8000/api/v1/health
+   - Auth API: http://localhost:8000/api/v1/auth/login
+
+> 详细的数据库与迁移配置说明可参考 `docs/backend/setup.md`。
 
 ## API Usage
 

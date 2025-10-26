@@ -9,6 +9,7 @@ from pathlib import Path
 import asyncio
 from loguru import logger
 import time
+import uuid
 
 from llama_index.core import (
     KnowledgeGraphIndex, 
@@ -400,9 +401,15 @@ class Neo4jKnowledgeService:
                 "error": str(e)
             }
     
-    async def query(self, 
-                   question: str,
-                   mode: str = "hybrid") -> Dict[str, Any]:
+    async def query(
+        self,
+        question: str,
+        mode: str = "hybrid",
+        *,
+        max_results: int = 10,
+        include_evidence: bool = True,
+        source_ids: Optional[List[uuid.UUID]] = None,
+    ) -> Dict[str, Any]:
         """query knowledge graph"""
         if not self._initialized:
             raise Exception("Service not initialized")
@@ -448,6 +455,59 @@ class Neo4jKnowledgeService:
                         "metadata": node.metadata,
                         "score": getattr(node, 'score', None)
                     })
+
+            # Respect max results for downstream consumers
+            source_nodes = source_nodes[:max_results]
+
+            def _safe_uuid(raw: Any) -> uuid.UUID:
+                if isinstance(raw, uuid.UUID):
+                    return raw
+                if raw is None:
+                    return uuid.uuid4()
+                try:
+                    return uuid.UUID(str(raw))
+                except (ValueError, TypeError):
+                    return uuid.uuid5(uuid.NAMESPACE_URL, f"knowledge-node:{raw}")
+
+            evidence: List[Dict[str, Any]] = []
+            if include_evidence:
+                for node in source_nodes:
+                    metadata = node.get("metadata") or {}
+                    evidence.append(
+                        {
+                            "source_id": metadata.get("source_id")
+                            or metadata.get("id")
+                            or node.get("node_id"),
+                            "source_name": metadata.get("source_name")
+                            or metadata.get("title")
+                            or metadata.get("file_path")
+                            or "未知来源",
+                            "content": metadata.get("content") or node.get("text", ""),
+                            "content_snippet": node.get("text", "")[:200],
+                            "relevance_score": metadata.get("relevance_score")
+                            or metadata.get("score")
+                            or node.get("score")
+                            or 0.0,
+                            "page_number": metadata.get("page_number"),
+                            "section_title": metadata.get("section_title")
+                            or metadata.get("section"),
+                        }
+                    )
+
+            # Derive confidence score
+            raw_confidence = getattr(response, "score", None)
+            if raw_confidence is None:
+                raw_confidence = max(
+                    (item.get("score") or 0.0 for item in source_nodes), default=0.0
+                )
+            confidence_score = max(0.0, min(1.0, float(raw_confidence)))
+
+            resolved_sources = source_ids or [
+                _safe_uuid(
+                    (node.get("metadata") or {}).get("source_id") or node.get("node_id")
+                )
+                for node in source_nodes
+            ]
             
             logger.info(f"Successfully answered query: {question[:50]}...")
             
@@ -455,7 +515,10 @@ class Neo4jKnowledgeService:
                 "success": True,
                 "answer": str(response),
                 "source_nodes": source_nodes,
-                "query_mode": mode
+                "query_mode": mode,
+                "confidence_score": confidence_score,
+                "evidence": evidence if include_evidence else [],
+                "sources_queried": resolved_sources,
             }
             
         except asyncio.TimeoutError:
@@ -464,13 +527,15 @@ class Neo4jKnowledgeService:
             return {
                 "success": False,
                 "error": error_msg,
-                "timeout": self.operation_timeout
+                "timeout": self.operation_timeout,
+                "sources_queried": source_ids or [],
             }
         except Exception as e:
             logger.error(f"Failed to query: {e}")
             return {
                 "success": False,
-                "error": str(e)
+                "error": str(e),
+                "sources_queried": source_ids or [],
             }
     
     async def get_graph_schema(self) -> Dict[str, Any]:

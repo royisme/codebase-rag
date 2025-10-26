@@ -174,6 +174,8 @@ class TaskQueue:
             task_type_enum = TaskType.KNOWLEDGE_GRAPH_CONSTRUCTION
         elif task_type == "batch_processing":
             task_type_enum = TaskType.BATCH_PROCESSING
+        elif task_type == "knowledge_source_sync":
+            task_type_enum = TaskType.KNOWLEDGE_SOURCE_SYNC
         
         # create task in database
         if self._storage:
@@ -531,4 +533,24 @@ async def submit_directory_processing_task(
         task_kwargs=kwargs,
         task_name=task_name,
         task_type="batch_processing"
+    )
+
+async def submit_knowledge_source_sync_task(
+    source_id: str,
+    job_id: str,
+    sync_config: Optional[Dict[str, Any]] = None,
+    task_name: str = "Knowledge Source Sync",
+    **kwargs
+) -> str:
+    """submit knowledge source sync task"""
+    return await task_queue.submit_task(
+        task_func=lambda: None,  # 处理逻辑在processor中
+        task_kwargs={
+            "source_id": source_id,
+            "job_id": job_id,
+            "sync_config": sync_config or {},
+            **kwargs
+        },
+        task_name=task_name,
+        task_type="knowledge_source_sync"
     ) 

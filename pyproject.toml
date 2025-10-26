@@ -36,6 +36,15 @@ dependencies = [
     "matplotlib>=3.10.3",
     "nicegui>=2.19.0",
     "llama-index-llms-openrouter>=0.3.2",
+    "sqlalchemy[asyncio]>=2.0.44",
+    "alembic>=1.17.0",
+    "asyncpg>=0.30.0",
+    "psycopg[binary]>=3.2.11",
+    "fastapi-users[sqlalchemy]>=14.0.1",
+    "passlib[bcrypt]>=1.7.4",
+    "pycasbin>=2.4.0",
+    "casbin-sqlalchemy-adapter>=1.4.0",
+    "pytest-cov>=7.0.0",
 ]
 
 [project.scripts]
@@ -43,5 +52,5 @@ server = "start:main"
 mcp_client = "start_mcp:main"
 
 [tool.setuptools]
-packages = ["api", "core", "services", "monitoring"]
+packages = ["api", "core", "database", "services", "monitoring"]
 py-modules = ["start", "start_mcp", "mcp_server", "config", "main"]

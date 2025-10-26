@@ -1,8 +1,17 @@
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from typing import Optional, Literal
+from urllib.parse import quote_plus
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     # Application Settings
     app_name: str = "Code Graph Knowledge Service"
     app_version: str = "1.0.0"
@@ -10,7 +19,39 @@ class Settings(BaseSettings):
     # server settings
     host: str = Field(default="0.0.0.0", description="Host", alias="HOST")
     port: int = Field(default=8123, description="Port", alias="PORT")
-    
+
+    # Database Settings (SQLite for MVP)
+    db_path: str = Field(default="data/knowledge.db", description="SQLite database path", alias="DB_PATH")
+    db_echo: bool = Field(default=False, description="Enable SQLAlchemy echo logging", alias="DB_ECHO")
+
+    # Auth Settings
+    auth_jwt_secret: str = Field(default="change-me", description="JWT signing secret", alias="AUTH_JWT_SECRET")
+    auth_access_token_lifetime: int = Field(
+        default=3600,
+        description="JWT access token lifetime in seconds",
+        alias="AUTH_ACCESS_TOKEN_LIFETIME",
+    )
+    auth_reset_token_secret: str = Field(
+        default="change-me-reset",
+        description="Password reset token secret",
+        alias="AUTH_RESET_TOKEN_SECRET",
+    )
+    auth_verification_token_secret: str = Field(
+        default="change-me-verify",
+        description="Email verification token secret",
+        alias="AUTH_VERIFICATION_TOKEN_SECRET",
+    )
+    auth_superuser_email: str = Field(
+        default="admin@example.com",
+        description="Default superuser email",
+        alias="AUTH_SUPERUSER_EMAIL",
+    )
+    auth_superuser_password: str = Field(
+        default="Admin123!@#",
+        description="Default superuser password",
+        alias="AUTH_SUPERUSER_PASSWORD",
+    )
+
     # Monitoring Settings
     enable_monitoring: bool = Field(default=True, description="Enable web-based monitoring interface", alias="ENABLE_MONITORING")
     monitoring_path: str = Field(default="/ui", description="Base path for monitoring interface", alias="MONITORING_PATH")
@@ -98,13 +139,34 @@ class Settings(BaseSettings):
     # logging
     log_file: Optional[str] = Field(default="app.log", description="Log file path")
     log_level: str = Field(default="INFO", description="Log level")
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # 忽略额外的字段，避免验证错误
+    casbin_auto_save: bool = Field(default=True, description="Enable Casbin auto-save", alias="CASBIN_AUTO_SAVE")
 
-# Global settings instance
+    # Knowledge Source Processing Settings
+    knowledge_sync_enabled: bool = Field(default=True, description="Enable automatic knowledge source synchronization", alias="KNOWLEDGE_SYNC_ENABLED")
+    knowledge_sync_interval_minutes: int = Field(default=60, description="Default sync interval for knowledge sources (minutes)", alias="KNOWLEDGE_SYNC_INTERVAL_MINUTES")
+    knowledge_max_concurrent_jobs: int = Field(default=3, description="Maximum concurrent knowledge source processing jobs", alias="KNOWLEDGE_MAX_CONCURRENT_JOBS")
+    knowledge_job_timeout_minutes: int = Field(default=30, description="Default timeout for knowledge source jobs (minutes)", alias="KNOWLEDGE_JOB_TIMEOUT_MINUTES")
+    knowledge_retry_attempts: int = Field(default=3, description="Number of retry attempts for failed knowledge source jobs", alias="KNOWLEDGE_RETRY_ATTEMPTS")
+
+    # GraphRAG Settings
+    graphrag_query_timeout_seconds: int = Field(default=30, description="Default timeout for GraphRAG queries (seconds)", alias="GRAPHRAG_QUERY_TIMEOUT_SECONDS")
+    graphrag_max_results: int = Field(default=20, description="Maximum results for GraphRAG queries", alias="GRAPHRAG_MAX_RESULTS")
+    graphrag_enable_evidence: bool = Field(default=True, description="Enable evidence collection for GraphRAG queries", alias="GRAPHRAG_ENABLE_EVIDENCE")
+
+    @property
+    def database_dsn_async(self) -> str:
+        # Ensure database directory exists
+        db_path = Path(self.db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite+aiosqlite:///{self.db_path}"
+
+    @property
+    def database_dsn_sync(self) -> str:
+        # Ensure database directory exists
+        db_path = Path(self.db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite:///{self.db_path}"
+
 settings = Settings()
 
 # Validation functions

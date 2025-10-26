@@ -8,6 +8,7 @@ from services.graph_service import graph_service
 from services.neo4j_knowledge_service import Neo4jKnowledgeService
 from services.universal_sql_schema_parser import parse_sql_schema_smart
 from services.task_queue import task_queue
+from security.casbin_enforcer import require_permission
 from config import settings
 from loguru import logger
 
@@ -80,7 +81,10 @@ async def health_check():
 
 # knowledge query interface
 @router.post("/knowledge/query")
-async def query_knowledge(query_request: QueryRequest):
+async def query_knowledge(
+    query_request: QueryRequest,
+    _user=Depends(require_permission("/knowledge/query", "POST")),
+):
     """Query knowledge base using Neo4j GraphRAG"""
     try:
         result = await knowledge_service.query(
@@ -99,7 +103,10 @@ async def query_knowledge(query_request: QueryRequest):
 
 # knowledge search interface
 @router.post("/knowledge/search")
-async def search_knowledge(search_request: SearchRequest):
+async def search_knowledge(
+    search_request: SearchRequest,
+    _user=Depends(require_permission("/knowledge/search", "POST")),
+):
     """Search similar nodes in knowledge base"""
     try:
         result = await knowledge_service.search_similar_nodes(
@@ -118,7 +125,10 @@ async def search_knowledge(search_request: SearchRequest):
 
 # document management
 @router.post("/documents")
-async def add_document(request: DocumentAddRequest):
+async def add_document(
+    request: DocumentAddRequest,
+    _user=Depends(require_permission("/knowledge/documents", "POST")),
+):
     """Add document to knowledge base"""
     try:
         result = await knowledge_service.add_document(
@@ -137,7 +147,10 @@ async def add_document(request: DocumentAddRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/documents/file")
-async def add_file(file_path: str):
+async def add_file(
+    file_path: str,
+    _user=Depends(require_permission("/knowledge/documents", "POST")),
+):
     """Add file to knowledge base"""
     try:
         result = await knowledge_service.add_file(file_path)
@@ -152,7 +165,10 @@ async def add_file(file_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/documents/directory")
-async def add_directory(request: DirectoryProcessRequest):
+async def add_directory(
+    request: DirectoryProcessRequest,
+    _user=Depends(require_permission("/knowledge/documents", "POST")),
+):
     """Add directory to knowledge base"""
     try:
         result = await knowledge_service.add_directory(
