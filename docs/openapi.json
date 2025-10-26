@@ -1,0 +1,5027 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Code Graph Knowledge Service",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Register:Register",
+        "operationId": "register_register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                },
+                "examples": {
+                  "REGISTER_USER_ALREADY_EXISTS": {
+                    "summary": "A user with this email already exists.",
+                    "value": {
+                      "detail": "REGISTER_USER_ALREADY_EXISTS"
+                    }
+                  },
+                  "REGISTER_INVALID_PASSWORD": {
+                    "summary": "Password validation failed.",
+                    "value": {
+                      "detail": {
+                        "code": "REGISTER_INVALID_PASSWORD",
+                        "reason": "Password should beat least 3 characters"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Auth:Jwt.Login",
+        "operationId": "auth_jwt_login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_auth_jwt_login_api_v1_auth_login_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BearerResponse"
+                },
+                "example": {
+                  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiOTIyMWZmYzktNjQwZi00MzcyLTg2ZDMtY2U2NDJjYmE1NjAzIiwiYXVkIjoiZmFzdGFwaS11c2VyczphdXRoIiwiZXhwIjoxNTcxNTA0MTkzfQ.M10bjOe45I5Ncu_uXvOmVV8QxnL-nZfcH96U90JaocI",
+                  "token_type": "bearer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                },
+                "examples": {
+                  "LOGIN_BAD_CREDENTIALS": {
+                    "summary": "Bad credentials or the user is inactive.",
+                    "value": {
+                      "detail": "LOGIN_BAD_CREDENTIALS"
+                    }
+                  },
+                  "LOGIN_USER_NOT_VERIFIED": {
+                    "summary": "The user is not verified.",
+                    "value": {
+                      "detail": "LOGIN_USER_NOT_VERIFIED"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Auth:Jwt.Logout",
+        "operationId": "auth_jwt_logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Missing token or inactive user."
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Reset:Forgot Password",
+        "operationId": "reset_forgot_password_api_v1_auth_forgot_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_reset_forgot_password_api_v1_auth_forgot_password_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Reset:Reset Password",
+        "operationId": "reset_reset_password_api_v1_auth_reset_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_reset_reset_password_api_v1_auth_reset_password_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                },
+                "examples": {
+                  "RESET_PASSWORD_BAD_TOKEN": {
+                    "summary": "Bad or expired token.",
+                    "value": {
+                      "detail": "RESET_PASSWORD_BAD_TOKEN"
+                    }
+                  },
+                  "RESET_PASSWORD_INVALID_PASSWORD": {
+                    "summary": "Password validation failed.",
+                    "value": {
+                      "detail": {
+                        "code": "RESET_PASSWORD_INVALID_PASSWORD",
+                        "reason": "Password should be at least 3 characters"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/me": {
+      "get": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Users:Current User",
+        "operationId": "users_current_user_api_v1_admin_users_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing token or inactive user."
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Users:Patch Current User",
+        "operationId": "users_patch_current_user_api_v1_admin_users_me_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing token or inactive user."
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                },
+                "examples": {
+                  "UPDATE_USER_EMAIL_ALREADY_EXISTS": {
+                    "summary": "A user with this email already exists.",
+                    "value": {
+                      "detail": "UPDATE_USER_EMAIL_ALREADY_EXISTS"
+                    }
+                  },
+                  "UPDATE_USER_INVALID_PASSWORD": {
+                    "summary": "Password validation failed.",
+                    "value": {
+                      "detail": {
+                        "code": "UPDATE_USER_INVALID_PASSWORD",
+                        "reason": "Password should beat least 3 characters"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/users/{id}": {
+      "get": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Users:User",
+        "operationId": "users_user_api_v1_admin_users__id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing token or inactive user."
+          },
+          "403": {
+            "description": "Not a superuser."
+          },
+          "404": {
+            "description": "The user does not exist."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Users:Patch User",
+        "operationId": "users_patch_user_api_v1_admin_users__id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing token or inactive user."
+          },
+          "403": {
+            "description": "Not a superuser."
+          },
+          "404": {
+            "description": "The user does not exist."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "UPDATE_USER_EMAIL_ALREADY_EXISTS": {
+                    "summary": "A user with this email already exists.",
+                    "value": {
+                      "detail": "UPDATE_USER_EMAIL_ALREADY_EXISTS"
+                    }
+                  },
+                  "UPDATE_USER_INVALID_PASSWORD": {
+                    "summary": "Password validation failed.",
+                    "value": {
+                      "detail": {
+                        "code": "UPDATE_USER_INVALID_PASSWORD",
+                        "reason": "Password should beat least 3 characters"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Users:Delete User",
+        "operationId": "users_delete_user_api_v1_admin_users__id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Missing token or inactive user."
+          },
+          "403": {
+            "description": "Not a superuser."
+          },
+          "404": {
+            "description": "The user does not exist."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Refresh Token",
+        "description": "基于现有登录状态刷新访问令牌。",
+        "operationId": "refresh_token_api_v1_auth_refresh_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/roles": {
+      "get": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "List Roles",
+        "operationId": "list_roles_api_v1_admin_roles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleSchema"
+                  },
+                  "type": "array",
+                  "title": "Response List Roles Api V1 Admin Roles Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/policies": {
+      "get": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "List Policies",
+        "operationId": "list_policies_api_v1_admin_policies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PolicySchema"
+                  },
+                  "type": "array",
+                  "title": "Response List Policies Api V1 Admin Policies Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Create Policy",
+        "operationId": "create_policy_api_v1_admin_policies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicySchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/policies/{policy_id}": {
+      "patch": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Update Policy",
+        "operationId": "update_policy_api_v1_admin_policies__policy_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicySchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Delete Policy",
+        "operationId": "delete_policy_api_v1_admin_policies__policy_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audit": {
+      "get": {
+        "tags": [
+          "RBAC"
+        ],
+        "summary": "Get Audit Logs",
+        "operationId": "get_audit_logs_api_v1_admin_audit_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Audit Logs Api V1 Admin Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Health Check",
+        "description": "health check interface",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/query": {
+      "post": {
+        "tags": [
+          "knowledge-query"
+        ],
+        "summary": "执行 GraphRAG 查询",
+        "description": "对选定知识源发起 GraphRAG 查询，返回答案、置信度与证据锚点信息。",
+        "operationId": "query_knowledge_graph_api_v1_knowledge_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphRAGQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "查询成功并返回结构化回答",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphRAGQueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询请求无效或底层处理失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphRAGErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "指定的知识源不存在"
+          },
+          "408": {
+            "description": "查询超时",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphRAGErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "内部服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphRAGErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge/search": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Search Knowledge",
+        "description": "Search similar nodes in knowledge base",
+        "operationId": "search_knowledge_api_v1_knowledge_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api__neo4j_routes__SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Add Document",
+        "description": "Add document to knowledge base",
+        "operationId": "add_document_api_v1_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentAddRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/file": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Add File",
+        "description": "Add file to knowledge base",
+        "operationId": "add_file_api_v1_documents_file_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/directory": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Add Directory",
+        "description": "Add directory to knowledge base",
+        "operationId": "add_directory_api_v1_documents_directory_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryProcessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sql/parse": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Parse Sql",
+        "description": "Parse SQL statement",
+        "operationId": "parse_sql_api_v1_sql_parse_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SQLParseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sql/validate": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Validate Sql",
+        "description": "Validate SQL syntax",
+        "operationId": "validate_sql_api_v1_sql_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SQLParseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sql/convert": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Convert Sql Dialect",
+        "description": "Convert SQL between dialects",
+        "operationId": "convert_sql_dialect_api_v1_sql_convert_post",
+        "parameters": [
+          {
+            "name": "sql",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sql"
+            }
+          },
+          {
+            "name": "from_dialect",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "From Dialect"
+            }
+          },
+          {
+            "name": "to_dialect",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "To Dialect"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schema": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Get Graph Schema",
+        "description": "Get knowledge graph schema",
+        "operationId": "get_graph_schema_api_v1_schema_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/statistics": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Get Statistics",
+        "description": "Get knowledge base statistics",
+        "operationId": "get_statistics_api_v1_statistics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clear": {
+      "delete": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Clear Knowledge Base",
+        "description": "Clear knowledge base",
+        "operationId": "clear_knowledge_base_api_v1_clear_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sql/parse-schema": {
+      "post": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Parse Sql Schema",
+        "description": "Parse SQL schema with smart auto-detection\n\nAutomatically detects:\n- SQL dialect (Oracle, MySQL, PostgreSQL, SQL Server)  \n- Business domain classification\n- Table relationships and statistics",
+        "operationId": "parse_sql_schema_api_v1_sql_parse_schema_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SQLSchemaParseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Get System Config",
+        "description": "Get system configuration",
+        "operationId": "get_system_config_api_v1_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources": {
+      "post": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "创建知识源",
+        "description": "创建新的知识源记录，并立即返回规范化响应结构。",
+        "operationId": "create_knowledge_source_api_v1_admin_sources_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeSourceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "知识源创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数不合法或知识源名称已存在"
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "分页获取知识源列表",
+        "description": "支持分页、状态、类型与关键字搜索的知识源管理列表。",
+        "operationId": "list_knowledge_sources_api_v1_admin_sources_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "页码",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "页码"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "每页数量",
+              "default": 20,
+              "title": "Size"
+            },
+            "description": "每页数量"
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "按源类型过滤",
+              "title": "Source Type"
+            },
+            "description": "按源类型过滤"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "按激活状态过滤",
+              "title": "Is Active"
+            },
+            "description": "按激活状态过滤"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "搜索关键词",
+              "title": "Search"
+            },
+            "description": "搜索关键词"
+          },
+          {
+            "name": "created_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "按创建者过滤",
+              "title": "Created By"
+            },
+            "description": "按创建者过滤"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回知识源分页列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "获取单个知识源详情",
+        "description": "根据知识源ID返回完整信息，包含最近一次同步信息。",
+        "operationId": "get_knowledge_source_api_v1_admin_sources__source_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回指定知识源详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "知识源不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "更新知识源",
+        "description": "支持更新名称、描述、配置、状态等字段，返回最新信息。",
+        "operationId": "update_knowledge_source_api_v1_admin_sources__source_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeSourceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功并返回最新数据",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数不合法或知识源名称冲突"
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "知识源不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "软删除知识源",
+        "description": "将知识源标记为非活跃状态，并记录审计日志。",
+        "operationId": "delete_knowledge_source_api_v1_admin_sources__source_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "删除成功，无返回体"
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "知识源不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources/{source_id}/stats": {
+      "get": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "获取知识源统计信息",
+        "description": "返回指定知识源的同步情况、任务统计等信息。",
+        "operationId": "get_source_statistics_api_v1_admin_sources__source_id__stats_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回知识源统计信息",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "知识源不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources/{source_id}/jobs": {
+      "post": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "为知识源创建解析任务",
+        "description": "创建解析任务并提交同步队列，返回任务详情。",
+        "operationId": "create_parse_job_api_v1_admin_sources__source_id__jobs_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseJobCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "解析任务创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数不合法或存在冲突任务"
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "知识源不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "列出知识源解析任务",
+        "description": "分页返回指定知识源的解析任务列表，支持状态与创建者过滤。",
+        "operationId": "list_parse_jobs_api_v1_admin_sources__source_id__jobs_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "页码",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "页码"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "每页数量",
+              "default": 20,
+              "title": "Size"
+            },
+            "description": "每页数量"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/database__models__knowledge__ParseStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "按状态过滤",
+              "title": "Status"
+            },
+            "description": "按状态过滤"
+          },
+          {
+            "name": "created_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "按创建者过滤",
+              "title": "Created By"
+            },
+            "description": "按创建者过滤"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回解析任务分页列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseJobListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "知识源不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "获取解析任务详情",
+        "description": "根据任务ID返回解析任务的完整状态、进度与结果信息。",
+        "operationId": "get_parse_job_api_v1_admin_sources_jobs__job_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回解析任务详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseJobResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "解析任务不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources/{source_id}/sync": {
+      "post": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "手动触发知识源同步",
+        "description": "创建新的解析任务并提交到后台同步队列。",
+        "operationId": "sync_knowledge_source_api_v1_admin_sources__source_id__sync_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Sync Config"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "同步任务提交成功",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "知识源未激活或请求参数不合法"
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "404": {
+            "description": "知识源不存在"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/sources": {
+      "get": {
+        "tags": [
+          "knowledge-query"
+        ],
+        "summary": "列出可供查询的知识源",
+        "description": "返回激活状态的知识源元数据，供前端在 GraphRAG 查询时选择。",
+        "operationId": "list_available_sources_api_v1_knowledge_sources_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "只返回激活的知识源",
+              "default": true,
+              "title": "Is Active"
+            },
+            "description": "只返回激活的知识源"
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "按源类型过滤",
+              "title": "Source Type"
+            },
+            "description": "按源类型过滤"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回知识源列表",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/query/{query_id}": {
+      "get": {
+        "tags": [
+          "knowledge-query"
+        ],
+        "summary": "查询历史记录详情",
+        "description": "根据查询 ID 返回缓存的查询结果，当前版本为占位实现。",
+        "operationId": "get_query_result_api_v1_knowledge_query__query_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Query Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回缓存或占位信息",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/stats": {
+      "get": {
+        "tags": [
+          "knowledge-query"
+        ],
+        "summary": "获取知识图谱运行统计",
+        "description": "汇总 Neo4j 统计、知识源数量以及 GraphRAG 服务能力。",
+        "operationId": "get_knowledge_stats_api_v1_knowledge_stats_get",
+        "responses": {
+          "200": {
+            "description": "成功返回知识图谱统计信息",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/neo4j-knowledge/initialize": {
+      "post": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Initialize Service",
+        "description": "initialize Neo4j knowledge graph service",
+        "operationId": "initialize_service_api_v1_neo4j_knowledge_initialize_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/documents": {
+      "post": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Add Document",
+        "description": "add document to knowledge graph",
+        "operationId": "add_document_api_v1_neo4j_knowledge_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/files": {
+      "post": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Add File",
+        "description": "upload and add file to knowledge graph",
+        "operationId": "add_file_api_v1_neo4j_knowledge_files_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_add_file_api_v1_neo4j_knowledge_files_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/directories": {
+      "post": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Add Directory",
+        "description": "add files in directory to knowledge graph",
+        "operationId": "add_directory_api_v1_neo4j_knowledge_directories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/query": {
+      "post": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Query Knowledge Graph",
+        "description": "query knowledge graph",
+        "operationId": "query_knowledge_graph_api_v1_neo4j_knowledge_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api__neo4j_routes__QueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/search": {
+      "post": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Search Similar Nodes",
+        "description": "search similar nodes based on vector similarity",
+        "operationId": "search_similar_nodes_api_v1_neo4j_knowledge_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api__neo4j_routes__SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/schema": {
+      "get": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Get Graph Schema",
+        "description": "get graph schema information",
+        "operationId": "get_graph_schema_api_v1_neo4j_knowledge_schema_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/statistics": {
+      "get": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Get Statistics",
+        "description": "get knowledge graph statistics",
+        "operationId": "get_statistics_api_v1_neo4j_knowledge_statistics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/clear": {
+      "delete": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Clear Knowledge Base",
+        "description": "clear knowledge base",
+        "operationId": "clear_knowledge_base_api_v1_neo4j_knowledge_clear_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/neo4j-knowledge/health": {
+      "get": {
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
+        "summary": "Health Check",
+        "description": "health check",
+        "operationId": "health_check_api_v1_neo4j_knowledge_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/": {
+      "post": {
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
+        "summary": "Create Task",
+        "description": "create new task",
+        "operationId": "create_task_api_v1_tasks__post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Create Task Api V1 Tasks  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
+        "summary": "List Tasks",
+        "description": "get task list",
+        "operationId": "list_tasks_api_v1_tasks__get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by task status",
+              "title": "Status"
+            },
+            "description": "Filter by task status"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 20,
+              "title": "Page Size"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "task_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by task type",
+              "title": "Task Type"
+            },
+            "description": "Filter by task type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
+        "summary": "Get Task Status",
+        "description": "get task status",
+        "operationId": "get_task_status_api_v1_tasks__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
+        "summary": "Cancel Task",
+        "description": "cancel task",
+        "operationId": "cancel_task_api_v1_tasks__task_id__delete",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/stats/overview": {
+      "get": {
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
+        "summary": "Get Task Stats",
+        "description": "get task statistics",
+        "operationId": "get_task_stats_api_v1_tasks_stats_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}/retry": {
+      "post": {
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
+        "summary": "Retry Task",
+        "description": "retry failed task",
+        "operationId": "retry_task_api_v1_tasks__task_id__retry_post",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/queue/status": {
+      "get": {
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
+        "summary": "Get Queue Status",
+        "description": "get queue status",
+        "operationId": "get_queue_status_api_v1_tasks_queue_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sse/task/{task_id}": {
+      "get": {
+        "tags": [
+          "Real-time Updates",
+          "SSE"
+        ],
+        "summary": "Stream Task Progress",
+        "description": "Stream task progress via Server-Sent Events\n\nArgs:\n    task_id: Task ID to monitor",
+        "operationId": "stream_task_progress_api_v1_sse_task__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sse/tasks": {
+      "get": {
+        "tags": [
+          "Real-time Updates",
+          "SSE"
+        ],
+        "summary": "Stream All Tasks",
+        "description": "Stream all tasks progress via Server-Sent Events\n\nArgs:\n    status_filter: Optional status filter (pending, processing, success, failed, cancelled)",
+        "operationId": "stream_all_tasks_api_v1_sse_tasks_get",
+        "parameters": [
+          {
+            "name": "status_filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sse/stats": {
+      "get": {
+        "tags": [
+          "Real-time Updates",
+          "SSE"
+        ],
+        "summary": "Get Sse Stats",
+        "description": "Get SSE connection statistics",
+        "operationId": "get_sse_stats_api_v1_sse_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "root path interface",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/info": {
+      "get": {
+        "summary": "System Info",
+        "description": "system information interface",
+        "operationId": "system_info_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BearerResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type"
+        ],
+        "title": "BearerResponse"
+      },
+      "Body_add_file_api_v1_neo4j_knowledge_files_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_add_file_api_v1_neo4j_knowledge_files_post"
+      },
+      "Body_auth_jwt_login_api_v1_auth_login_post": {
+        "properties": {
+          "grant_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^password$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Type"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": ""
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "format": "password",
+            "title": "Client Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "Body_auth_jwt_login_api_v1_auth_login_post"
+      },
+      "Body_reset_forgot_password_api_v1_auth_forgot_password_post": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "Body_reset_forgot_password_api_v1_auth_forgot_password_post"
+      },
+      "Body_reset_reset_password_api_v1_auth_reset_password_post": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "password"
+        ],
+        "title": "Body_reset_reset_password_api_v1_auth_reset_password_post"
+      },
+      "CreateTaskRequest": {
+        "properties": {
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_type",
+          "task_name",
+          "payload"
+        ],
+        "title": "CreateTaskRequest"
+      },
+      "DirectoryProcessRequest": {
+        "properties": {
+          "directory_path": {
+            "type": "string",
+            "title": "Directory Path"
+          },
+          "recursive": {
+            "type": "boolean",
+            "title": "Recursive",
+            "default": true
+          },
+          "file_patterns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Patterns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "directory_path"
+        ],
+        "title": "DirectoryProcessRequest"
+      },
+      "DirectoryRequest": {
+        "properties": {
+          "directory_path": {
+            "type": "string",
+            "title": "Directory Path"
+          },
+          "recursive": {
+            "type": "boolean",
+            "title": "Recursive",
+            "default": true
+          },
+          "file_extensions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Extensions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "directory_path"
+        ],
+        "title": "DirectoryRequest"
+      },
+      "DocumentAddRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": "Untitled"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "DocumentAddRequest"
+      },
+      "DocumentRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "DocumentRequest"
+      },
+      "ErrorModel": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorModel"
+      },
+      "EvidenceAnchor": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "content_snippet": {
+            "type": "string",
+            "title": "Content Snippet"
+          },
+          "relevance_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Relevance Score"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "section_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_name",
+          "content_snippet",
+          "relevance_score"
+        ],
+        "title": "EvidenceAnchor",
+        "description": "证据锚点模式。",
+        "example": {
+          "content_snippet": "导入流程会先校验客户编号是否存在于 customer_core 表……",
+          "page_number": 12,
+          "relevance_score": 0.87,
+          "section_title": "数据导入校验",
+          "source_id": "550e8400-e29b-41d4-a716-446655440000",
+          "source_name": "客户数据库 · customer_orders 表"
+        }
+      },
+      "GraphRAGErrorResponse": {
+        "properties": {
+          "error_code": {
+            "type": "string",
+            "title": "Error Code",
+            "description": "错误代码"
+          },
+          "error_message": {
+            "type": "string",
+            "title": "Error Message",
+            "description": "错误信息"
+          },
+          "query_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "processing_time_ms": {
+            "type": "integer",
+            "title": "Processing Time Ms",
+            "description": "处理时间（毫秒）"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error_code",
+          "error_message",
+          "processing_time_ms"
+        ],
+        "title": "GraphRAGErrorResponse",
+        "description": "GraphRAG 错误响应模式。",
+        "example": {
+          "error_code": "TIMEOUT",
+          "error_message": "查询超时，请尝试简化查询或增加超时时间",
+          "processing_time_ms": 30050,
+          "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3"
+        }
+      },
+      "GraphRAGQueryRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Query",
+            "description": "查询文本"
+          },
+          "source_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ids",
+            "description": "限制查询的知识源ID列表"
+          },
+          "max_results": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "description": "最大返回结果数",
+            "default": 10
+          },
+          "include_evidence": {
+            "type": "boolean",
+            "title": "Include Evidence",
+            "description": "是否包含证据信息",
+            "default": true
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "maximum": 300.0,
+            "minimum": 5.0,
+            "title": "Timeout Seconds",
+            "description": "查询超时时间（秒）",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "GraphRAGQueryRequest",
+        "description": "GraphRAG 查询请求模式。",
+        "example": {
+          "include_evidence": true,
+          "max_results": 5,
+          "query": "总结客户资料导入流程涉及的关键表和字段",
+          "source_ids": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "3d6f0a1c-49f1-4c61-86df-d2dfd52a9bfa"
+          ],
+          "timeout_seconds": 30
+        }
+      },
+      "GraphRAGQueryResponse": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer",
+            "description": "生成的答案"
+          },
+          "confidence_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence Score",
+            "description": "答案置信度"
+          },
+          "evidence_anchors": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceAnchor"
+            },
+            "type": "array",
+            "title": "Evidence Anchors",
+            "description": "证据锚点列表"
+          },
+          "sources_queried": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Sources Queried",
+            "description": "实际查询的知识源ID列表"
+          },
+          "processing_time_ms": {
+            "type": "integer",
+            "title": "Processing Time Ms",
+            "description": "处理时间（毫秒）"
+          },
+          "query_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Query Id",
+            "description": "查询ID"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer",
+          "confidence_score",
+          "sources_queried",
+          "processing_time_ms",
+          "query_id"
+        ],
+        "title": "GraphRAGQueryResponse",
+        "description": "GraphRAG 查询响应模式。",
+        "example": {
+          "answer": "导入流程分为数据校验、暂存、入库三个阶段……",
+          "confidence_score": 0.78,
+          "evidence_anchors": [
+            {
+              "content_snippet": "导入流程会先校验客户编号是否存在于 customer_core 表……",
+              "page_number": 12,
+              "relevance_score": 0.87,
+              "section_title": "数据导入校验",
+              "source_id": "550e8400-e29b-41d4-a716-446655440000",
+              "source_name": "客户数据库 · customer_orders 表"
+            }
+          ],
+          "processing_time_ms": 1432,
+          "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3",
+          "sources_queried": [
+            "550e8400-e29b-41d4-a716-446655440000"
+          ]
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "services": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Services"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "services",
+          "version"
+        ],
+        "title": "HealthResponse"
+      },
+      "KnowledgeSourceCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name",
+            "description": "知识源名称"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "知识源描述"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType",
+            "description": "知识源类型",
+            "default": "other"
+          },
+          "connection_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Config",
+            "description": "连接配置"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "源元数据"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "是否激活",
+            "default": true
+          },
+          "sync_frequency_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Frequency Minutes",
+            "description": "自动同步间隔（分钟）"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "KnowledgeSourceCreate",
+        "description": "创建知识源请求模式。"
+      },
+      "KnowledgeSourceListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeSourceResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages"
+        ],
+        "title": "KnowledgeSourceListResponse",
+        "description": "知识源列表响应模式。",
+        "example": {
+          "items": [
+            {
+              "created_at": "2025-10-20T07:12:10Z",
+              "created_by": "42f687f6-bc62-4e17-b284-1d3d5a2c9d3c",
+              "description": "生产环境 PostgreSQL 数据库 Schema",
+              "id": "550e8400-e29b-41d4-a716-446655440000",
+              "is_active": true,
+              "last_synced_at": "2025-10-20T08:30:55Z",
+              "name": "生产环境数据库",
+              "source_type": "database",
+              "sync_frequency_minutes": 60,
+              "updated_at": "2025-10-20T08:30:55Z"
+            }
+          ],
+          "page": 1,
+          "pages": 1,
+          "size": 20,
+          "total": 1
+        }
+      },
+      "KnowledgeSourceResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name",
+            "description": "知识源名称"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "知识源描述"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType",
+            "description": "知识源类型",
+            "default": "other"
+          },
+          "connection_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Config",
+            "description": "连接配置"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "源元数据"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "是否激活",
+            "default": true
+          },
+          "sync_frequency_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Frequency Minutes",
+            "description": "自动同步间隔（分钟）"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "KnowledgeSourceResponse",
+        "description": "知识源响应模式。",
+        "example": {
+          "connection_config": {
+            "database": "cit_knowledge",
+            "host": "prod-db.internal",
+            "port": 5432
+          },
+          "created_at": "2025-10-20T07:12:10Z",
+          "created_by": "42f687f6-bc62-4e17-b284-1d3d5a2c9d3c",
+          "description": "生产环境 PostgreSQL 数据库 Schema",
+          "id": "550e8400-e29b-41d4-a716-446655440000",
+          "is_active": true,
+          "last_synced_at": "2025-10-20T08:30:55Z",
+          "metadata": {
+            "environment": "production",
+            "owner": "data-platform"
+          },
+          "name": "生产环境数据库",
+          "source_type": "database",
+          "sync_frequency_minutes": 60,
+          "updated_at": "2025-10-20T08:30:55Z"
+        }
+      },
+      "KnowledgeSourceUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connection_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Config"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "sync_frequency_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Frequency Minutes"
+          }
+        },
+        "type": "object",
+        "title": "KnowledgeSourceUpdate",
+        "description": "更新知识源请求模式。"
+      },
+      "ParseJobCreate": {
+        "properties": {
+          "job_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Config",
+            "description": "任务特定配置"
+          },
+          "knowledge_source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Knowledge Source Id",
+            "description": "知识源ID"
+          }
+        },
+        "type": "object",
+        "required": [
+          "knowledge_source_id"
+        ],
+        "title": "ParseJobCreate",
+        "description": "创建解析任务请求模式。"
+      },
+      "ParseJobListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ParseJobResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages"
+        ],
+        "title": "ParseJobListResponse",
+        "description": "解析任务列表响应模式。",
+        "example": {
+          "items": [
+            {
+              "created_at": "2025-10-20T08:30:59Z",
+              "created_by": "42f687f6-bc62-4e17-b284-1d3d5a2c9d3c",
+              "id": "e1b4c136-b7ca-4f78-8ed3-927076e0af5d",
+              "items_processed": 1200,
+              "knowledge_source_id": "550e8400-e29b-41d4-a716-446655440000",
+              "progress_percentage": 45,
+              "status": "running",
+              "total_items": 2500,
+              "updated_at": "2025-10-20T08:31:45Z"
+            }
+          ],
+          "page": 1,
+          "pages": 1,
+          "size": 20,
+          "total": 1
+        }
+      },
+      "ParseJobResponse": {
+        "properties": {
+          "job_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Config",
+            "description": "任务特定配置"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "knowledge_source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Knowledge Source Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/database__models__knowledge__ParseStatus"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "progress_percentage": {
+            "type": "integer",
+            "title": "Progress Percentage"
+          },
+          "items_processed": {
+            "type": "integer",
+            "title": "Items Processed"
+          },
+          "total_items": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Items"
+          },
+          "result_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Summary"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "knowledge_source_id",
+          "status",
+          "progress_percentage",
+          "items_processed",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ParseJobResponse",
+        "description": "解析任务响应模式。",
+        "example": {
+          "created_at": "2025-10-20T08:30:59Z",
+          "created_by": "42f687f6-bc62-4e17-b284-1d3d5a2c9d3c",
+          "id": "e1b4c136-b7ca-4f78-8ed3-927076e0af5d",
+          "items_processed": 1200,
+          "job_config": {
+            "sync_mode": "incremental"
+          },
+          "knowledge_source_id": "550e8400-e29b-41d4-a716-446655440000",
+          "progress_percentage": 45,
+          "result_summary": {
+            "new_nodes": 64,
+            "relationships": 128
+          },
+          "started_at": "2025-10-20T08:31:00Z",
+          "status": "running",
+          "total_items": 2500,
+          "updated_at": "2025-10-20T08:31:45Z"
+        }
+      },
+      "PolicyCreateRequest": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "domain",
+          "resource",
+          "action"
+        ],
+        "title": "PolicyCreateRequest"
+      },
+      "PolicySchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject",
+          "domain",
+          "resource",
+          "action"
+        ],
+        "title": "PolicySchema"
+      },
+      "PolicyUpdateRequest": {
+        "properties": {
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "title": "PolicyUpdateRequest"
+      },
+      "RoleSchema": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "permissions"
+        ],
+        "title": "RoleSchema"
+      },
+      "SQLParseRequest": {
+        "properties": {
+          "sql": {
+            "type": "string",
+            "title": "Sql"
+          },
+          "dialect": {
+            "type": "string",
+            "title": "Dialect",
+            "default": "mysql"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sql"
+        ],
+        "title": "SQLParseRequest"
+      },
+      "SQLSchemaParseRequest": {
+        "properties": {
+          "schema_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Content"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          }
+        },
+        "type": "object",
+        "title": "SQLSchemaParseRequest"
+      },
+      "SourceType": {
+        "type": "string",
+        "enum": [
+          "document",
+          "database",
+          "api",
+          "website",
+          "code",
+          "other"
+        ],
+        "title": "SourceType",
+        "description": "知识源类型枚举。"
+      },
+      "TaskListResponse": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskResponse"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tasks",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "TaskListResponse"
+      },
+      "TaskResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "progress": {
+            "type": "number",
+            "title": "Progress"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status",
+          "progress",
+          "message",
+          "created_at",
+          "metadata"
+        ],
+        "title": "TaskResponse"
+      },
+      "TaskStatsResponse": {
+        "properties": {
+          "total_tasks": {
+            "type": "integer",
+            "title": "Total Tasks"
+          },
+          "pending_tasks": {
+            "type": "integer",
+            "title": "Pending Tasks"
+          },
+          "processing_tasks": {
+            "type": "integer",
+            "title": "Processing Tasks"
+          },
+          "completed_tasks": {
+            "type": "integer",
+            "title": "Completed Tasks"
+          },
+          "failed_tasks": {
+            "type": "integer",
+            "title": "Failed Tasks"
+          },
+          "cancelled_tasks": {
+            "type": "integer",
+            "title": "Cancelled Tasks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_tasks",
+          "pending_tasks",
+          "processing_tasks",
+          "completed_tasks",
+          "failed_tasks",
+          "cancelled_tasks"
+        ],
+        "title": "TaskStatsResponse"
+      },
+      "UserCreate": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "default": true
+          },
+          "is_superuser": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Superuser",
+            "default": false
+          },
+          "is_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Verified",
+            "default": false
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "default": "viewer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserCreate"
+      },
+      "UserRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "is_superuser": {
+            "type": "boolean",
+            "title": "Is Superuser",
+            "default": false
+          },
+          "is_verified": {
+            "type": "boolean",
+            "title": "Is Verified",
+            "default": false
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "role"
+        ],
+        "title": "UserRead"
+      },
+      "UserUpdate": {
+        "properties": {
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "is_superuser": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Superuser"
+          },
+          "is_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Verified"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "title": "UserUpdate"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "api__neo4j_routes__QueryRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "hybrid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "QueryRequest"
+      },
+      "api__neo4j_routes__SearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "top_k": {
+            "type": "integer",
+            "title": "Top K",
+            "default": 10
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest"
+      },
+      "database__models__knowledge__ParseStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "ParseStatus",
+        "description": "解析任务状态枚举。"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/api/v1/auth/login"
+          }
+        }
+      }
+    }
+  }
+}

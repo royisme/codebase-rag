@@ -1,0 +1,4 @@
+This directory stores Alembic migration scripts.
+
+- Use `uv run alembic revision -m "message"` to create migrations.
+- Use `uv run alembic upgrade head` to apply migrations.
