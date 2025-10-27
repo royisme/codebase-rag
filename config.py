@@ -152,6 +152,11 @@ class Settings(BaseSettings):
     graphrag_query_timeout_seconds: int = Field(default=30, description="Default timeout for GraphRAG queries (seconds)", alias="GRAPHRAG_QUERY_TIMEOUT_SECONDS")
     graphrag_max_results: int = Field(default=20, description="Maximum results for GraphRAG queries", alias="GRAPHRAG_MAX_RESULTS")
     graphrag_enable_evidence: bool = Field(default=True, description="Enable evidence collection for GraphRAG queries", alias="GRAPHRAG_ENABLE_EVIDENCE")
+    graphrag_query_cache_ttl_seconds: int = Field(
+        default=600,
+        description="Cache TTL for GraphRAG query results (seconds)",
+        alias="GRAPHRAG_QUERY_CACHE_TTL_SECONDS",
+    )
 
     @property
     def database_dsn_async(self) -> str:

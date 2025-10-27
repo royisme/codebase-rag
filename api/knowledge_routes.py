@@ -14,17 +14,21 @@ from database import async_session_factory
 from services.neo4j_knowledge_service import Neo4jKnowledgeService
 from services.source_service import get_source_service
 from services.audit_logger import audit_logger
+from services.graph_rag_service import GraphRAGService
+from services.graph_query_cache import graph_query_cache
 from security.casbin_enforcer import require_permission
 from schemas import (
     GraphRAGQueryRequest,
     GraphRAGQueryResponse,
     GraphRAGErrorResponse,
     EvidenceAnchor,
+    GraphRAGAnswerPayload,
 )
 from config import settings
 from loguru import logger
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["knowledge-query"])
+graph_rag_service = GraphRAGService()
 
 
 # Helper function to get actor info from request
@@ -78,6 +82,14 @@ async def query_knowledge_graph(
     """使用GraphRAG查询知识图谱。"""
     start_time = dt.datetime.now()
     query_id = uuid.uuid4()
+    context_query_id = query_request.context_query_id
+    context_query_id_str = str(context_query_id) if context_query_id else None
+    cached_context: Optional[GraphRAGQueryResponse] = None
+    context_cache_hit = False
+
+    if context_query_id_str:
+        cached_context = await graph_query_cache.get(context_query_id_str)
+        context_cache_hit = cached_context is not None
 
     try:
         async with asyncio.timeout(query_request.timeout_seconds):
@@ -97,12 +109,11 @@ async def query_knowledge_graph(
                     "include_evidence": query_request.include_evidence,
                     "source_ids": [str(sid) for sid in query_request.source_ids] if query_request.source_ids else None,
                     "timeout_seconds": query_request.timeout_seconds,
+                    "context_query_id": context_query_id_str,
+                    "context_cache_hit": context_cache_hit,
                 },
                 ip_address=get_actor_info(user).get("ip_address"),
             )
-
-            # 初始化Neo4j知识服务
-            knowledge_service = Neo4jKnowledgeService()
 
             # 如果指定了源ID，进行权限验证
             if query_request.source_ids:
@@ -123,22 +134,59 @@ async def query_knowledge_graph(
                                 detail=f"知识源 {source.name} 未激活，无法查询"
                             )
 
-            # 执行GraphRAG查询
-            logger.info(f"执行GraphRAG查询 {query_id}: {query_request.query[:50]}...")
+            # 构造带上下文的问题
+            question_for_service = query_request.query.strip()
+            if cached_context:
+                previous_answer = cached_context.answer
+                context_blocks: List[str] = [question_for_service]
 
-            result = await knowledge_service.query(
-                question=query_request.query,
-                mode="hybrid",  # 使用混合模式
-                max_results=query_request.max_results,
+                if previous_answer.summary:
+                    context_blocks.append(f"上一轮摘要: {previous_answer.summary.strip()}")
+
+                if previous_answer.related_entities:
+                    entity_lines: List[str] = []
+                    for entity in previous_answer.related_entities[:8]:
+                        if isinstance(entity, dict):
+                            entity_type = entity.get("type", "entity")
+                            name = entity.get("name") or entity.get("detail") or ""
+                            detail = entity.get("detail") or ""
+                        else:
+                            entity_type = getattr(entity, "type", "entity")
+                            name = getattr(entity, "name", None) or getattr(entity, "detail", "") or ""
+                            detail = getattr(entity, "detail", "") or ""
+
+                        entity_lines.append(f"- {entity_type}: {name} {detail}".strip())
+                    if [line for line in entity_lines if line.strip()]:
+                        context_blocks.append("上一轮关联实体:\n" + "\n".join(entity_lines))
+
+                if previous_answer.next_actions:
+                    action_lines = "\n".join(f"- {action}" for action in previous_answer.next_actions[:5])
+                    context_blocks.append("上一轮建议操作:\n" + action_lines)
+
+                question_for_service = "\n\n".join(block for block in context_blocks if block)
+
+            # 执行GraphRAG查询
+            logger.info(
+                "执行GraphRAG查询 {} (context: {}, hit: {}): {}",
+                query_id,
+                context_query_id_str,
+                context_cache_hit,
+                query_request.query[:50],
+            )
+
+            rag_result = await graph_rag_service.query(
+                question_for_service,
+                source_ids=[str(sid) for sid in query_request.source_ids] if query_request.source_ids else None,
+                timeout_seconds=query_request.timeout_seconds,
                 include_evidence=query_request.include_evidence,
-                source_ids=query_request.source_ids,
+                max_results=query_request.max_results,
             )
 
             processing_time_ms = int((dt.datetime.now() - start_time).total_seconds() * 1000)
 
-            if not result.get("success"):
+            if not rag_result.answer.summary or rag_result.answer.summary.strip() == "":
                 error_code = GraphRAGErrorCodes.PROCESSING_ERROR
-                error_message = result.get("error", "查询处理失败")
+                error_message = "未能生成有效回答，请稍后重试"
 
                 # 记录失败的审计日志
                 await audit_logger.record_event(
@@ -153,6 +201,8 @@ async def query_knowledge_graph(
                         "query_id": str(query_id),
                         "error_code": error_code,
                         "processing_time_ms": processing_time_ms,
+                        "context_query_id": context_query_id_str,
+                        "context_cache_hit": context_cache_hit,
                     },
                     ip_address=get_actor_info(user).get("ip_address"),
                 )
@@ -167,29 +217,45 @@ async def query_knowledge_graph(
                     ).model_dump(mode="json")
                 )
 
-            # 构建证据锚点
-            evidence_anchors = []
-            if query_request.include_evidence and result.get("evidence"):
-                for evidence in result.get("evidence", []):
-                    anchor = EvidenceAnchor(
-                        source_id=evidence.get("source_id", uuid.uuid4()),
-                        source_name=evidence.get("source_name", "未知来源"),
-                        content_snippet=evidence.get("content", "")[:200],
-                        relevance_score=evidence.get("relevance_score", 0.0),
-                        page_number=evidence.get("page_number"),
-                        section_title=evidence.get("section_title"),
-                    )
-                    evidence_anchors.append(anchor)
-
-            # 构建响应
-            response = GraphRAGQueryResponse(
-                answer=result.get("answer", ""),
-                confidence_score=result.get("confidence_score", 0.0),
-                evidence_anchors=evidence_anchors,
-                sources_queried=query_request.source_ids or [],
-                processing_time_ms=processing_time_ms,
-                query_id=query_id,
+            answer_payload = GraphRAGAnswerPayload.model_validate(
+                {
+                    "summary": rag_result.answer.summary,
+                    "related_entities": rag_result.answer.related_entities,
+                    "evidence": rag_result.answer.evidence,
+                    "next_actions": rag_result.answer.next_actions,
+                }
             )
+
+            evidence_anchors: List[EvidenceAnchor] = []
+            for item in answer_payload.evidence:
+                source_identifier = item.source_ref or item.id
+                if not source_identifier:
+                    continue
+                try:
+                    evidence_uuid = uuid.UUID(str(source_identifier))
+                except Exception:
+                    continue
+                evidence_anchors.append(
+                    EvidenceAnchor(
+                        source_id=evidence_uuid,
+                        source_name=item.source_ref or item.id or "未知来源",
+                        content_snippet=item.snippet[:200],
+                        relevance_score=item.score or 0.0,
+                    )
+                )
+
+            response = GraphRAGQueryResponse(
+                answer=answer_payload,
+                confidence_score=rag_result.confidence_score,
+                evidence_anchors=evidence_anchors,
+                raw_messages=rag_result.raw_messages,
+                sources_queried=rag_result.sources_queried,
+                processing_time_ms=rag_result.processing_time_ms or processing_time_ms,
+                query_id=rag_result.query_id or query_id,
+                issues=rag_result.issues,
+            )
+
+            await graph_query_cache.set(str(response.query_id), response)
 
             # 记录成功的审计日志
             await audit_logger.record_event(
@@ -203,14 +269,21 @@ async def query_knowledge_graph(
                 metadata={
                     "query_id": str(query_id),
                     "confidence_score": response.confidence_score,
-                    "evidence_count": len(evidence_anchors),
-                    "processing_time_ms": processing_time_ms,
+                    "evidence_count": len(response.answer.evidence),
+                    "processing_time_ms": response.processing_time_ms,
                     "sources_queried_count": len(response.sources_queried),
+                    "context_query_id": context_query_id_str,
+                    "context_cache_hit": context_cache_hit,
                 },
                 ip_address=get_actor_info(user).get("ip_address"),
             )
 
-            logger.info(f"GraphRAG查询 {query_id} 成功完成，耗时 {processing_time_ms}ms")
+            logger.info(
+                "GraphRAG查询 {} 成功完成，耗时 {}ms（issues: {}）",
+                query_id,
+                response.processing_time_ms,
+                response.issues,
+            )
             return response
 
     except asyncio.TimeoutError:
@@ -230,11 +303,18 @@ async def query_knowledge_graph(
                 "error_code": GraphRAGErrorCodes.TIMEOUT,
                 "timeout_seconds": query_request.timeout_seconds,
                 "processing_time_ms": processing_time_ms,
+                "context_query_id": context_query_id_str,
+                "context_cache_hit": context_cache_hit,
             },
             ip_address=get_actor_info(user).get("ip_address"),
         )
 
-        logger.warning(f"GraphRAG查询 {query_id} 超时")
+        logger.warning(
+            "GraphRAG查询 {} 超时（context: {}, hit: {})",
+            query_id,
+            context_query_id_str,
+            context_cache_hit,
+        )
         return JSONResponse(
             status_code=408,
             content=GraphRAGErrorResponse(
@@ -264,11 +344,19 @@ async def query_knowledge_graph(
                 "query_id": str(query_id),
                 "error_code": GraphRAGErrorCodes.INTERNAL_ERROR,
                 "processing_time_ms": processing_time_ms,
+                "context_query_id": context_query_id_str,
+                "context_cache_hit": context_cache_hit,
             },
             ip_address=get_actor_info(user).get("ip_address"),
         )
 
-        logger.error(f"GraphRAG查询 {query_id} 发生内部错误: {e}")
+        logger.error(
+            "GraphRAG查询 {} 发生内部错误 (context: {}, hit: {}): {}",
+            query_id,
+            context_query_id_str,
+            context_cache_hit,
+            e,
+        )
         return JSONResponse(
             status_code=500,
             content=GraphRAGErrorResponse(
@@ -349,13 +437,11 @@ async def get_query_result(
 ):
     """获取之前查询的结果（如果缓存中有）。"""
     try:
-        # 这个功能可以实现查询结果缓存
-        # 目前返回暂未实现的信息
-        return {
-            "query_id": str(query_id),
-            "message": "查询结果缓存功能尚未实现",
-            "status": "not_found",
-        }
+        cached = await graph_query_cache.get(str(query_id))
+        if not cached:
+            raise HTTPException(status_code=404, detail="查询结果已过期或未命中缓存")
+
+        return cached.model_dump(mode="json")
 
     except Exception as e:
         logger.error(f"获取查询结果失败: {e}")

@@ -11,16 +11,22 @@ from pydantic import BaseModel
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
     full_name: Optional[str] = None
+    company: Optional[str] = None
+    department: Optional[str] = None
     role: str
 
 
 class UserCreate(schemas.BaseUserCreate):
     full_name: Optional[str] = None
+    company: Optional[str] = None
+    department: Optional[str] = None
     role: str = "viewer"
 
 
 class UserUpdate(schemas.BaseUserUpdate):
     full_name: Optional[str] = None
+    company: Optional[str] = None
+    department: Optional[str] = None
     role: Optional[str] = None
 
 

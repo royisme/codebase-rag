@@ -69,19 +69,40 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 
   ```json
   {
-    "answer": "导入流程分为数据校验、暂存、入库三个阶段……",
+    "answer": {
+      "summary": "导入流程最近的改动集中在 `backend/services/importer.py`，提交 f19bb9b1 优化了错误处理。",
+      "related_entities": [
+        {
+          "type": "file",
+          "name": "backend/services/importer.py",
+          "importance": "high",
+          "detail": "提交 f19bb9b1 更新了异常处理逻辑"
+        },
+        {
+          "type": "commit",
+          "name": "f19bb9b1",
+          "importance": "high",
+          "detail": "Refactor importer error handling"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "commit:f19bb9b1",
+          "snippet": "Refactor importer error handling to capture audit entries.",
+          "source_type": "commit",
+          "source_ref": "f19bb9b1"
+        }
+      ],
+      "next_actions": [
+        "查看这些文件最近的提交详情。",
+        "联系相关负责人确认变更计划。"
+      ]
+    },
     "confidence_score": 0.78,
-    "evidence_anchors": [
-      {
-        "source_id": "550e8400-e29b-41d4-a716-446655440000",
-        "source_name": "客户数据库 · customer_orders 表",
-        "content_snippet": "导入流程会先校验客户编号是否存在于 customer_core 表……",
-        "relevance_score": 0.87
-      }
-    ],
     "sources_queried": ["550e8400-e29b-41d4-a716-446655440000"],
     "processing_time_ms": 1432,
-    "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3"
+    "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3",
+    "issues": []
   }
   ```
 

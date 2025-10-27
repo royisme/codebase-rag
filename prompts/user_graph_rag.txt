@@ -1,0 +1,15 @@
+用户问题：
+{{ question }}
+
+检索意图：
+{{ intent }}
+
+图谱摘要（JSON）：
+{{ graph_context_json }}
+
+证据片段：
+{% for item in evidence_snippets %}
+[{{ loop.index }}] {{ item.text }}
+{% endfor %}
+
+请综合以上信息回答，并使用 JSON 输出，字段与系统提示保持一致。

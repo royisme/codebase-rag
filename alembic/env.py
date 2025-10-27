@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from logging.config import fileConfig
+from pathlib import Path
+import sys
 from typing import Any
 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from config import settings
 from database import Base
@@ -20,12 +26,15 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+_schema = getattr(settings, "db_schema", None)
+_include_schemas = bool(_schema)
 
 
 def _configure_sqlalchemy_url() -> None:
-    section = config.get_section(config.config_ini_section, {})
-    section["sqlalchemy.url"] = settings.database_dsn_sync if context.is_offline_mode() else settings.database_dsn_async
-    config.set_section(config.config_ini_section, section)
+    sqlalchemy_url = (
+        settings.database_dsn_sync if context.is_offline_mode() else settings.database_dsn_async
+    )
+    config.set_main_option("sqlalchemy.url", sqlalchemy_url)
 
 
 def run_migrations_offline() -> None:
@@ -37,8 +46,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        version_table_schema=settings.db_schema,
-        include_schemas=True,
+        version_table_schema=_schema,
+        include_schemas=_include_schemas,
     )
 
     with context.begin_transaction():
@@ -49,8 +58,8 @@ def do_run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        version_table_schema=settings.db_schema,
-        include_schemas=True,
+        version_table_schema=_schema,
+        include_schemas=_include_schemas,
     )
 
     with context.begin_transaction():

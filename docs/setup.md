@@ -74,6 +74,12 @@ uv run server
 
    首次运行会打印默认管理员凭据，可使用 `/api/v1/auth/login` 获取访问令牌。
 
+4. **注册流程说明**
+
+   - `/api/v1/auth/register` 接口现在支持 `company`、`department` 字段，用于存储企业名称与部门信息，仅在响应中展示，不参与权限判断。
+   - 注册成功后接口返回 `UserRead` 对象，其中 `company`、`department` 若未填写将为 `null`。
+   - **注册不会自动返回访问令牌**：前端需在注册成功后调用 `/api/v1/auth/login`（或 `/api/v1/auth/jwt/login`）获取 token。
+
 ## 7.（可选）切换到 PostgreSQL
 
 若需要联调更接近生产的环境：
@@ -97,5 +103,6 @@ uv run server
 - **Casbin Adapter 尝试连接失败**：确认当前模式是否仍引用 PostgreSQL DSN，必要时清空 `.env` 中的老变量。
 - **无法生成 Swagger**：请检查 `DEBUG` 是否设为 `true`，生产环境默认关闭在线文档。
 - **GraphRAG 查询超时**：可调整 `GRAPHRAG_QUERY_TIMEOUT_SECONDS` 或使用更小的测试数据集。
+- **GraphRAG 多轮上下文**：如需延长缓存有效期，可配置 `GRAPHRAG_QUERY_CACHE_TTL_SECONDS`；前端在继续追问时应附带上一轮响应的 `query_id`。
 
 完成以上步骤后，即可基于 SQLite 数据库开展 RBAC、审计、知识源管理以及 GraphRAG 接口的开发与测试。

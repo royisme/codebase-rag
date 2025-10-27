@@ -20,6 +20,9 @@ from .knowledge import (
     ParseJobListResponse,
 
     # GraphRAG schemas
+    GraphRelatedEntity,
+    GraphEvidenceItem,
+    GraphRAGAnswerPayload,
     GraphRAGQueryRequest,
     GraphRAGQueryResponse,
     GraphRAGErrorResponse,
@@ -46,6 +49,9 @@ __all__ = [
     "ParseJobListResponse",
 
     # GraphRAG schemas
+    "GraphRelatedEntity",
+    "GraphEvidenceItem",
+    "GraphRAGAnswerPayload",
     "GraphRAGQueryRequest",
     "GraphRAGQueryResponse",
     "GraphRAGErrorResponse",

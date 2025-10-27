@@ -3550,6 +3550,140 @@
           "source_name": "客户数据库 · customer_orders 表"
         }
       },
+      "GraphEvidenceItem": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "证据 ID"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet",
+            "description": "证据文本片段"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type",
+            "description": "证据来源类型，如 commit/file/doc"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref",
+            "description": "引用标识，如提交哈希或文件路径"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "相关性评分"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snippet"
+        ],
+        "title": "GraphEvidenceItem",
+        "description": "证据片段。",
+        "example": {
+          "id": "commit:f19bb9b1",
+          "score": 0.82,
+          "snippet": "Refactor GraphRAG service to expose structured response.",
+          "source_ref": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3",
+          "source_type": "commit"
+        }
+      },
+      "GraphRAGAnswerPayload": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "面向用户的总体回答"
+          },
+          "related_entities": {
+            "items": {
+              "$ref": "#/components/schemas/GraphRelatedEntity"
+            },
+            "type": "array",
+            "title": "Related Entities",
+            "description": "关联实体列表"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEvidenceItem"
+            },
+            "type": "array",
+            "title": "Evidence",
+            "description": "证据片段列表"
+          },
+          "next_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Next Actions",
+            "description": "建议的后续操作"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "title": "GraphRAGAnswerPayload",
+        "description": "GraphRAG 查询回答主体。",
+        "example": {
+          "evidence": [
+            {
+              "id": "commit:98c1",
+              "snippet": "Improve login error handling by surfacing audit entries.",
+              "source_ref": "98c1f3d",
+              "source_type": "commit"
+            }
+          ],
+          "next_actions": [
+            "查看这些文件最近的提交详情。",
+            "联系相关负责人确认变更计划。"
+          ],
+          "related_entities": [
+            {
+              "detail": "提交 98c1 修改了异常处理逻辑",
+              "importance": "high",
+              "name": "backend/services/auth_service.py",
+              "type": "file"
+            }
+          ],
+          "summary": "登录流程最近在 2025-10-23 的提交中进行了错误处理优化。"
+        }
+      },
       "GraphRAGErrorResponse": {
         "properties": {
           "error_code": {
@@ -3641,6 +3775,19 @@
             "title": "Timeout Seconds",
             "description": "查询超时时间（秒）",
             "default": 30
+          },
+          "context_query_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Query Id",
+            "description": "上一轮查询的 query_id，命中缓存时用于多轮上下文"
           }
         },
         "type": "object",
@@ -3650,6 +3797,7 @@
         "title": "GraphRAGQueryRequest",
         "description": "GraphRAG 查询请求模式。",
         "example": {
+          "context_query_id": "ab2f89c3-7f02-4f39-a815-0123456789ab",
           "include_evidence": true,
           "max_results": 5,
           "query": "总结客户资料导入流程涉及的关键表和字段",
@@ -3663,9 +3811,8 @@
       "GraphRAGQueryResponse": {
         "properties": {
           "answer": {
-            "type": "string",
-            "title": "Answer",
-            "description": "生成的答案"
+            "$ref": "#/components/schemas/GraphRAGAnswerPayload",
+            "description": "结构化回答"
           },
           "confidence_score": {
             "type": "number",
@@ -3680,16 +3827,31 @@
             },
             "type": "array",
             "title": "Evidence Anchors",
-            "description": "证据锚点列表"
+            "description": "原始证据锚点列表"
+          },
+          "raw_messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Messages",
+            "description": "LLM 或检索返回的原始消息"
           },
           "sources_queried": {
             "items": {
-              "type": "string",
-              "format": "uuid"
+              "type": "string"
             },
             "type": "array",
             "title": "Sources Queried",
-            "description": "实际查询的知识源ID列表"
+            "description": "实际查询的知识源标识列表"
           },
           "processing_time_ms": {
             "type": "integer",
@@ -3697,40 +3859,148 @@
             "description": "处理时间（毫秒）"
           },
           "query_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Query Id",
             "description": "查询ID"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "上下文构建中的警告信息"
           }
         },
         "type": "object",
         "required": [
           "answer",
           "confidence_score",
-          "sources_queried",
-          "processing_time_ms",
-          "query_id"
+          "processing_time_ms"
         ],
         "title": "GraphRAGQueryResponse",
         "description": "GraphRAG 查询响应模式。",
         "example": {
-          "answer": "导入流程分为数据校验、暂存、入库三个阶段……",
+          "answer": {
+            "evidence": [
+              {
+                "id": "commit:f19bb9b1",
+                "snippet": "Refactor importer error handling to capture audit entries.",
+                "source_ref": "f19bb9b1",
+                "source_type": "commit"
+              }
+            ],
+            "next_actions": [
+              "查看这些文件最近的提交详情。",
+              "联系相关负责人确认变更计划。"
+            ],
+            "related_entities": [
+              {
+                "detail": "在提交 f19bb9b1 中更新",
+                "importance": "high",
+                "name": "backend/services/importer.py",
+                "type": "file"
+              },
+              {
+                "detail": "Refactor importer error handling",
+                "importance": "high",
+                "name": "f19bb9b1",
+                "type": "commit"
+              }
+            ],
+            "summary": "导入流程最近的改动集中在 `backend/services/importer.py`，提交 f19bb9b1 调整了错误处理。"
+          },
           "confidence_score": 0.78,
-          "evidence_anchors": [
-            {
-              "content_snippet": "导入流程会先校验客户编号是否存在于 customer_core 表……",
-              "page_number": 12,
-              "relevance_score": 0.87,
-              "section_title": "数据导入校验",
-              "source_id": "550e8400-e29b-41d4-a716-446655440000",
-              "source_name": "客户数据库 · customer_orders 表"
-            }
-          ],
+          "issues": [],
           "processing_time_ms": 1432,
           "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3",
           "sources_queried": [
             "550e8400-e29b-41d4-a716-446655440000"
           ]
+        }
+      },
+      "GraphRelatedEntity": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "实体类型，例如 file、commit、module、person"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "实体名称或路径"
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Importance",
+            "description": "重要程度",
+            "default": "medium"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "实体的描述或补充信息"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link",
+            "description": "可选的跳转链接"
+          },
+          "extra": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra",
+            "description": "附加字段"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "name"
+        ],
+        "title": "GraphRelatedEntity",
+        "description": "关联实体信息。",
+        "example": {
+          "detail": "最近 2 次提交涉及此文件",
+          "importance": "high",
+          "link": "https://git.example.com/blob/commit",
+          "name": "backend/services/graph_rag_service.py",
+          "type": "file"
         }
       },
       "HTTPValidationError": {
@@ -4782,6 +5052,28 @@
             ],
             "title": "Full Name"
           },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
           "role": {
             "type": "string",
             "title": "Role",
@@ -4832,6 +5124,28 @@
               }
             ],
             "title": "Full Name"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
           },
           "role": {
             "type": "string",
@@ -4914,6 +5228,28 @@
               }
             ],
             "title": "Full Name"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
           },
           "role": {
             "anyOf": [

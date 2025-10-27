@@ -34,6 +34,8 @@ class User(SQLAlchemyBaseUserTableUUID, TimestampMixin, Base):
     __tablename__ = "users"
 
     full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(50), default="viewer", nullable=False)
 
     oauth_accounts: Mapped[list[UserOAuthAccount]] = relationship(
