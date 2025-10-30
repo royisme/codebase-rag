@@ -11,6 +11,8 @@ from .knowledge import (
     KnowledgeSourceUpdate,
     KnowledgeSourceResponse,
     KnowledgeSourceListResponse,
+    KnowledgeSourceValidationRequest,
+    KnowledgeSourceValidationResponse,
 
     # ParseJob schemas
     ParseJobBase,
@@ -40,6 +42,8 @@ __all__ = [
     "KnowledgeSourceUpdate",
     "KnowledgeSourceResponse",
     "KnowledgeSourceListResponse",
+    "KnowledgeSourceValidationRequest",
+    "KnowledgeSourceValidationResponse",
 
     # ParseJob schemas
     "ParseJobBase",
