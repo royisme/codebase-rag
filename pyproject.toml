@@ -45,6 +45,8 @@ dependencies = [
     "pycasbin>=2.4.0",
     "casbin-sqlalchemy-adapter>=1.4.0",
     "pytest-cov>=7.0.0",
+    "ghapi",
+    "python-gitlab",
 ]
 
 [project.scripts]
