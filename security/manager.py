@@ -20,6 +20,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     def __init__(self, user_db):
         super().__init__(user_db)
         self.password_helper = PasswordHelper()
+        self.logger = logger.bind(component="UserManager")
 
     async def on_after_register(self, user: User, request=None):  # pragma: no cover - hook
         self.logger.info("User registered", extra={"user_id": str(user.id)})

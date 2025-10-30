@@ -186,9 +186,10 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 4. **Start Neo4j Database**
    ```bash
    # Using Docker
-   docker run \
+   docker run -d \
        --name neo4j-code-graph \
-       -p 7474:7474 -p 7687:7687 \
+       -p 7474:7474\
+       -p 7687:7687 \
        -e NEO4J_AUTH=neo4j/password \
        -e NEO4J_PLUGINS='["apoc"]' \
        neo4j:5.15
@@ -200,7 +201,7 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
    python start.py
    # or use script entry points
    uv run server
-   
+
    # Start MCP service (optional)
    python start_mcp.py
    # or use script entry points
