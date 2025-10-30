@@ -101,6 +101,29 @@ class CodeIndexingPipeline:
         sync_config = sync_config or {}
 
         connection_config = dict(source.connection_config or {})
+        overrides: Dict[str, Any] = {}
+
+        if isinstance(sync_config, dict):
+            nested = sync_config.get("connection_config")
+            if isinstance(nested, dict):
+                overrides.update(nested)
+
+            for key, value in sync_config.items():
+                if key == "connection_config":
+                    continue
+                overrides[key] = value
+
+        if overrides:
+            connection_config.update({k: v for k, v in overrides.items() if v is not None})
+
+        depth_override = overrides.get("git_depth") or overrides.get("clone_depth")
+        if depth_override is None:
+            depth_override = connection_config.get("git_depth") or connection_config.get("clone_depth")
+        if depth_override is not None:
+            try:
+                self.git_service.depth = int(depth_override)
+            except (TypeError, ValueError):
+                pass
         # Extract parameters with fallbacks
         repo_url = connection_config.get("repo_url")
         if not repo_url:
