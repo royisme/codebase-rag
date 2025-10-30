@@ -47,7 +47,6 @@ router.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
     prefix="/admin/users",
     tags=["RBAC"],
-    dependencies=[Depends(current_superuser)],
 )
 
 
@@ -68,6 +67,14 @@ async def refresh_token(
         target="refresh",
     )
     return response
+
+
+@router.get("/auth/me", response_model=UserRead, tags=["Auth"])
+async def get_current_user_profile(
+    user=Depends(current_active_user),
+):
+    """返回当前登录用户的基础资料。"""
+    return UserRead.model_validate(user)
 
 
 @router.get("/admin/roles", response_model=list[RoleSchema], tags=["RBAC"])

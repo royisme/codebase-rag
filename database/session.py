@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -43,8 +42,7 @@ async_session_factory = async_sessionmaker(
 )
 
 
-@asynccontextmanager
-async def get_async_session() -> AsyncIterator[AsyncSession]:
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI 依赖使用的异步会话生成器。"""
 
     session = async_session_factory()

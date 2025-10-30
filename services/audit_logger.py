@@ -36,8 +36,10 @@ class AuditLogger:
         created_at: dt.datetime | None = None,
         session: AsyncSession | None = None,
     ) -> None:
+        actor_id_value = str(actor_id) if isinstance(actor_id, uuid.UUID) else actor_id
+
         payload = AuditEvent(
-            actor_id=actor_id,
+            actor_id=actor_id_value,
             actor_email=actor_email,
             resource=resource,
             action=action,
