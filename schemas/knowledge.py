@@ -198,6 +198,28 @@ class ParseJobListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class KnowledgeSourceValidationRequest(BaseModel):
+    """知识源连接验证请求。"""
+
+    repo_url: str = Field(..., description="Git 仓库地址")
+    auth_type: Literal["token", "none"] = Field("none", description="认证方式")
+    access_token: Optional[str] = Field(None, description="访问令牌（按需提供）")
+    branch: Optional[str] = Field(None, description="待验证的分支名称")
+
+
+class KnowledgeSourceValidationResponse(BaseModel):
+    """知识源连接验证响应。"""
+
+    valid: bool = Field(..., description="是否验证成功")
+    message: Optional[str] = Field(None, description="验证结果说明")
+    accessible_branches: Optional[List[str]] = Field(
+        None, description="可访问的分支列表"
+    )
+    default_branch: Optional[str] = Field(
+        None, description="推断的默认分支名称"
+    )
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

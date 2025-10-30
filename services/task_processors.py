@@ -5,13 +5,16 @@ define the specific execution logic for different types of tasks
 
 import asyncio
 import datetime as dt
-from typing import Dict, Any, Optional, Callable
-from abc import ABC, abstractmethod
-from pathlib import Path
 import json
+from abc import ABC, abstractmethod
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
+
 from loguru import logger
 
 from .task_storage import TaskType, Task
+from services.code_indexing import CodeIndexingPipeline
 
 class TaskProcessor(ABC):
     """task processor base class"""
@@ -581,7 +584,12 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
 
                 # 根据源类型执行不同的同步逻辑
                 result = await self._sync_by_source_type(
-                    source, sync_config, progress_callback
+                    source,
+                    sync_config,
+                    progress_callback,
+                    job_id=job_id,
+                    session=session,
+                    source_service=source_service,
                 )
 
                 self._update_progress(progress_callback, 90, "完成同步后处理")
@@ -641,7 +649,11 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
         self,
         source,
         sync_config: Dict[str, Any],
-        progress_callback: Optional[Callable]
+        progress_callback: Optional[Callable],
+        *,
+        job_id: Optional[str],
+        session,
+        source_service,
     ) -> Dict[str, Any]:
         """根据知识源类型执行同步"""
         source_type = source.source_type
@@ -655,7 +667,14 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
         elif source_type == "document":
             return await self._sync_document_source(source, sync_config, progress_callback)
         elif source_type == "code":
-            return await self._sync_code_source(source, sync_config, progress_callback)
+            return await self._sync_code_source(
+                source,
+                sync_config,
+                progress_callback,
+                job_id=job_id,
+                session=session,
+                source_service=source_service,
+            )
         else:
             # 默认处理
             return await self._sync_generic_source(source, sync_config, progress_callback)
@@ -737,23 +756,33 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
             "processing_time": 2.0
         }
 
-    async def _sync_code_source(self, source, sync_config, progress_callback) -> Dict[str, Any]:
+    async def _sync_code_source(
+        self,
+        source,
+        sync_config,
+        progress_callback,
+        *,
+        job_id: Optional[str],
+        session,
+        source_service,
+    ) -> Dict[str, Any]:
         """同步代码知识源"""
-        self._update_progress(progress_callback, 40, "分析代码结构")
 
-        await asyncio.sleep(1)
-        self._update_progress(progress_callback, 70, "提取代码实体")
+        pipeline = CodeIndexingPipeline(
+            source_service=source_service,
+            session=session,
+            neo4j_service=self.neo4j_service,
+        )
 
-        await asyncio.sleep(1)
-        self._update_progress(progress_callback, 90, "构建代码依赖图谱")
+        result = await pipeline.run(
+            source=source,
+            job_id=job_id,
+            sync_config=sync_config,
+            progress_callback=None,
+            task_progress_callback=progress_callback,
+        )
 
-        return {
-            "files_analyzed": 15,
-            "functions_found": 45,
-            "classes_found": 12,
-            "nodes_created": 80,
-            "processing_time": 2.8
-        }
+        return asdict(result)
 
     async def _sync_generic_source(self, source, sync_config, progress_callback) -> Dict[str, Any]:
         """同步通用知识源"""

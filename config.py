@@ -148,6 +148,35 @@ class Settings(BaseSettings):
     knowledge_job_timeout_minutes: int = Field(default=30, description="Default timeout for knowledge source jobs (minutes)", alias="KNOWLEDGE_JOB_TIMEOUT_MINUTES")
     knowledge_retry_attempts: int = Field(default=3, description="Number of retry attempts for failed knowledge source jobs", alias="KNOWLEDGE_RETRY_ATTEMPTS")
 
+    # Code Repository Indexing Defaults
+    code_repo_root: str = Field(default="/data/repos", description="Root directory for cloning code repositories", alias="CODE_REPO_ROOT")
+    code_git_depth: int = Field(default=1, description="Default git clone depth for repository sync", alias="CODE_GIT_DEPTH")
+    code_include_patterns: list[str] = Field(
+        default_factory=lambda: ["*.py", "*.ts", "*.js", "*.go"],
+        description="Default include glob patterns when scanning repositories",
+        alias="CODE_INCLUDE_PATTERNS",
+    )
+    code_exclude_patterns: list[str] = Field(
+        default_factory=lambda: ["node_modules/*", "*.test.*", "tests/*", "__pycache__/*"],
+        description="Default exclude glob patterns when scanning repositories",
+        alias="CODE_EXCLUDE_PATTERNS",
+    )
+    code_max_file_size_kb: int = Field(
+        default=500,
+        description="Maximum file size (KB) considered during repository scanning",
+        alias="CODE_MAX_FILE_SIZE_KB",
+    )
+    code_max_concurrent_indexing: int = Field(
+        default=2,
+        description="Maximum number of concurrent repository indexing pipelines",
+        alias="CODE_MAX_CONCURRENT_INDEXING",
+    )
+    code_job_timeout_seconds: int = Field(
+        default=900,
+        description="Timeout budget for a single repository indexing job in seconds",
+        alias="CODE_JOB_TIMEOUT_SECONDS",
+    )
+
     # GraphRAG Settings
     graphrag_query_timeout_seconds: int = Field(default=30, description="Default timeout for GraphRAG queries (seconds)", alias="GRAPHRAG_QUERY_TIMEOUT_SECONDS")
     graphrag_max_results: int = Field(default=20, description="Maximum results for GraphRAG queries", alias="GRAPHRAG_MAX_RESULTS")

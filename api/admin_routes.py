@@ -12,12 +12,15 @@ from database import async_session_factory
 from database.models import ParseStatus
 from services.source_service import get_source_service, SourceServiceError, SourceNotFoundError
 from services.task_queue import submit_knowledge_source_sync_task
+from services.code_indexing import validate_git_connection
 from security.casbin_enforcer import require_permission
 from schemas import (
     KnowledgeSourceCreate,
     KnowledgeSourceUpdate,
     KnowledgeSourceResponse,
     KnowledgeSourceListResponse,
+    KnowledgeSourceValidationRequest,
+    KnowledgeSourceValidationResponse,
     ParseJobCreate,
     ParseJobResponse,
     ParseJobListResponse,
@@ -35,6 +38,46 @@ def get_actor_info(user) -> Dict[str, Any]:
         "email": getattr(user, "email", None),
         "ip_address": getattr(user, "ip_address", None),
     }
+
+
+@router.post(
+    "/validate",
+    response_model=KnowledgeSourceValidationResponse,
+    summary="验证知识源连接",
+    description="校验 Git 仓库凭据及可访问分支列表。",
+    response_model_exclude_none=True,
+    responses={
+        200: {"description": "验证结果返回"},
+        400: {"description": "请求参数不合法"},
+        403: {"description": "RBAC：权限不足"},
+        500: {"description": "内部服务器错误"},
+    },
+)
+async def validate_knowledge_source_connection(
+    payload: KnowledgeSourceValidationRequest,
+    user=Depends(require_permission("/admin/sources/validate", "POST")),
+):
+    """验证代码仓库连接和凭据。"""
+
+    try:
+        valid, message, branches = await validate_git_connection(
+            payload.repo_url,
+            auth_type=payload.auth_type,
+            access_token=payload.access_token,
+            branch=payload.branch,
+        )
+
+        default_branch = payload.branch or (branches[0] if branches else None)
+
+        return KnowledgeSourceValidationResponse(
+            valid=valid,
+            message=message,
+            accessible_branches=branches or None,
+            default_branch=default_branch,
+        )
+    except Exception as exc:  # pragma: no cover - validation failure path
+        logger.error(f"仓库连接验证失败: {exc}")
+        raise HTTPException(status_code=500, detail="仓库连接验证失败")
 
 
 @router.post(
