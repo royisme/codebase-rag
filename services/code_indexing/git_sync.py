@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from urllib.parse import urlparse, urlunparse
 
 from loguru import logger
@@ -158,25 +159,47 @@ async def _run_command(
     loop = asyncio.get_running_loop()
 
     def _run_sync():
-        sanitized_parts = []
-        for part in command:
-            if "@" in part and part.startswith("http"):
-                parsed = urlparse(part)
-                if parsed.username:
-                    masked_netloc = part.replace(parsed.username, "***")
-                    sanitized_parts.append(masked_netloc)
-                    continue
-            sanitized_parts.append(part)
+        def mask_value(value: str) -> str:
+            if not isinstance(value, str):
+                return value
 
-        logger.debug("Executing command: %s", " ".join(sanitized_parts))
-        result = subprocess.run(
-            command,
-            cwd=str(cwd) if cwd else None,
-            env=env,
-            capture_output=capture_output,
-            text=True,
-            check=check,
-        )
+            if "@" in value and value.startswith("http"):
+                parsed_url = urlparse(value)
+                if parsed_url.username:
+                    masked_netloc = parsed_url.netloc.replace(parsed_url.username, "***", 1)
+                    return urlunparse(parsed_url._replace(netloc=masked_netloc))
+
+            return re.sub(r"(https?://)([^@]+)@", r"\1***@", value)
+
+        if isinstance(command, list):
+            sanitized_parts = [mask_value(part) for part in command]
+            debug_command = " ".join(sanitized_parts)
+            sanitized_for_error: Union[List[str], str] = sanitized_parts
+        else:  # pragma: no cover - defensive branch for unexpected command types
+            command_str = str(command)
+            debug_command = mask_value(command_str)
+            sanitized_for_error = debug_command
+
+        logger.debug("Executing command: %s", debug_command)
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=str(cwd) if cwd else None,
+                env=env,
+                capture_output=capture_output,
+                text=True,
+                check=check,
+            )
+        except subprocess.CalledProcessError as exc:
+            sanitized_exc = subprocess.CalledProcessError(
+                exc.returncode,
+                sanitized_for_error,
+                output=exc.output,
+                stderr=exc.stderr,
+            )
+            raise sanitized_exc from None
+
         return result
 
     result = await loop.run_in_executor(None, _run_sync)
