@@ -8,7 +8,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse, urlunparse
 
 from loguru import logger
@@ -159,25 +159,16 @@ async def _run_command(
     loop = asyncio.get_running_loop()
 
     def _run_sync():
-        def mask_value(value: str) -> str:
-            if not isinstance(value, str):
-                return value
-
-            if "@" in value and value.startswith("http"):
-                parsed_url = urlparse(value)
-                if parsed_url.username:
-                    masked_netloc = parsed_url.netloc.replace(parsed_url.username, "***", 1)
-                    return urlunparse(parsed_url._replace(netloc=masked_netloc))
-
-            return re.sub(r"(https?://)([^@]+)@", r"\1***@", value)
+        def sanitize_command_parts(parts: Iterable[str]) -> List[str]:
+            return [_mask_sensitive_text(part) for part in parts]
 
         if isinstance(command, list):
-            sanitized_parts = [mask_value(part) for part in command]
+            sanitized_parts = sanitize_command_parts(command)
             debug_command = " ".join(sanitized_parts)
             sanitized_for_error: Union[List[str], str] = sanitized_parts
         else:  # pragma: no cover - defensive branch for unexpected command types
             command_str = str(command)
-            debug_command = mask_value(command_str)
+            debug_command = _mask_sensitive_text(command_str)
             sanitized_for_error = debug_command
 
         logger.debug("Executing command: %s", debug_command)
@@ -209,6 +200,52 @@ async def _run_command(
     return result
 
 
+_URL_WITH_CREDS_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
+_BASIC_AUTH_FRAGMENT = re.compile(r"(https?://)([^/@]+@)")
+
+
+def _mask_sensitive_text(value: str) -> str:
+    """Mask credentials within any Git-style URLs contained in ``value``."""
+
+    if not isinstance(value, str):
+        return str(value)
+
+    def _replace(match: re.Match[str]) -> str:
+        return _mask_url_credentials(match.group(0))
+
+    return _URL_WITH_CREDS_PATTERN.sub(_replace, value)
+
+
+def _mask_url_credentials(url: str) -> str:
+    """Replace the credential portion of a URL with masked placeholders."""
+
+    try:
+        parsed = urlparse(url)
+    except ValueError:  # pragma: no cover - defensive for malformed URLs
+        return _BASIC_AUTH_FRAGMENT.sub(r"\1***@", url)
+
+    if parsed.scheme not in {"http", "https"}:
+        return url
+
+    netloc = parsed.netloc
+    if "@" not in netloc:
+        return url
+
+    hostname = parsed.hostname or ""
+    port = f":{parsed.port}" if parsed.port else ""
+
+    # ``urlparse`` treats ``token@host`` as username-only credentials.
+    if parsed.password is not None:
+        userinfo = "***:***@"
+    elif parsed.username is not None or "@" in netloc:
+        userinfo = "***@"
+    else:  # pragma: no cover - should be covered by previous checks
+        userinfo = ""
+
+    masked_netloc = f"{userinfo}{hostname}{port}" if userinfo else f"{hostname}{port}"
+    return urlunparse(parsed._replace(netloc=masked_netloc))
+
+
 def _build_authenticated_url(
     repo_url: str,
     *,
@@ -238,13 +275,11 @@ def _build_authenticated_url(
 def _sanitize_message(message: str, sanitized_url: str) -> str:
     """Remove repository credentials from log messages."""
 
-    if "@" in message:
-        parts = message.split("@")
-        if parts:
-            prefix = parts[0]
-            if "https://" in prefix:
-                message = message.replace(prefix + "@", "https://***@")
-    return message.replace(sanitized_url.replace("https://", ""), sanitized_url)
+    masked = _mask_sensitive_text(message)
+    sanitized_host = sanitized_url.replace("https://", "").replace("http://", "")
+    if sanitized_host:
+        return masked.replace(sanitized_host, sanitized_url)
+    return masked
 
 
 def _parse_branches(stdout: str) -> List[str]:
