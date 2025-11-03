@@ -44,3 +44,8 @@ data/
 docs/
 tests/
 .aider*
+
+## v0.2 specific
+repos/
+*.db
+*.sqlite
