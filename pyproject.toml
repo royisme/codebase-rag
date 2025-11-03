@@ -41,8 +41,7 @@ dependencies = [
 [project.scripts]
 server = "start:main"
 mcp_client = "start_mcp:main"
-server_v02 = "backend.app.main:main"
 
 [tool.setuptools]
-packages = ["api", "core", "services", "monitoring", "backend", "backend.app", "backend.app.routers", "backend.app.services", "backend.app.services.graph", "backend.app.services.ingest", "backend.app.services.ranking", "backend.app.services.context", "backend.app.models"]
+packages = ["api", "core", "services", "monitoring"]
 py-modules = ["start", "start_mcp", "mcp_server", "config", "main"]

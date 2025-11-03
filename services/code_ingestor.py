@@ -1,5 +1,6 @@
 """
-Code ingestor service for scanning and ingesting code files (v0.2)
+Code ingestor service for repository ingestion
+Handles file scanning, language detection, and Neo4j ingestion
 """
 import os
 from pathlib import Path
@@ -10,7 +11,7 @@ import fnmatch
 
 
 class CodeIngestor:
-    """Code file scanner and ingestor"""
+    """Code file scanner and ingestor for repositories"""
     
     # Language detection based on file extension
     LANG_MAP = {
@@ -35,7 +36,7 @@ class CodeIngestor:
     }
     
     def __init__(self, neo4j_service):
-        """Initialize code ingestor"""
+        """Initialize code ingestor with Neo4j service"""
         self.neo4j_service = neo4j_service
     
     def scan_files(
@@ -83,14 +84,14 @@ class CodeIngestor:
                   fnmatch.fnmatch(rel_path + '/', pattern) for pattern in exclude_globs)
     
     def _get_file_info(self, file_path: str, rel_path: str) -> Dict[str, Any]:
-        """Get file information"""
+        """Get file information including language, size, and content"""
         ext = Path(file_path).suffix.lower()
         lang = self.LANG_MAP.get(ext, 'unknown')
         
         # Get file size
         size = os.path.getsize(file_path)
         
-        # Read content for small files (v0.2: for fulltext search)
+        # Read content for small files (for fulltext search)
         content = None
         if size < 100_000:  # Only read files < 100KB
             try:
@@ -158,6 +159,13 @@ class CodeIngestor:
             }
 
 
+# Global instance
+code_ingestor = None
+
+
 def get_code_ingestor(neo4j_service):
-    """Factory function to create CodeIngestor"""
-    return CodeIngestor(neo4j_service)
+    """Get or create code ingestor instance"""
+    global code_ingestor
+    if code_ingestor is None:
+        code_ingestor = CodeIngestor(neo4j_service)
+    return code_ingestor

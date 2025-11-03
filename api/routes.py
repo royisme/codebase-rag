@@ -1,13 +1,19 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal
 from pydantic import BaseModel
+import uuid
+from datetime import datetime
 
 from services.sql_parser import sql_analyzer
 from services.graph_service import graph_service
 from services.neo4j_knowledge_service import Neo4jKnowledgeService
 from services.universal_sql_schema_parser import parse_sql_schema_smart
 from services.task_queue import task_queue
+from services.code_ingestor import get_code_ingestor
+from services.git_utils import git_utils
+from services.ranker import ranker
+from services.pack_builder import pack_builder
 from config import settings
 from loguru import logger
 
@@ -52,6 +58,56 @@ class SearchRequest(BaseModel):
 class SQLSchemaParseRequest(BaseModel):
     schema_content: Optional[str] = None
     file_path: Optional[str] = None
+
+# Repository ingestion models
+class IngestRepoRequest(BaseModel):
+    """Repository ingestion request"""
+    repo_url: Optional[str] = None
+    local_path: Optional[str] = None
+    branch: Optional[str] = "main"
+    include_globs: list[str] = ["**/*.py", "**/*.ts", "**/*.tsx"]
+    exclude_globs: list[str] = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**"]
+
+class IngestRepoResponse(BaseModel):
+    """Repository ingestion response"""
+    task_id: str
+    status: str  # queued, running, done, error
+    message: Optional[str] = None
+    files_processed: Optional[int] = None
+
+# Related files models
+class NodeSummary(BaseModel):
+    """Summary of a code node"""
+    type: str  # file, symbol
+    ref: str
+    path: Optional[str] = None
+    lang: Optional[str] = None
+    score: float
+    summary: str
+
+class RelatedResponse(BaseModel):
+    """Response for related files endpoint"""
+    nodes: list[NodeSummary]
+    query: str
+    repo_id: str
+
+# Context pack models
+class ContextItem(BaseModel):
+    """A single item in the context pack"""
+    kind: str  # file, symbol, guideline
+    title: str
+    summary: str
+    ref: str
+    extra: Optional[dict] = None
+
+class ContextPack(BaseModel):
+    """Response for context pack endpoint"""
+    items: list[ContextItem]
+    budget_used: int
+    budget_limit: int
+    stage: str
+    repo_id: str
+
 
 # health check
 @router.get("/health", response_model=HealthResponse)
@@ -285,3 +341,249 @@ async def get_system_config():
     except Exception as e:
         logger.error(f"Get config failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) 
+# Repository ingestion endpoint
+@router.post("/ingest/repo", response_model=IngestRepoResponse)
+async def ingest_repo(request: IngestRepoRequest):
+    """
+    Ingest a repository into the knowledge graph
+    Scans files matching patterns and creates File/Repo nodes in Neo4j
+    """
+    try:
+        # Validate request
+        if not request.repo_url and not request.local_path:
+            raise HTTPException(
+                status_code=400,
+                detail="Either repo_url or local_path must be provided"
+            )
+        
+        # Generate task ID
+        task_id = f"ing-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+        
+        # Determine repository path and ID
+        repo_path = None
+        repo_id = None
+        cleanup_needed = False
+        
+        if request.local_path:
+            repo_path = request.local_path
+            repo_id = git_utils.get_repo_id_from_path(repo_path)
+        else:
+            # Clone repository
+            logger.info(f"Cloning repository: {request.repo_url}")
+            clone_result = git_utils.clone_repo(
+                request.repo_url,
+                branch=request.branch
+            )
+            
+            if not clone_result.get("success"):
+                return IngestRepoResponse(
+                    task_id=task_id,
+                    status="error",
+                    message=clone_result.get("error", "Failed to clone repository")
+                )
+            
+            repo_path = clone_result["path"]
+            repo_id = git_utils.get_repo_id_from_url(request.repo_url)
+            cleanup_needed = True
+        
+        logger.info(f"Processing repository: {repo_id} at {repo_path}")
+        
+        # Get code ingestor
+        code_ingestor = get_code_ingestor(graph_service)
+        
+        # Scan files
+        files = code_ingestor.scan_files(
+            repo_path=repo_path,
+            include_globs=request.include_globs,
+            exclude_globs=request.exclude_globs
+        )
+        
+        if not files:
+            message = "No files found matching the specified patterns"
+            logger.warning(message)
+            return IngestRepoResponse(
+                task_id=task_id,
+                status="done",
+                message=message,
+                files_processed=0
+            )
+        
+        # Ingest files into Neo4j
+        result = code_ingestor.ingest_files(
+            repo_id=repo_id,
+            files=files
+        )
+        
+        # Cleanup if needed
+        if cleanup_needed:
+            git_utils.cleanup_temp_repo(repo_path)
+        
+        if result.get("success"):
+            return IngestRepoResponse(
+                task_id=task_id,
+                status="done",
+                message=f"Successfully ingested {result['files_processed']} files",
+                files_processed=result["files_processed"]
+            )
+        else:
+            return IngestRepoResponse(
+                task_id=task_id,
+                status="error",
+                message=result.get("error", "Failed to ingest files")
+            )
+        
+    except Exception as e:
+        logger.error(f"Ingest failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Related files endpoint
+@router.get("/graph/related", response_model=RelatedResponse)
+async def get_related(
+    query: str = Query(..., description="Search query"),
+    repoId: str = Query(..., description="Repository ID"),
+    limit: int = Query(30, ge=1, le=100, description="Maximum number of results")
+):
+    """
+    Find related files using fulltext search and keyword matching
+    Returns file summaries with ref:// handles for MCP integration
+    """
+    try:
+        # Perform fulltext search
+        search_results = graph_service.fulltext_search(
+            query_text=query,
+            repo_id=repoId,
+            limit=limit * 2  # Get more for ranking
+        )
+        
+        if not search_results:
+            logger.info(f"No results found for query: {query}")
+            return RelatedResponse(
+                nodes=[],
+                query=query,
+                repo_id=repoId
+            )
+        
+        # Rank results
+        ranked_files = ranker.rank_files(
+            files=search_results,
+            query=query,
+            limit=limit
+        )
+        
+        # Convert to NodeSummary objects
+        nodes = []
+        for file in ranked_files:
+            summary = ranker.generate_file_summary(
+                path=file["path"],
+                lang=file["lang"]
+            )
+            
+            ref = ranker.generate_ref_handle(
+                path=file["path"]
+            )
+            
+            node = NodeSummary(
+                type="file",
+                ref=ref,
+                path=file["path"],
+                lang=file["lang"],
+                score=file["score"],
+                summary=summary
+            )
+            nodes.append(node)
+        
+        logger.info(f"Found {len(nodes)} related files for query: {query}")
+        
+        return RelatedResponse(
+            nodes=nodes,
+            query=query,
+            repo_id=repoId
+        )
+        
+    except Exception as e:
+        logger.error(f"Related query failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Context pack endpoint
+@router.get("/context/pack", response_model=ContextPack)
+async def get_context_pack(
+    repoId: str = Query(..., description="Repository ID"),
+    stage: str = Query("plan", description="Stage (plan/review/implement)"),
+    budget: int = Query(1500, ge=100, le=10000, description="Token budget"),
+    keywords: Optional[str] = Query(None, description="Comma-separated keywords"),
+    focus: Optional[str] = Query(None, description="Comma-separated focus paths")
+):
+    """
+    Build a context pack within token budget
+    Searches for relevant files and packages them with summaries and ref:// handles
+    """
+    try:
+        # Parse keywords and focus paths
+        keyword_list = [k.strip() for k in keywords.split(',')] if keywords else []
+        focus_paths = [f.strip() for f in focus.split(',')] if focus else []
+        
+        # Create search query from keywords
+        search_query = ' '.join(keyword_list) if keyword_list else '*'
+        
+        # Search for relevant files
+        search_results = graph_service.fulltext_search(
+            query_text=search_query,
+            repo_id=repoId,
+            limit=50
+        )
+        
+        if not search_results:
+            logger.info(f"No files found for context pack in repo: {repoId}")
+            return ContextPack(
+                items=[],
+                budget_used=0,
+                budget_limit=budget,
+                stage=stage,
+                repo_id=repoId
+            )
+        
+        # Rank files
+        ranked_files = ranker.rank_files(
+            files=search_results,
+            query=search_query,
+            limit=50
+        )
+        
+        # Convert to node format
+        nodes = []
+        for file in ranked_files:
+            summary = ranker.generate_file_summary(
+                path=file["path"],
+                lang=file["lang"]
+            )
+            
+            ref = ranker.generate_ref_handle(
+                path=file["path"]
+            )
+            
+            nodes.append({
+                "type": "file",
+                "path": file["path"],
+                "lang": file["lang"],
+                "score": file["score"],
+                "summary": summary,
+                "ref": ref
+            })
+        
+        # Build context pack within budget
+        context_pack = pack_builder.build_context_pack(
+            nodes=nodes,
+            budget=budget,
+            stage=stage,
+            repo_id=repoId,
+            keywords=keyword_list,
+            focus_paths=focus_paths
+        )
+        
+        logger.info(f"Built context pack with {len(context_pack['items'])} items")
+        
+        return ContextPack(**context_pack)
+        
+    except Exception as e:
+        logger.error(f"Context pack generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

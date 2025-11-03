@@ -1,5 +1,5 @@
 """
-Context pack builder for generating context bundles (v0.2)
+Context pack builder for generating context bundles within token budgets
 """
 from typing import List, Dict, Any, Optional
 from loguru import logger
@@ -21,7 +21,7 @@ class PackBuilder:
         Build a context pack from nodes within budget
         
         Args:
-            nodes: List of NodeSummary dicts
+            nodes: List of node dictionaries with path, lang, score, etc.
             budget: Token budget (estimated as ~4 chars per token)
             stage: Stage name (plan/review/etc)
             repo_id: Repository ID
@@ -29,7 +29,7 @@ class PackBuilder:
             focus_paths: Optional list of paths to prioritize
         
         Returns:
-            ContextPack dict
+            Dict with items, budget_used, budget_limit, stage, repo_id
         """
         items = []
         budget_used = 0
@@ -96,20 +96,7 @@ class PackBuilder:
         if len(parts) >= 2:
             return '/'.join(parts[-2:])
         return path
-    
-    @staticmethod
-    def estimate_budget(items: List[Dict[str, Any]]) -> int:
-        """Estimate token budget used by items"""
-        total_chars = 0
-        for item in items:
-            total_chars += len(item.get("title", ""))
-            total_chars += len(item.get("summary", ""))
-            total_chars += len(item.get("ref", ""))
-            total_chars += 50  # overhead
-        
-        return total_chars // 4  # ~4 chars per token
 
 
-def get_pack_builder():
-    """Factory function"""
-    return PackBuilder()
+# Global instance
+pack_builder = PackBuilder()

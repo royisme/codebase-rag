@@ -391,6 +391,105 @@ class Neo4jGraphService:
                 logger.info("Disconnected from Neo4j")
         except Exception as e:
             logger.error(f"Failed to close Neo4j connection: {e}")
+    
+    def create_repo(self, repo_id: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Create a repository node (synchronous for compatibility)"""
+        if not self._connected:
+            return {"success": False, "error": "Not connected to Neo4j"}
+        
+        try:
+            with self.driver.session(database=settings.neo4j_database) as session:
+                query = """
+                MERGE (r:Repo {id: $repo_id})
+                SET r += $metadata
+                RETURN r
+                """
+                session.run(query, {
+                    "repo_id": repo_id,
+                    "metadata": metadata or {}
+                })
+                return {"success": True}
+        except Exception as e:
+            logger.error(f"Failed to create repo: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def create_file(
+        self,
+        repo_id: str,
+        path: str,
+        lang: str,
+        size: int,
+        content: Optional[str] = None,
+        sha: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a file node and link to repo (synchronous)"""
+        if not self._connected:
+            return {"success": False, "error": "Not connected to Neo4j"}
+        
+        try:
+            with self.driver.session(database=settings.neo4j_database) as session:
+                query = """
+                MATCH (r:Repo {id: $repo_id})
+                MERGE (f:File {repoId: $repo_id, path: $path})
+                SET f.lang = $lang,
+                    f.size = $size,
+                    f.content = $content,
+                    f.sha = $sha,
+                    f.updated = datetime()
+                MERGE (f)-[:IN_REPO]->(r)
+                RETURN f
+                """
+                session.run(query, {
+                    "repo_id": repo_id,
+                    "path": path,
+                    "lang": lang,
+                    "size": size,
+                    "content": content,
+                    "sha": sha
+                })
+                return {"success": True}
+        except Exception as e:
+            logger.error(f"Failed to create file: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def fulltext_search(
+        self,
+        query_text: str,
+        repo_id: Optional[str] = None,
+        limit: int = 30
+    ) -> List[Dict[str, Any]]:
+        """Fulltext search on files (synchronous)"""
+        if not self._connected:
+            return []
+        
+        try:
+            with self.driver.session(database=settings.neo4j_database) as session:
+                # For now, use simple CONTAINS match until fulltext index is set up
+                # This is a simplified version for the initial implementation
+                query = """
+                MATCH (f:File)
+                WHERE ($repo_id IS NULL OR f.repoId = $repo_id)
+                  AND (toLower(f.path) CONTAINS toLower($query_text) 
+                       OR toLower(f.lang) CONTAINS toLower($query_text)
+                       OR ($query_text IN f.content AND f.content IS NOT NULL))
+                RETURN f.path as path,
+                       f.lang as lang,
+                       f.size as size,
+                       f.repoId as repoId,
+                       1.0 as score
+                LIMIT $limit
+                """
+                
+                result = session.run(query, {
+                    "query_text": query_text,
+                    "repo_id": repo_id,
+                    "limit": limit
+                })
+                
+                return [dict(record) for record in result]
+        except Exception as e:
+            logger.error(f"Fulltext search failed: {e}")
+            return []
 
 # global graph service instance
 graph_service = Neo4jGraphService() 

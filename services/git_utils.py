@@ -1,5 +1,5 @@
 """
-Git utilities for repository operations (v0.2)
+Git utilities for repository operations
 """
 import os
 import subprocess
@@ -48,13 +48,11 @@ class GitUtils:
     @staticmethod
     def get_repo_id_from_path(repo_path: str) -> str:
         """Generate a repository ID from path"""
-        # Use the last directory name as repo ID
         return os.path.basename(os.path.abspath(repo_path))
     
     @staticmethod
     def get_repo_id_from_url(repo_url: str) -> str:
         """Generate a repository ID from URL"""
-        # Extract repo name from URL like https://github.com/user/repo.git
         repo_name = repo_url.rstrip('/').split('/')[-1]
         if repo_name.endswith('.git'):
             repo_name = repo_name[:-4]
@@ -69,3 +67,7 @@ class GitUtils:
                 logger.info(f"Cleaned up temporary repo: {repo_path}")
         except Exception as e:
             logger.warning(f"Failed to cleanup temp repo: {e}")
+
+
+# Global instance
+git_utils = GitUtils()

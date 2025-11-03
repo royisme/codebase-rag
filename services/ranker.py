@@ -1,6 +1,6 @@
 """
-Ranking service for search results (v0.2)
-Simple keyword and path matching
+Ranking service for search results
+Simple keyword and path matching for file relevance
 """
 from typing import List, Dict, Any
 import re
@@ -15,10 +15,7 @@ class Ranker:
         query: str,
         limit: int = 30
     ) -> List[Dict[str, Any]]:
-        """
-        Rank files by relevance to query
-        v0.2: Simple keyword matching on path and language
-        """
+        """Rank files by relevance to query using keyword matching"""
         query_lower = query.lower()
         query_terms = set(re.findall(r'\w+', query_lower))
         
@@ -66,10 +63,7 @@ class Ranker:
     
     @staticmethod
     def generate_file_summary(path: str, lang: str) -> str:
-        """
-        Generate rule-based summary for a file (v0.2)
-        Format: "{lang} file in {parent_dir}"
-        """
+        """Generate rule-based summary for a file"""
         parts = path.split('/')
         
         if len(parts) > 1:
@@ -81,9 +75,9 @@ class Ranker:
     
     @staticmethod
     def generate_ref_handle(path: str, start_line: int = 1, end_line: int = 1000) -> str:
-        """
-        Generate ref:// handle for a file
-        Format: ref://file/<relpath>#L<start>-L<end>
-        """
-        # Cap end_line at a reasonable number based on typical file sizes
+        """Generate ref:// handle for a file"""
         return f"ref://file/{path}#L{start_line}-L{end_line}"
+
+
+# Global instance
+ranker = Ranker()
