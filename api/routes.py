@@ -581,9 +581,117 @@ async def get_context_pack(
         )
         
         logger.info(f"Built context pack with {len(context_pack['items'])} items")
-        
+
         return ContextPack(**context_pack)
-        
+
     except Exception as e:
         logger.error(f"Context pack generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Impact analysis endpoint
+class ImpactNode(BaseModel):
+    """A node in the impact analysis results"""
+    type: str  # file, symbol
+    path: str
+    lang: Optional[str] = None
+    repoId: str
+    relationship: str  # CALLS, IMPORTS
+    depth: int
+    score: float
+    ref: str
+    summary: str
+
+class ImpactResponse(BaseModel):
+    """Response for impact analysis endpoint"""
+    nodes: list[ImpactNode]
+    file: str
+    repo_id: str
+    depth: int
+
+@router.get("/graph/impact", response_model=ImpactResponse)
+async def get_impact_analysis(
+    repoId: str = Query(..., description="Repository ID"),
+    file: str = Query(..., description="File path to analyze"),
+    depth: int = Query(2, ge=1, le=5, description="Traversal depth for dependencies"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of results")
+):
+    """
+    Analyze the impact of a file by finding reverse dependencies.
+
+    Returns files and symbols that depend on the specified file through:
+    - CALLS relationships (who calls functions/methods in this file)
+    - IMPORTS relationships (who imports this file)
+
+    This is useful for:
+    - Understanding the blast radius of changes
+    - Finding code that needs to be updated when modifying this file
+    - Identifying critical files with many dependents
+
+    Example:
+        GET /graph/impact?repoId=myproject&file=src/auth/token.py&depth=2&limit=50
+
+        Returns files that call functions in token.py or import from it,
+        up to 2 levels deep in the dependency chain.
+    """
+    try:
+        # Perform impact analysis
+        impact_results = graph_service.impact_analysis(
+            repo_id=repoId,
+            file_path=file,
+            depth=depth,
+            limit=limit
+        )
+
+        if not impact_results:
+            logger.info(f"No reverse dependencies found for file: {file}")
+            return ImpactResponse(
+                nodes=[],
+                file=file,
+                repo_id=repoId,
+                depth=depth
+            )
+
+        # Convert to ImpactNode objects
+        nodes = []
+        for result in impact_results:
+            # Generate summary
+            summary = ranker.generate_file_summary(
+                path=result["path"],
+                lang=result.get("lang", "unknown")
+            )
+
+            # Add relationship context to summary
+            rel_type = result.get("relationship", "DEPENDS_ON")
+            if rel_type == "CALLS":
+                summary += f" (calls functions in {file.split('/')[-1]})"
+            elif rel_type == "IMPORTS":
+                summary += f" (imports {file.split('/')[-1]})"
+
+            # Generate ref handle
+            ref = ranker.generate_ref_handle(path=result["path"])
+
+            node = ImpactNode(
+                type=result.get("type", "file"),
+                path=result["path"],
+                lang=result.get("lang"),
+                repoId=result["repoId"],
+                relationship=result.get("relationship", "DEPENDS_ON"),
+                depth=result.get("depth", 1),
+                score=result.get("score", 0.5),
+                ref=ref,
+                summary=summary
+            )
+            nodes.append(node)
+
+        logger.info(f"Found {len(nodes)} reverse dependencies for {file}")
+
+        return ImpactResponse(
+            nodes=nodes,
+            file=file,
+            repo_id=repoId,
+            depth=depth
+        )
+
+    except Exception as e:
+        logger.error(f"Impact analysis failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

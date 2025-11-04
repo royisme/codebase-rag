@@ -61,40 +61,59 @@ class Neo4jGraphService:
         """set database schema, indexes and constraints"""
         try:
             with self.driver.session(database=settings.neo4j_database) as session:
-                # create unique constraints
+                # Create unique constraints
                 constraints = [
+                    # Repo: unique by id
+                    "CREATE CONSTRAINT repo_key IF NOT EXISTS FOR (r:Repo) REQUIRE (r.id) IS UNIQUE",
+
+                    # File: composite key (repoId, path) - allows same path in different repos
+                    "CREATE CONSTRAINT file_key IF NOT EXISTS FOR (f:File) REQUIRE (f.repoId, f.path) IS NODE KEY",
+
+                    # Symbol: unique by id
+                    "CREATE CONSTRAINT sym_key IF NOT EXISTS FOR (s:Symbol) REQUIRE (s.id) IS UNIQUE",
+
+                    # Code entities
                     "CREATE CONSTRAINT code_entity_id IF NOT EXISTS FOR (n:CodeEntity) REQUIRE n.id IS UNIQUE",
                     "CREATE CONSTRAINT function_id IF NOT EXISTS FOR (n:Function) REQUIRE n.id IS UNIQUE",
                     "CREATE CONSTRAINT class_id IF NOT EXISTS FOR (n:Class) REQUIRE n.id IS UNIQUE",
-                    "CREATE CONSTRAINT file_id IF NOT EXISTS FOR (n:File) REQUIRE n.id IS UNIQUE",
                     "CREATE CONSTRAINT table_id IF NOT EXISTS FOR (n:Table) REQUIRE n.id IS UNIQUE",
                 ]
-                
+
                 for constraint in constraints:
                     try:
                         session.run(constraint)
                     except Exception as e:
-                        if "already exists" not in str(e).lower():
+                        if "already exists" not in str(e).lower() and "equivalent" not in str(e).lower():
                             logger.warning(f"Failed to create constraint: {e}")
-                
-                # create indexes
+
+                # Create fulltext index for file search (critical for performance)
+                try:
+                    session.run("CREATE FULLTEXT INDEX file_text IF NOT EXISTS FOR (f:File) ON EACH [f.path, f.lang]")
+                    logger.info("Fulltext index 'file_text' created/verified")
+                except Exception as e:
+                    if "already exists" not in str(e).lower() and "equivalent" not in str(e).lower():
+                        logger.warning(f"Failed to create fulltext index: {e}")
+
+                # Create regular indexes for exact lookups
                 indexes = [
+                    "CREATE INDEX file_path IF NOT EXISTS FOR (f:File) ON (f.path)",
+                    "CREATE INDEX file_repo IF NOT EXISTS FOR (f:File) ON (f.repoId)",
+                    "CREATE INDEX symbol_name IF NOT EXISTS FOR (s:Symbol) ON (s.name)",
                     "CREATE INDEX code_entity_name IF NOT EXISTS FOR (n:CodeEntity) ON (n.name)",
                     "CREATE INDEX function_name IF NOT EXISTS FOR (n:Function) ON (n.name)",
                     "CREATE INDEX class_name IF NOT EXISTS FOR (n:Class) ON (n.name)",
-                    "CREATE INDEX file_path IF NOT EXISTS FOR (n:File) ON (n.path)",
                     "CREATE INDEX table_name IF NOT EXISTS FOR (n:Table) ON (n.name)",
                 ]
-                
+
                 for index in indexes:
                     try:
                         session.run(index)
                     except Exception as e:
-                        if "already exists" not in str(e).lower():
+                        if "already exists" not in str(e).lower() and "equivalent" not in str(e).lower():
                             logger.warning(f"Failed to create index: {e}")
-            
-            logger.info("Schema setup completed")
-            
+
+            logger.info("Schema setup completed (constraints + fulltext index + regular indexes)")
+
         except Exception as e:
             logger.error(f"Failed to setup schema: {e}")
     
@@ -458,20 +477,53 @@ class Neo4jGraphService:
         repo_id: Optional[str] = None,
         limit: int = 30
     ) -> List[Dict[str, Any]]:
-        """Fulltext search on files (synchronous)"""
+        """Fulltext search on files using Neo4j fulltext index (synchronous)"""
         if not self._connected:
             return []
-        
+
         try:
             with self.driver.session(database=settings.neo4j_database) as session:
-                # For now, use simple CONTAINS match until fulltext index is set up
-                # This is a simplified version for the initial implementation
+                # Use Neo4j fulltext index for efficient search
+                # This provides relevance scoring and fuzzy matching
+                query = """
+                CALL db.index.fulltext.queryNodes('file_text', $query_text)
+                YIELD node, score
+                WHERE $repo_id IS NULL OR node.repoId = $repo_id
+                RETURN node.path as path,
+                       node.lang as lang,
+                       node.size as size,
+                       node.repoId as repoId,
+                       score
+                ORDER BY score DESC
+                LIMIT $limit
+                """
+
+                result = session.run(query, {
+                    "query_text": query_text,
+                    "repo_id": repo_id,
+                    "limit": limit
+                })
+
+                return [dict(record) for record in result]
+        except Exception as e:
+            # Fallback to CONTAINS if fulltext index is not available
+            logger.warning(f"Fulltext index not available, falling back to CONTAINS: {e}")
+            return self._fulltext_search_fallback(query_text, repo_id, limit)
+
+    def _fulltext_search_fallback(
+        self,
+        query_text: str,
+        repo_id: Optional[str] = None,
+        limit: int = 30
+    ) -> List[Dict[str, Any]]:
+        """Fallback search using CONTAINS when fulltext index is not available"""
+        try:
+            with self.driver.session(database=settings.neo4j_database) as session:
                 query = """
                 MATCH (f:File)
                 WHERE ($repo_id IS NULL OR f.repoId = $repo_id)
-                  AND (toLower(f.path) CONTAINS toLower($query_text) 
-                       OR toLower(f.lang) CONTAINS toLower($query_text)
-                       OR ($query_text IN f.content AND f.content IS NOT NULL))
+                  AND (toLower(f.path) CONTAINS toLower($query_text)
+                       OR toLower(f.lang) CONTAINS toLower($query_text))
                 RETURN f.path as path,
                        f.lang as lang,
                        f.size as size,
@@ -479,16 +531,114 @@ class Neo4jGraphService:
                        1.0 as score
                 LIMIT $limit
                 """
-                
+
                 result = session.run(query, {
                     "query_text": query_text,
                     "repo_id": repo_id,
                     "limit": limit
                 })
-                
+
                 return [dict(record) for record in result]
         except Exception as e:
-            logger.error(f"Fulltext search failed: {e}")
+            logger.error(f"Fallback search failed: {e}")
+            return []
+
+    def impact_analysis(
+        self,
+        repo_id: str,
+        file_path: str,
+        depth: int = 2,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """
+        Analyze the impact of a file by finding reverse dependencies.
+        Returns files/symbols that CALL or IMPORT the specified file.
+
+        Args:
+            repo_id: Repository ID
+            file_path: Path to the file to analyze
+            depth: Maximum traversal depth (1-5)
+            limit: Maximum number of results
+
+        Returns:
+            List of dicts with path, type, relationship, score, etc.
+        """
+        if not self._connected:
+            return []
+
+        try:
+            with self.driver.session(database=settings.neo4j_database) as session:
+                # Find reverse dependencies through CALLS and IMPORTS relationships
+                query = """
+                MATCH (target:File {repoId: $repo_id, path: $file_path})
+
+                // Find symbols defined in the target file
+                OPTIONAL MATCH (target)<-[:DEFINED_IN]-(targetSymbol:Symbol)
+
+                // Find reverse CALLS (who calls symbols in this file)
+                OPTIONAL MATCH (targetSymbol)<-[:CALLS*1..$depth]-(callerSymbol:Symbol)
+                OPTIONAL MATCH (callerSymbol)-[:DEFINED_IN]->(callerFile:File)
+
+                // Find reverse IMPORTS (who imports this file)
+                OPTIONAL MATCH (target)<-[:IMPORTS*1..$depth]-(importerFile:File)
+
+                // Aggregate results
+                WITH target,
+                     collect(DISTINCT {
+                         type: 'file',
+                         path: callerFile.path,
+                         lang: callerFile.lang,
+                         repoId: callerFile.repoId,
+                         relationship: 'CALLS',
+                         depth: length((targetSymbol)<-[:CALLS*1..$depth]-(callerSymbol))
+                     }) as callers,
+                     collect(DISTINCT {
+                         type: 'file',
+                         path: importerFile.path,
+                         lang: importerFile.lang,
+                         repoId: importerFile.repoId,
+                         relationship: 'IMPORTS',
+                         depth: length((target)<-[:IMPORTS*1..$depth]-(importerFile))
+                     }) as importers
+
+                // Combine and score results
+                UNWIND (callers + importers) as impact
+                WITH DISTINCT impact
+                WHERE impact.path IS NOT NULL
+
+                // Score: prefer direct dependencies (depth=1) and CALLS over IMPORTS
+                WITH impact,
+                     CASE
+                         WHEN impact.depth = 1 AND impact.relationship = 'CALLS' THEN 1.0
+                         WHEN impact.depth = 1 AND impact.relationship = 'IMPORTS' THEN 0.9
+                         WHEN impact.depth = 2 AND impact.relationship = 'CALLS' THEN 0.7
+                         WHEN impact.depth = 2 AND impact.relationship = 'IMPORTS' THEN 0.6
+                         ELSE 0.5 / impact.depth
+                     END as score
+
+                RETURN impact.type as type,
+                       impact.path as path,
+                       impact.lang as lang,
+                       impact.repoId as repoId,
+                       impact.relationship as relationship,
+                       impact.depth as depth,
+                       score
+                ORDER BY score DESC, impact.path
+                LIMIT $limit
+                """
+
+                result = session.run(query, {
+                    "repo_id": repo_id,
+                    "file_path": file_path,
+                    "depth": depth,
+                    "limit": limit
+                })
+
+                return [dict(record) for record in result]
+
+        except Exception as e:
+            logger.error(f"Impact analysis failed: {e}")
+            # If the query fails (e.g., relationships don't exist yet), return empty
             return []
 
 # global graph service instance
