@@ -193,30 +193,34 @@ class CodeTransformer(DataTransformer):
         """transform Python code"""
         chunks = []
         relations = []
-        
+
         try:
             # use AST to parse Python code
             tree = ast.parse(content)
-            
+
+            # Extract imports FIRST (file-level relationships)
+            import_relations = self._extract_python_imports(data_source, tree)
+            relations.extend(import_relations)
+
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     # extract function
                     func_chunk = self._extract_function_chunk(data_source, content, node)
                     chunks.append(func_chunk)
-                    
+
                     # extract function call relations
                     func_relations = self._extract_function_relations(data_source, node)
                     relations.extend(func_relations)
-                    
+
                 elif isinstance(node, ast.ClassDef):
                     # extract class
                     class_chunk = self._extract_class_chunk(data_source, content, node)
                     chunks.append(class_chunk)
-                    
+
                     # extract class inheritance relations
                     class_relations = self._extract_class_relations(data_source, node)
                     relations.extend(class_relations)
-            
+
             return ProcessingResult(
                 source_id=data_source.id,
                 success=True,
@@ -224,7 +228,7 @@ class CodeTransformer(DataTransformer):
                 relations=relations,
                 metadata={"transformer": "CodeTransformer", "language": "python"}
             )
-            
+
         except SyntaxError as e:
             logger.warning(f"Python syntax error in {data_source.name}, falling back to generic parsing: {e}")
             return await self._transform_generic_code(data_source, content)
@@ -311,7 +315,7 @@ class CodeTransformer(DataTransformer):
     def _extract_class_relations(self, data_source: DataSource, node: ast.ClassDef) -> List[ExtractedRelation]:
         """extract class inheritance relations"""
         relations = []
-        
+
         for base in node.bases:
             if isinstance(base, ast.Name):
                 relation = ExtractedRelation(
@@ -325,22 +329,97 @@ class CodeTransformer(DataTransformer):
                     }
                 )
                 relations.append(relation)
-        
+
+        return relations
+
+    def _extract_python_imports(self, data_source: DataSource, tree: ast.AST) -> List[ExtractedRelation]:
+        """
+        Extract Python import statements and create IMPORTS relationships.
+
+        Handles:
+        - import module
+        - import module as alias
+        - from module import name
+        - from module import name as alias
+        - from . import relative
+        - from ..package import relative
+        """
+        relations = []
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                # Handle: import module [as alias]
+                for alias in node.names:
+                    module_name = alias.name
+                    relation = ExtractedRelation(
+                        source_id=data_source.id,
+                        from_entity=data_source.source_path or data_source.name,
+                        to_entity=module_name,
+                        relation_type="IMPORTS",
+                        properties={
+                            "from_type": "file",
+                            "to_type": "module",
+                            "import_type": "import",
+                            "alias": alias.asname if alias.asname else None,
+                            "module": module_name
+                        }
+                    )
+                    relations.append(relation)
+
+            elif isinstance(node, ast.ImportFrom):
+                # Handle: from module import name [as alias]
+                module_name = node.module if node.module else ""
+                level = node.level  # 0=absolute, 1+=relative (. or ..)
+
+                # Construct full module path for relative imports
+                if level > 0:
+                    # Relative import (from . import or from .. import)
+                    relative_prefix = "." * level
+                    full_module = f"{relative_prefix}{module_name}" if module_name else relative_prefix
+                else:
+                    full_module = module_name
+
+                for alias in node.names:
+                    imported_name = alias.name
+
+                    # Create import relation
+                    relation = ExtractedRelation(
+                        source_id=data_source.id,
+                        from_entity=data_source.source_path or data_source.name,
+                        to_entity=full_module,
+                        relation_type="IMPORTS",
+                        properties={
+                            "from_type": "file",
+                            "to_type": "module",
+                            "import_type": "from_import",
+                            "module": full_module,
+                            "imported_name": imported_name,
+                            "alias": alias.asname if alias.asname else None,
+                            "is_relative": level > 0,
+                            "level": level
+                        }
+                    )
+                    relations.append(relation)
+
         return relations
     
     async def _transform_js_code(self, data_source: DataSource, content: str) -> ProcessingResult:
         """transform JavaScript/TypeScript code"""
         chunks = []
         relations = []
-        
+
+        # Extract imports FIRST (file-level relationships)
+        import_relations = self._extract_js_imports(data_source, content)
+        relations.extend(import_relations)
+
         # use regex to extract functions and classes (simplified version)
-        
+
         # extract functions
         function_pattern = r'(function\s+(\w+)\s*\([^)]*\)\s*\{[^}]*\}|const\s+(\w+)\s*=\s*\([^)]*\)\s*=>\s*\{[^}]*\})'
         for match in re.finditer(function_pattern, content, re.MULTILINE | re.DOTALL):
             func_code = match.group(1)
             func_name = match.group(2) or match.group(3)
-            
+
             chunk = ProcessedChunk(
                 source_id=data_source.id,
                 chunk_type=ChunkType.CODE_FUNCTION,
@@ -352,14 +431,14 @@ class CodeTransformer(DataTransformer):
                 }
             )
             chunks.append(chunk)
-        
+
         # extract classes
         class_pattern = r'class\s+(\w+)(?:\s+extends\s+(\w+))?\s*\{[^}]*\}'
         for match in re.finditer(class_pattern, content, re.MULTILINE | re.DOTALL):
             class_code = match.group(0)
             class_name = match.group(1)
             parent_class = match.group(2)
-            
+
             chunk = ProcessedChunk(
                 source_id=data_source.id,
                 chunk_type=ChunkType.CODE_CLASS,
@@ -372,7 +451,7 @@ class CodeTransformer(DataTransformer):
                 }
             )
             chunks.append(chunk)
-            
+
             # if there is inheritance relation, add relation
             if parent_class:
                 relation = ExtractedRelation(
@@ -383,7 +462,7 @@ class CodeTransformer(DataTransformer):
                     properties={"from_type": "class", "to_type": "class"}
                 )
                 relations.append(relation)
-        
+
         return ProcessingResult(
             source_id=data_source.id,
             success=True,
@@ -391,6 +470,82 @@ class CodeTransformer(DataTransformer):
             relations=relations,
             metadata={"transformer": "CodeTransformer", "language": data_source.metadata.get("language")}
         )
+
+    def _extract_js_imports(self, data_source: DataSource, content: str) -> List[ExtractedRelation]:
+        """
+        Extract JavaScript/TypeScript import statements and create IMPORTS relationships.
+
+        Handles:
+        - import module from 'path'
+        - import { named } from 'path'
+        - import * as namespace from 'path'
+        - import 'path' (side-effect)
+        - const module = require('path')
+        """
+        relations = []
+
+        # ES6 imports: import ... from '...'
+        # Patterns:
+        # - import defaultExport from 'module'
+        # - import { export1, export2 } from 'module'
+        # - import * as name from 'module'
+        # - import 'module'
+        es6_import_pattern = r'import\s+(?:(\w+)|(?:\{([^}]+)\})|(?:\*\s+as\s+(\w+)))?\s*(?:from\s+)?[\'"]([^\'"]+)[\'"]'
+
+        for match in re.finditer(es6_import_pattern, content):
+            default_import = match.group(1)
+            named_imports = match.group(2)
+            namespace_import = match.group(3)
+            module_path = match.group(4)
+
+            # Normalize module path (remove leading ./ and ../)
+            normalized_path = module_path
+
+            # Create import relation
+            relation = ExtractedRelation(
+                source_id=data_source.id,
+                from_entity=data_source.source_path or data_source.name,
+                to_entity=normalized_path,
+                relation_type="IMPORTS",
+                properties={
+                    "from_type": "file",
+                    "to_type": "module",
+                    "import_type": "es6_import",
+                    "module": normalized_path,
+                    "default_import": default_import,
+                    "named_imports": named_imports.strip() if named_imports else None,
+                    "namespace_import": namespace_import,
+                    "is_relative": module_path.startswith('.'),
+                    "language": data_source.metadata.get("language", "javascript")
+                }
+            )
+            relations.append(relation)
+
+        # CommonJS require: const/var/let module = require('path')
+        require_pattern = r'(?:const|var|let)\s+(\w+)\s*=\s*require\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)'
+
+        for match in re.finditer(require_pattern, content):
+            variable_name = match.group(1)
+            module_path = match.group(2)
+
+            relation = ExtractedRelation(
+                source_id=data_source.id,
+                from_entity=data_source.source_path or data_source.name,
+                to_entity=module_path,
+                relation_type="IMPORTS",
+                properties={
+                    "from_type": "file",
+                    "to_type": "module",
+                    "import_type": "commonjs_require",
+                    "module": module_path,
+                    "variable_name": variable_name,
+                    "is_relative": module_path.startswith('.'),
+                    "language": data_source.metadata.get("language", "javascript")
+                }
+            )
+            relations.append(relation)
+
+        return relations
     
     async def _transform_generic_code(self, data_source: DataSource, content: str) -> ProcessingResult:
         """generic code transformation (split by line count)"""
