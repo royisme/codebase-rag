@@ -65,8 +65,10 @@ class IngestRepoRequest(BaseModel):
     repo_url: Optional[str] = None
     local_path: Optional[str] = None
     branch: Optional[str] = "main"
+    mode: str = "full"  # full | incremental
     include_globs: list[str] = ["**/*.py", "**/*.ts", "**/*.tsx"]
     exclude_globs: list[str] = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**"]
+    since_commit: Optional[str] = None  # For incremental mode: compare against this commit
 
 class IngestRepoResponse(BaseModel):
     """Repository ingestion response"""
@@ -74,6 +76,8 @@ class IngestRepoResponse(BaseModel):
     status: str  # queued, running, done, error
     message: Optional[str] = None
     files_processed: Optional[int] = None
+    mode: Optional[str] = None  # full | incremental
+    changed_files_count: Optional[int] = None  # For incremental mode
 
 # Related files models
 class NodeSummary(BaseModel):
@@ -107,6 +111,7 @@ class ContextPack(BaseModel):
     budget_limit: int
     stage: str
     repo_id: str
+    category_counts: Optional[dict] = None  # {"file": N, "symbol": M}
 
 
 # health check
@@ -386,50 +391,117 @@ async def ingest_repo(request: IngestRepoRequest):
             repo_id = git_utils.get_repo_id_from_url(request.repo_url)
             cleanup_needed = True
         
-        logger.info(f"Processing repository: {repo_id} at {repo_path}")
-        
+        logger.info(f"Processing repository: {repo_id} at {repo_path} (mode={request.mode})")
+
         # Get code ingestor
         code_ingestor = get_code_ingestor(graph_service)
-        
-        # Scan files
-        files = code_ingestor.scan_files(
-            repo_path=repo_path,
-            include_globs=request.include_globs,
-            exclude_globs=request.exclude_globs
-        )
-        
-        if not files:
-            message = "No files found matching the specified patterns"
+
+        # Handle incremental mode
+        files_to_process = []
+        changed_files_count = 0
+
+        if request.mode == "incremental":
+            # Check if it's a git repository
+            if not git_utils.is_git_repo(repo_path):
+                logger.warning(f"Incremental mode requested but {repo_path} is not a git repo, falling back to full mode")
+                request.mode = "full"
+            else:
+                # Get changed files
+                changed_result = git_utils.get_changed_files(
+                    repo_path=repo_path,
+                    since_commit=request.since_commit,
+                    include_untracked=True
+                )
+
+                if not changed_result.get("success"):
+                    logger.warning(f"Failed to get changed files: {changed_result.get('error')}, falling back to full mode")
+                    request.mode = "full"
+                else:
+                    changed_files = changed_result.get("changed_files", [])
+                    changed_files_count = len(changed_files)
+
+                    if changed_files_count == 0:
+                        logger.info("No files changed, skipping ingestion")
+                        return IngestRepoResponse(
+                            task_id=task_id,
+                            status="done",
+                            message="No files changed since last ingestion",
+                            files_processed=0,
+                            mode="incremental",
+                            changed_files_count=0
+                        )
+
+                    # Filter changed files by glob patterns
+                    logger.info(f"Found {changed_files_count} changed files, filtering by patterns...")
+
+                    # Scan only the changed files
+                    all_files = code_ingestor.scan_files(
+                        repo_path=repo_path,
+                        include_globs=request.include_globs,
+                        exclude_globs=request.exclude_globs
+                    )
+
+                    # Create a set of changed file paths for quick lookup
+                    changed_paths = {cf['path'] for cf in changed_files}
+
+                    # Filter to only include files that are in both lists
+                    files_to_process = [
+                        f for f in all_files
+                        if f['path'] in changed_paths
+                    ]
+
+                    logger.info(f"Filtered to {len(files_to_process)} files matching patterns")
+
+        # Full mode or fallback
+        if request.mode == "full":
+            # Scan all files
+            files_to_process = code_ingestor.scan_files(
+                repo_path=repo_path,
+                include_globs=request.include_globs,
+                exclude_globs=request.exclude_globs
+            )
+
+        if not files_to_process:
+            message = "No files found matching the specified patterns" if request.mode == "full" else "No changed files match the patterns"
             logger.warning(message)
             return IngestRepoResponse(
                 task_id=task_id,
                 status="done",
                 message=message,
-                files_processed=0
+                files_processed=0,
+                mode=request.mode,
+                changed_files_count=changed_files_count if request.mode == "incremental" else None
             )
-        
+
         # Ingest files into Neo4j
         result = code_ingestor.ingest_files(
             repo_id=repo_id,
-            files=files
+            files=files_to_process
         )
-        
+
         # Cleanup if needed
         if cleanup_needed:
             git_utils.cleanup_temp_repo(repo_path)
-        
+
         if result.get("success"):
+            message = f"Successfully ingested {result['files_processed']} files"
+            if request.mode == "incremental":
+                message += f" (out of {changed_files_count} changed)"
+
             return IngestRepoResponse(
                 task_id=task_id,
                 status="done",
-                message=f"Successfully ingested {result['files_processed']} files",
-                files_processed=result["files_processed"]
+                message=message,
+                files_processed=result["files_processed"],
+                mode=request.mode,
+                changed_files_count=changed_files_count if request.mode == "incremental" else None
             )
         else:
             return IngestRepoResponse(
                 task_id=task_id,
                 status="error",
-                message=result.get("error", "Failed to ingest files")
+                message=result.get("error", "Failed to ingest files"),
+                mode=request.mode
             )
         
     except Exception as e:
