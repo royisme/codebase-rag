@@ -14,6 +14,7 @@ from services.code_ingestor import get_code_ingestor
 from services.git_utils import git_utils
 from services.ranker import ranker
 from services.pack_builder import pack_builder
+from services.metrics import metrics_service
 from config import settings
 from loguru import logger
 
@@ -121,15 +122,15 @@ async def health_check():
     try:
         # check Neo4j knowledge service status
         neo4j_connected = knowledge_service._initialized if hasattr(knowledge_service, '_initialized') else False
-        
+
         services_status = {
             "neo4j_knowledge_service": neo4j_connected,
             "graph_service": graph_service._connected if hasattr(graph_service, '_connected') else False,
             "task_queue": True  # task queue is always available
         }
-        
+
         overall_status = "healthy" if services_status["neo4j_knowledge_service"] else "degraded"
-        
+
         return HealthResponse(
             status=overall_status,
             services=services_status,
@@ -137,6 +138,45 @@ async def health_check():
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Prometheus metrics endpoint
+@router.get("/metrics")
+async def get_metrics():
+    """
+    Prometheus metrics endpoint
+
+    Exposes metrics in Prometheus text format for monitoring and observability:
+    - HTTP request counts and latencies
+    - Repository ingestion metrics
+    - Graph query performance
+    - Neo4j health and statistics
+    - Context pack generation metrics
+    - Task queue metrics
+
+    Example:
+        curl http://localhost:8000/api/v1/metrics
+    """
+    try:
+        # Update Neo4j metrics before generating output
+        await metrics_service.update_neo4j_metrics(graph_service)
+
+        # Update task queue metrics
+        from services.task_queue import task_queue, TaskStatus
+        stats = task_queue.get_queue_stats()
+        metrics_service.update_task_queue_size("pending", stats.get("pending", 0))
+        metrics_service.update_task_queue_size("running", stats.get("running", 0))
+        metrics_service.update_task_queue_size("completed", stats.get("completed", 0))
+        metrics_service.update_task_queue_size("failed", stats.get("failed", 0))
+
+        # Generate metrics
+        from fastapi.responses import Response
+        return Response(
+            content=metrics_service.get_metrics(),
+            media_type=metrics_service.get_content_type()
+        )
+    except Exception as e:
+        logger.error(f"Metrics generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # knowledge query interface

@@ -6,7 +6,14 @@ from loguru import logger
 from services.neo4j_knowledge_service import Neo4jKnowledgeService
 from services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
 from services.task_processors import processor_registry
+from services.graph_service import graph_service
+from services.code_ingestor import get_code_ingestor
+from services.ranker import ranker
+from services.pack_builder import pack_builder
+from services.git_utils import git_utils
 from config import settings, get_current_model_info
+from datetime import datetime
+import uuid
 
 # initialize MCP server
 mcp = FastMCP("Neo4j Knowledge Graph MCP Server")
@@ -828,6 +835,493 @@ async def clear_knowledge_base(ctx: Context = None) -> Dict[str, Any]:
             "success": False,
             "error": error_msg
         }
+
+# ===================================
+# Code Graph MCP Tools (v0.5)
+# ===================================
+
+# MCP tool: ingest repository
+@mcp.tool
+async def code_graph_ingest_repo(
+    local_path: Optional[str] = None,
+    repo_url: Optional[str] = None,
+    branch: str = "main",
+    mode: str = "full",
+    include_globs: Optional[List[str]] = None,
+    exclude_globs: Optional[List[str]] = None,
+    since_commit: Optional[str] = None,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Ingest a repository into the code knowledge graph.
+
+    Args:
+        local_path: Path to local repository
+        repo_url: URL of repository to clone (if local_path not provided)
+        branch: Git branch to use (default: "main")
+        mode: Ingestion mode - "full" or "incremental" (default: "full")
+        include_globs: File patterns to include (default: ["**/*.py", "**/*.ts", "**/*.tsx"])
+        exclude_globs: File patterns to exclude (default: ["**/node_modules/**", "**/.git/**", "**/__pycache__/**"])
+        since_commit: For incremental mode, compare against this commit
+
+    Returns:
+        Dict containing task_id, status, and processing info
+    """
+    try:
+        await ensure_service_initialized()
+
+        if not local_path and not repo_url:
+            return {
+                "success": False,
+                "error": "Either local_path or repo_url must be provided"
+            }
+
+        if ctx:
+            await ctx.info(f"Ingesting repository (mode: {mode})")
+
+        # Set defaults
+        if include_globs is None:
+            include_globs = ["**/*.py", "**/*.ts", "**/*.tsx"]
+        if exclude_globs is None:
+            exclude_globs = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**"]
+
+        # Generate task ID
+        task_id = f"ing-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+
+        # Determine repository path and ID
+        repo_path = None
+        repo_id = None
+        cleanup_needed = False
+
+        if local_path:
+            repo_path = local_path
+            repo_id = git_utils.get_repo_id_from_path(repo_path)
+        else:
+            # Clone repository
+            if ctx:
+                await ctx.info(f"Cloning repository: {repo_url}")
+
+            clone_result = git_utils.clone_repo(repo_url, branch=branch)
+
+            if not clone_result.get("success"):
+                return {
+                    "success": False,
+                    "task_id": task_id,
+                    "status": "error",
+                    "error": clone_result.get("error", "Failed to clone repository")
+                }
+
+            repo_path = clone_result["path"]
+            repo_id = git_utils.get_repo_id_from_url(repo_url)
+            cleanup_needed = True
+
+        # Get code ingestor
+        code_ingestor = get_code_ingestor(graph_service)
+
+        # Handle incremental mode
+        files_to_process = None
+        changed_files_count = 0
+
+        if mode == "incremental" and git_utils.is_git_repo(repo_path):
+            if ctx:
+                await ctx.info("Using incremental mode - detecting changed files")
+
+            changed_files = git_utils.get_changed_files(
+                repo_path,
+                since_commit=since_commit,
+                include_untracked=True
+            )
+            changed_files_count = len(changed_files)
+
+            if changed_files_count == 0:
+                return {
+                    "success": True,
+                    "task_id": task_id,
+                    "status": "done",
+                    "message": "No changed files detected",
+                    "mode": "incremental",
+                    "files_processed": 0,
+                    "changed_files_count": 0
+                }
+
+            # Filter changed files by globs
+            files_to_process = [f["path"] for f in changed_files if f["action"] != "deleted"]
+
+            if ctx:
+                await ctx.info(f"Found {changed_files_count} changed files")
+
+        # Scan files
+        if ctx:
+            await ctx.info(f"Scanning repository: {repo_path}")
+
+        scanned_files = code_ingestor.scan_files(
+            repo_path=repo_path,
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            specific_files=files_to_process
+        )
+
+        if not scanned_files:
+            return {
+                "success": True,
+                "task_id": task_id,
+                "status": "done",
+                "message": "No files found matching criteria",
+                "mode": mode,
+                "files_processed": 0,
+                "changed_files_count": changed_files_count if mode == "incremental" else None
+            }
+
+        # Ingest files
+        if ctx:
+            await ctx.info(f"Ingesting {len(scanned_files)} files...")
+
+        result = code_ingestor.ingest_files(
+            repo_id=repo_id,
+            files=scanned_files
+        )
+
+        if ctx:
+            if result.get("success"):
+                await ctx.info(f"Successfully ingested {result.get('files_processed', 0)} files")
+            else:
+                await ctx.error(f"Ingestion failed: {result.get('error')}")
+
+        return {
+            "success": result.get("success", False),
+            "task_id": task_id,
+            "status": "done" if result.get("success") else "error",
+            "message": result.get("message"),
+            "files_processed": result.get("files_processed", 0),
+            "mode": mode,
+            "changed_files_count": changed_files_count if mode == "incremental" else None,
+            "repo_id": repo_id,
+            "repo_path": repo_path
+        }
+
+    except Exception as e:
+        error_msg = f"Repository ingestion failed: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+# MCP tool: find related files
+@mcp.tool
+async def code_graph_related(
+    query: str,
+    repo_id: str,
+    limit: int = 30,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Find related files using fulltext search and keyword matching.
+
+    Args:
+        query: Search query text
+        repo_id: Repository ID to search in
+        limit: Maximum number of results (default: 30, max: 100)
+
+    Returns:
+        Dict containing list of related files with ref:// handles
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Finding files related to: {query}")
+
+        # Perform fulltext search
+        search_results = graph_service.fulltext_search(
+            query_text=query,
+            repo_id=repo_id,
+            limit=limit * 2  # Get more for ranking
+        )
+
+        if not search_results:
+            if ctx:
+                await ctx.info("No related files found")
+            return {
+                "success": True,
+                "nodes": [],
+                "query": query,
+                "repo_id": repo_id
+            }
+
+        # Rank results
+        ranked_files = ranker.rank_files(
+            files=search_results,
+            query=query,
+            limit=limit
+        )
+
+        # Convert to node summaries
+        nodes = []
+        for file in ranked_files:
+            summary = ranker.generate_file_summary(
+                path=file["path"],
+                lang=file["lang"]
+            )
+
+            ref = ranker.generate_ref_handle(path=file["path"])
+
+            nodes.append({
+                "type": "file",
+                "ref": ref,
+                "path": file["path"],
+                "lang": file["lang"],
+                "score": file["score"],
+                "summary": summary
+            })
+
+        if ctx:
+            await ctx.info(f"Found {len(nodes)} related files")
+
+        return {
+            "success": True,
+            "nodes": nodes,
+            "query": query,
+            "repo_id": repo_id
+        }
+
+    except Exception as e:
+        error_msg = f"Related files search failed: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+# MCP tool: impact analysis
+@mcp.tool
+async def code_graph_impact(
+    repo_id: str,
+    file_path: str,
+    depth: int = 2,
+    limit: int = 50,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Analyze the impact of a file by finding reverse dependencies.
+
+    Finds files and symbols that depend on the specified file through:
+    - CALLS relationships (who calls functions/methods in this file)
+    - IMPORTS relationships (who imports this file)
+
+    Args:
+        repo_id: Repository ID
+        file_path: Path to file to analyze
+        depth: Traversal depth for dependencies (default: 2, max: 5)
+        limit: Maximum number of results (default: 50, max: 100)
+
+    Returns:
+        Dict containing list of impacted files/symbols
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Analyzing impact of: {file_path}")
+
+        # Perform impact analysis
+        impact_results = graph_service.impact_analysis(
+            repo_id=repo_id,
+            file_path=file_path,
+            depth=depth,
+            limit=limit
+        )
+
+        if not impact_results:
+            if ctx:
+                await ctx.info("No reverse dependencies found")
+            return {
+                "success": True,
+                "nodes": [],
+                "file": file_path,
+                "repo_id": repo_id,
+                "depth": depth
+            }
+
+        # Convert to impact nodes
+        nodes = []
+        for result in impact_results:
+            summary = ranker.generate_file_summary(
+                path=result["path"],
+                lang=result.get("lang", "unknown")
+            )
+
+            ref = ranker.generate_ref_handle(path=result["path"])
+
+            nodes.append({
+                "type": result.get("type", "file"),
+                "path": result["path"],
+                "lang": result.get("lang"),
+                "repo_id": result.get("repoId", repo_id),
+                "relationship": result.get("relationship", "unknown"),
+                "depth": result.get("depth", 1),
+                "score": result.get("score", 0.0),
+                "ref": ref,
+                "summary": summary
+            })
+
+        if ctx:
+            await ctx.info(f"Found {len(nodes)} impacted files/symbols")
+
+        return {
+            "success": True,
+            "nodes": nodes,
+            "file": file_path,
+            "repo_id": repo_id,
+            "depth": depth
+        }
+
+    except Exception as e:
+        error_msg = f"Impact analysis failed: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+# MCP tool: build context pack
+@mcp.tool
+async def context_pack(
+    repo_id: str,
+    stage: str = "plan",
+    budget: int = 1500,
+    keywords: Optional[str] = None,
+    focus: Optional[str] = None,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Build a context pack within token budget.
+
+    Searches for relevant files and packages them with summaries and ref:// handles.
+
+    Args:
+        repo_id: Repository ID
+        stage: Development stage - "plan", "review", or "implement" (default: "plan")
+        budget: Token budget (default: 1500, max: 10000)
+        keywords: Comma-separated keywords for search (optional)
+        focus: Comma-separated focus file paths (optional)
+
+    Returns:
+        Dict containing context items within budget
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Building context pack (stage: {stage}, budget: {budget})")
+
+        # Parse keywords
+        keyword_list = []
+        if keywords:
+            keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]
+
+        # Parse focus paths
+        focus_list = []
+        if focus:
+            focus_list = [f.strip() for f in focus.split(",") if f.strip()]
+
+        # Search for relevant files
+        all_nodes = []
+
+        # Search by keywords
+        if keyword_list:
+            for keyword in keyword_list:
+                search_results = graph_service.fulltext_search(
+                    query_text=keyword,
+                    repo_id=repo_id,
+                    limit=20
+                )
+
+                if search_results:
+                    ranked = ranker.rank_files(
+                        files=search_results,
+                        query=keyword,
+                        limit=10
+                    )
+
+                    for file in ranked:
+                        all_nodes.append({
+                            "type": "file",
+                            "path": file["path"],
+                            "lang": file["lang"],
+                            "score": file["score"],
+                            "ref": ranker.generate_ref_handle(path=file["path"])
+                        })
+
+        # Add focus files with high priority
+        if focus_list:
+            for focus_path in focus_list:
+                all_nodes.append({
+                    "type": "file",
+                    "path": focus_path,
+                    "lang": "unknown",
+                    "score": 10.0,  # High priority
+                    "ref": ranker.generate_ref_handle(path=focus_path)
+                })
+
+        # Build context pack
+        if ctx:
+            await ctx.info(f"Packing {len(all_nodes)} candidate files into context...")
+
+        context_result = pack_builder.build_context_pack(
+            nodes=all_nodes,
+            budget=budget,
+            file_limit=8,
+            symbol_limit=12,
+            enable_deduplication=True
+        )
+
+        # Format items
+        items = []
+        for item in context_result.get("items", []):
+            items.append({
+                "kind": item.get("type", "file"),
+                "title": item.get("path", "Unknown"),
+                "summary": item.get("summary", ""),
+                "ref": item.get("ref", ""),
+                "extra": {
+                    "lang": item.get("lang"),
+                    "score": item.get("score", 0.0)
+                }
+            })
+
+        if ctx:
+            await ctx.info(f"Context pack built: {len(items)} items, {context_result.get('budget_used', 0)} tokens")
+
+        return {
+            "success": True,
+            "items": items,
+            "budget_used": context_result.get("budget_used", 0),
+            "budget_limit": budget,
+            "stage": stage,
+            "repo_id": repo_id,
+            "category_counts": context_result.get("category_counts", {})
+        }
+
+    except Exception as e:
+        error_msg = f"Context pack generation failed: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+# ===================================
+# MCP Resources
+# ===================================
 
 # MCP resource: knowledge base config
 @mcp.resource("knowledge://config")
