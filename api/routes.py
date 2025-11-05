@@ -67,8 +67,8 @@ class IngestRepoRequest(BaseModel):
     local_path: Optional[str] = None
     branch: Optional[str] = "main"
     mode: str = "full"  # full | incremental
-    include_globs: list[str] = ["**/*.py", "**/*.ts", "**/*.tsx"]
-    exclude_globs: list[str] = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**"]
+    include_globs: list[str] = ["**/*.py", "**/*.ts", "**/*.tsx", "**/*.java", "**/*.php", "**/*.go"]
+    exclude_globs: list[str] = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**", "**/.venv/**", "**/vendor/**", "**/target/**"]
     since_commit: Optional[str] = None  # For incremental mode: compare against this commit
 
 class IngestRepoResponse(BaseModel):

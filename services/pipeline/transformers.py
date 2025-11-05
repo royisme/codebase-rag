@@ -173,14 +173,20 @@ class CodeTransformer(DataTransformer):
         """transform code to chunks and relations"""
         try:
             language = data_source.metadata.get("language", "unknown")
-            
+
             if language == "python":
                 return await self._transform_python_code(data_source, content)
             elif language in ["javascript", "typescript"]:
                 return await self._transform_js_code(data_source, content)
+            elif language == "java":
+                return await self._transform_java_code(data_source, content)
+            elif language == "php":
+                return await self._transform_php_code(data_source, content)
+            elif language == "go":
+                return await self._transform_go_code(data_source, content)
             else:
                 return await self._transform_generic_code(data_source, content)
-                
+
         except Exception as e:
             logger.error(f"Failed to transform code {data_source.name}: {e}")
             return ProcessingResult(
@@ -546,7 +552,460 @@ class CodeTransformer(DataTransformer):
             relations.append(relation)
 
         return relations
-    
+
+    # ===================================
+    # Java Code Transformation
+    # ===================================
+
+    async def _transform_java_code(self, data_source: DataSource, content: str) -> ProcessingResult:
+        """transform Java code"""
+        chunks = []
+        relations = []
+
+        # Extract imports FIRST (file-level relationships)
+        import_relations = self._extract_java_imports(data_source, content)
+        relations.extend(import_relations)
+
+        # Extract classes using regex
+        class_pattern = r'(?:public\s+)?(?:abstract\s+)?(?:final\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([^{]+))?\s*\{'
+        for match in re.finditer(class_pattern, content, re.MULTILINE):
+            class_name = match.group(1)
+            parent_class = match.group(2)
+            interfaces = match.group(3)
+
+            # Find class body (simplified - may not handle nested classes perfectly)
+            start_pos = match.start()
+            brace_count = 0
+            end_pos = start_pos
+            for i in range(match.end(), len(content)):
+                if content[i] == '{':
+                    brace_count += 1
+                elif content[i] == '}':
+                    if brace_count == 0:
+                        end_pos = i + 1
+                        break
+                    brace_count -= 1
+
+            class_code = content[start_pos:end_pos] if end_pos > start_pos else match.group(0)
+
+            chunk = ProcessedChunk(
+                source_id=data_source.id,
+                chunk_type=ChunkType.CODE_CLASS,
+                content=class_code,
+                title=f"Class: {class_name}",
+                metadata={
+                    "class_name": class_name,
+                    "parent_class": parent_class,
+                    "interfaces": interfaces.strip() if interfaces else None,
+                    "language": "java"
+                }
+            )
+            chunks.append(chunk)
+
+            # Add inheritance relation
+            if parent_class:
+                relation = ExtractedRelation(
+                    source_id=data_source.id,
+                    from_entity=class_name,
+                    to_entity=parent_class,
+                    relation_type="INHERITS",
+                    properties={"from_type": "class", "to_type": "class", "language": "java"}
+                )
+                relations.append(relation)
+
+        # Extract methods (simplified - public/protected/private methods)
+        method_pattern = r'(?:public|protected|private)\s+(?:static\s+)?(?:final\s+)?(?:\w+(?:<[^>]+>)?)\s+(\w+)\s*\([^)]*\)\s*(?:throws\s+[^{]+)?\s*\{'
+        for match in re.finditer(method_pattern, content, re.MULTILINE):
+            method_name = match.group(1)
+
+            # Find method body
+            start_pos = match.start()
+            brace_count = 0
+            end_pos = start_pos
+            for i in range(match.end(), len(content)):
+                if content[i] == '{':
+                    brace_count += 1
+                elif content[i] == '}':
+                    if brace_count == 0:
+                        end_pos = i + 1
+                        break
+                    brace_count -= 1
+
+            method_code = content[start_pos:end_pos] if end_pos > start_pos else match.group(0)
+
+            chunk = ProcessedChunk(
+                source_id=data_source.id,
+                chunk_type=ChunkType.CODE_FUNCTION,
+                content=method_code,
+                title=f"Method: {method_name}",
+                metadata={
+                    "method_name": method_name,
+                    "language": "java"
+                }
+            )
+            chunks.append(chunk)
+
+        return ProcessingResult(
+            source_id=data_source.id,
+            success=True,
+            chunks=chunks,
+            relations=relations,
+            metadata={"transformer": "CodeTransformer", "language": "java"}
+        )
+
+    def _extract_java_imports(self, data_source: DataSource, content: str) -> List[ExtractedRelation]:
+        """
+        Extract Java import statements and create IMPORTS relationships.
+
+        Handles:
+        - import package.ClassName
+        - import package.*
+        - import static package.Class.method
+        """
+        relations = []
+
+        # Standard import: import package.ClassName;
+        import_pattern = r'import\s+(static\s+)?([a-zA-Z_][\w.]*\*?)\s*;'
+
+        for match in re.finditer(import_pattern, content):
+            is_static = match.group(1) is not None
+            imported_class = match.group(2)
+
+            relation = ExtractedRelation(
+                source_id=data_source.id,
+                from_entity=data_source.source_path or data_source.name,
+                to_entity=imported_class,
+                relation_type="IMPORTS",
+                properties={
+                    "from_type": "file",
+                    "to_type": "class" if not imported_class.endswith('*') else "package",
+                    "import_type": "static_import" if is_static else "import",
+                    "class_or_package": imported_class,
+                    "is_wildcard": imported_class.endswith('*'),
+                    "language": "java"
+                }
+            )
+            relations.append(relation)
+
+        return relations
+
+    # ===================================
+    # PHP Code Transformation
+    # ===================================
+
+    async def _transform_php_code(self, data_source: DataSource, content: str) -> ProcessingResult:
+        """transform PHP code"""
+        chunks = []
+        relations = []
+
+        # Extract imports/uses FIRST (file-level relationships)
+        import_relations = self._extract_php_imports(data_source, content)
+        relations.extend(import_relations)
+
+        # Extract classes
+        class_pattern = r'(?:abstract\s+)?(?:final\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([^{]+))?\s*\{'
+        for match in re.finditer(class_pattern, content, re.MULTILINE):
+            class_name = match.group(1)
+            parent_class = match.group(2)
+            interfaces = match.group(3)
+
+            # Find class body
+            start_pos = match.start()
+            brace_count = 0
+            end_pos = start_pos
+            for i in range(match.end(), len(content)):
+                if content[i] == '{':
+                    brace_count += 1
+                elif content[i] == '}':
+                    if brace_count == 0:
+                        end_pos = i + 1
+                        break
+                    brace_count -= 1
+
+            class_code = content[start_pos:end_pos] if end_pos > start_pos else match.group(0)
+
+            chunk = ProcessedChunk(
+                source_id=data_source.id,
+                chunk_type=ChunkType.CODE_CLASS,
+                content=class_code,
+                title=f"Class: {class_name}",
+                metadata={
+                    "class_name": class_name,
+                    "parent_class": parent_class,
+                    "interfaces": interfaces.strip() if interfaces else None,
+                    "language": "php"
+                }
+            )
+            chunks.append(chunk)
+
+            # Add inheritance relation
+            if parent_class:
+                relation = ExtractedRelation(
+                    source_id=data_source.id,
+                    from_entity=class_name,
+                    to_entity=parent_class,
+                    relation_type="INHERITS",
+                    properties={"from_type": "class", "to_type": "class", "language": "php"}
+                )
+                relations.append(relation)
+
+        # Extract functions
+        function_pattern = r'function\s+(\w+)\s*\([^)]*\)\s*(?::\s*\??\w+)?\s*\{'
+        for match in re.finditer(function_pattern, content, re.MULTILINE):
+            func_name = match.group(1)
+
+            # Find function body
+            start_pos = match.start()
+            brace_count = 0
+            end_pos = start_pos
+            for i in range(match.end(), len(content)):
+                if content[i] == '{':
+                    brace_count += 1
+                elif content[i] == '}':
+                    if brace_count == 0:
+                        end_pos = i + 1
+                        break
+                    brace_count -= 1
+
+            func_code = content[start_pos:end_pos] if end_pos > start_pos else match.group(0)
+
+            chunk = ProcessedChunk(
+                source_id=data_source.id,
+                chunk_type=ChunkType.CODE_FUNCTION,
+                content=func_code,
+                title=f"Function: {func_name}",
+                metadata={
+                    "function_name": func_name,
+                    "language": "php"
+                }
+            )
+            chunks.append(chunk)
+
+        return ProcessingResult(
+            source_id=data_source.id,
+            success=True,
+            chunks=chunks,
+            relations=relations,
+            metadata={"transformer": "CodeTransformer", "language": "php"}
+        )
+
+    def _extract_php_imports(self, data_source: DataSource, content: str) -> List[ExtractedRelation]:
+        """
+        Extract PHP use/require statements and create IMPORTS relationships.
+
+        Handles:
+        - use Namespace\ClassName
+        - use Namespace\ClassName as Alias
+        - use function Namespace\functionName
+        - require/require_once/include/include_once 'file.php'
+        """
+        relations = []
+
+        # Use statements: use Namespace\Class [as Alias];
+        use_pattern = r'use\s+(function\s+|const\s+)?([a-zA-Z_][\w\\]*)(?:\s+as\s+(\w+))?\s*;'
+
+        for match in re.finditer(use_pattern, content):
+            use_type = match.group(1).strip() if match.group(1) else "class"
+            class_name = match.group(2)
+            alias = match.group(3)
+
+            relation = ExtractedRelation(
+                source_id=data_source.id,
+                from_entity=data_source.source_path or data_source.name,
+                to_entity=class_name,
+                relation_type="IMPORTS",
+                properties={
+                    "from_type": "file",
+                    "to_type": use_type,
+                    "import_type": "use",
+                    "class_or_function": class_name,
+                    "alias": alias,
+                    "language": "php"
+                }
+            )
+            relations.append(relation)
+
+        # Require/include statements
+        require_pattern = r'(?:require|require_once|include|include_once)\s*\(?[\'"]([^\'"]+)[\'"]\)?'
+
+        for match in re.finditer(require_pattern, content):
+            file_path = match.group(1)
+
+            relation = ExtractedRelation(
+                source_id=data_source.id,
+                from_entity=data_source.source_path or data_source.name,
+                to_entity=file_path,
+                relation_type="IMPORTS",
+                properties={
+                    "from_type": "file",
+                    "to_type": "file",
+                    "import_type": "require",
+                    "file_path": file_path,
+                    "language": "php"
+                }
+            )
+            relations.append(relation)
+
+        return relations
+
+    # ===================================
+    # Go Code Transformation
+    # ===================================
+
+    async def _transform_go_code(self, data_source: DataSource, content: str) -> ProcessingResult:
+        """transform Go code"""
+        chunks = []
+        relations = []
+
+        # Extract imports FIRST (file-level relationships)
+        import_relations = self._extract_go_imports(data_source, content)
+        relations.extend(import_relations)
+
+        # Extract structs (Go's version of classes)
+        struct_pattern = r'type\s+(\w+)\s+struct\s*\{([^}]*)\}'
+        for match in re.finditer(struct_pattern, content, re.MULTILINE | re.DOTALL):
+            struct_name = match.group(1)
+            struct_body = match.group(2)
+
+            chunk = ProcessedChunk(
+                source_id=data_source.id,
+                chunk_type=ChunkType.CODE_CLASS,
+                content=match.group(0),
+                title=f"Struct: {struct_name}",
+                metadata={
+                    "struct_name": struct_name,
+                    "language": "go"
+                }
+            )
+            chunks.append(chunk)
+
+        # Extract interfaces
+        interface_pattern = r'type\s+(\w+)\s+interface\s*\{([^}]*)\}'
+        for match in re.finditer(interface_pattern, content, re.MULTILINE | re.DOTALL):
+            interface_name = match.group(1)
+
+            chunk = ProcessedChunk(
+                source_id=data_source.id,
+                chunk_type=ChunkType.CODE_CLASS,
+                content=match.group(0),
+                title=f"Interface: {interface_name}",
+                metadata={
+                    "interface_name": interface_name,
+                    "language": "go"
+                }
+            )
+            chunks.append(chunk)
+
+        # Extract functions
+        func_pattern = r'func\s+(?:\((\w+)\s+\*?(\w+)\)\s+)?(\w+)\s*\([^)]*\)\s*(?:\([^)]*\)|[\w\[\]\*]+)?\s*\{'
+        for match in re.finditer(func_pattern, content, re.MULTILINE):
+            receiver_name = match.group(1)
+            receiver_type = match.group(2)
+            func_name = match.group(3)
+
+            # Find function body
+            start_pos = match.start()
+            brace_count = 0
+            end_pos = start_pos
+            for i in range(match.end(), len(content)):
+                if content[i] == '{':
+                    brace_count += 1
+                elif content[i] == '}':
+                    if brace_count == 0:
+                        end_pos = i + 1
+                        break
+                    brace_count -= 1
+
+            func_code = content[start_pos:end_pos] if end_pos > start_pos else match.group(0)
+
+            title = f"Method: {receiver_type}.{func_name}" if receiver_type else f"Function: {func_name}"
+
+            chunk = ProcessedChunk(
+                source_id=data_source.id,
+                chunk_type=ChunkType.CODE_FUNCTION,
+                content=func_code,
+                title=title,
+                metadata={
+                    "function_name": func_name,
+                    "receiver_type": receiver_type,
+                    "is_method": receiver_type is not None,
+                    "language": "go"
+                }
+            )
+            chunks.append(chunk)
+
+        return ProcessingResult(
+            source_id=data_source.id,
+            success=True,
+            chunks=chunks,
+            relations=relations,
+            metadata={"transformer": "CodeTransformer", "language": "go"}
+        )
+
+    def _extract_go_imports(self, data_source: DataSource, content: str) -> List[ExtractedRelation]:
+        """
+        Extract Go import statements and create IMPORTS relationships.
+
+        Handles:
+        - import "package"
+        - import alias "package"
+        - import ( ... ) blocks
+        """
+        relations = []
+
+        # Single import: import "package" or import alias "package"
+        single_import_pattern = r'import\s+(?:(\w+)\s+)?"([^"]+)"'
+
+        for match in re.finditer(single_import_pattern, content):
+            alias = match.group(1)
+            package_path = match.group(2)
+
+            relation = ExtractedRelation(
+                source_id=data_source.id,
+                from_entity=data_source.source_path or data_source.name,
+                to_entity=package_path,
+                relation_type="IMPORTS",
+                properties={
+                    "from_type": "file",
+                    "to_type": "package",
+                    "import_type": "import",
+                    "package": package_path,
+                    "alias": alias,
+                    "language": "go"
+                }
+            )
+            relations.append(relation)
+
+        # Import block: import ( ... )
+        import_block_pattern = r'import\s*\(\s*((?:[^)]*\n)*)\s*\)'
+
+        for match in re.finditer(import_block_pattern, content, re.MULTILINE):
+            import_block = match.group(1)
+
+            # Parse each line in the block
+            line_pattern = r'(?:(\w+)\s+)?"([^"]+)"'
+            for line_match in re.finditer(line_pattern, import_block):
+                alias = line_match.group(1)
+                package_path = line_match.group(2)
+
+                relation = ExtractedRelation(
+                    source_id=data_source.id,
+                    from_entity=data_source.source_path or data_source.name,
+                    to_entity=package_path,
+                    relation_type="IMPORTS",
+                    properties={
+                        "from_type": "file",
+                        "to_type": "package",
+                        "import_type": "import",
+                        "package": package_path,
+                        "alias": alias,
+                        "language": "go"
+                    }
+                )
+                relations.append(relation)
+
+        return relations
+
     async def _transform_generic_code(self, data_source: DataSource, content: str) -> ProcessingResult:
         """generic code transformation (split by line count)"""
         chunks = []

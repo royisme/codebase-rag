@@ -1,5 +1,5 @@
 """
-MCP Server v2 - Complete Official SDK Implementation
+MCP Server  - Complete Official SDK Implementation
 
 Full migration from FastMCP to official Model Context Protocol SDK.
 All 25 tools now implemented with advanced features:
@@ -17,7 +17,7 @@ Tool Categories:
 - System (3 tools): schema, statistics, clear
 
 Usage:
-    python start_mcp_v2.py
+    python start_mcp.py
 """
 
 import asyncio
@@ -172,59 +172,113 @@ async def handle_call_tool(
     await ensure_service_initialized()
 
     try:
-        # Route to handler with service injection
-        if name == "query_knowledge":
-            result = await handle_query_knowledge(arguments, knowledge_service)
-        elif name == "search_similar_nodes":
-            result = await handle_search_similar_nodes(arguments, knowledge_service)
-        elif name == "add_document":
-            result = await handle_add_document(arguments, knowledge_service, submit_document_processing_task)
-        elif name == "add_file":
-            result = await handle_add_file(arguments, knowledge_service)
-        elif name == "add_directory":
-            result = await handle_add_directory(arguments, submit_directory_processing_task)
-        elif name == "code_graph_ingest_repo":
-            result = await handle_code_graph_ingest_repo(arguments, get_code_ingestor, git_utils)
-        elif name == "code_graph_related":
-            result = await handle_code_graph_related(arguments, graph_service, ranker)
-        elif name == "code_graph_impact":
-            result = await handle_code_graph_impact(arguments, graph_service)
-        elif name == "context_pack":
-            result = await handle_context_pack(arguments, pack_builder)
-        elif name == "add_memory":
-            result = await handle_add_memory(arguments, memory_store)
-        elif name == "search_memories":
-            result = await handle_search_memories(arguments, memory_store)
-        elif name == "get_memory":
-            result = await handle_get_memory(arguments, memory_store)
-        elif name == "update_memory":
-            result = await handle_update_memory(arguments, memory_store)
-        elif name == "delete_memory":
-            result = await handle_delete_memory(arguments, memory_store)
-        elif name == "supersede_memory":
-            result = await handle_supersede_memory(arguments, memory_store)
-        elif name == "get_project_summary":
-            result = await handle_get_project_summary(arguments, memory_store)
-        elif name == "get_task_status":
-            result = await handle_get_task_status(arguments, task_queue, TaskStatus)
-        elif name == "watch_task":
-            result = await handle_watch_task(arguments, task_queue, TaskStatus)
-        elif name == "watch_tasks":
-            result = await handle_watch_tasks(arguments, task_queue, TaskStatus)
-        elif name == "list_tasks":
-            result = await handle_list_tasks(arguments, task_queue)
-        elif name == "cancel_task":
-            result = await handle_cancel_task(arguments, task_queue)
-        elif name == "get_queue_stats":
-            result = await handle_get_queue_stats(arguments, task_queue)
-        elif name == "get_graph_schema":
-            result = await handle_get_graph_schema(arguments, knowledge_service)
-        elif name == "get_statistics":
-            result = await handle_get_statistics(arguments, knowledge_service)
-        elif name == "clear_knowledge_base":
-            result = await handle_clear_knowledge_base(arguments, knowledge_service)
+        await ensure_service_initialized()
+
+        if not local_path and not repo_url:
+            return {
+                "success": False,
+                "error": "Either local_path or repo_url must be provided"
+            }
+
+        if ctx:
+            await ctx.info(f"Ingesting repository (mode: {mode})")
+
+        # Set defaults
+        if include_globs is None:
+            include_globs = ["**/*.py", "**/*.ts", "**/*.tsx", "**/*.java", "**/*.php", "**/*.go"]
+        if exclude_globs is None:
+            exclude_globs = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**", "**/.venv/**", "**/vendor/**", "**/target/**"]
+
+        # Generate task ID
+        task_id = f"ing-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+
+        # Determine repository path and ID
+        repo_path = None
+        repo_id = None
+        cleanup_needed = False
+
+        if local_path:
+            repo_path = local_path
+            repo_id = git_utils.get_repo_id_from_path(repo_path)
         else:
-            return [TextContent(type="text", text=f"Error: Unknown tool '{name}'")]
+            # Clone repository
+            if ctx:
+                await ctx.info(f"Cloning repository: {repo_url}")
+
+            clone_result = git_utils.clone_repo(repo_url, branch=branch)
+
+            if not clone_result.get("success"):
+                return {
+                    "success": False,
+                    "task_id": task_id,
+                    "status": "error",
+                    "error": clone_result.get("error", "Failed to clone repository")
+                }
+
+            repo_path = clone_result["path"]
+            repo_id = git_utils.get_repo_id_from_url(repo_url)
+            cleanup_needed = True
+
+        # Get code ingestor
+        code_ingestor = get_code_ingestor(graph_service)
+
+        # Handle incremental mode
+        files_to_process = None
+        changed_files_count = 0
+
+        if mode == "incremental" and git_utils.is_git_repo(repo_path):
+            if ctx:
+                await ctx.info("Using incremental mode - detecting changed files")
+
+            changed_files_result = git_utils.get_changed_files(
+                repo_path,
+                since_commit=since_commit,
+                include_untracked=True
+            )
+            changed_files_count = changed_files_result.get("count", 0)
+
+            if changed_files_count == 0:
+                return {
+                    "success": True,
+                    "task_id": task_id,
+                    "status": "done",
+                    "message": "No changed files detected",
+                    "mode": "incremental",
+                    "files_processed": 0,
+                    "changed_files_count": 0
+                }
+
+            # Filter changed files by globs
+            files_to_process = [f["path"] for f in changed_files_result.get("changed_files", []) if f["action"] != "deleted"]
+
+            if ctx:
+                await ctx.info(f"Found {changed_files_count} changed files")
+
+        # Scan files
+        if ctx:
+            await ctx.info(f"Scanning repository: {repo_path}")
+
+        scanned_files = code_ingestor.scan_files(
+            repo_path=repo_path,
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            specific_files=files_to_process
+        )
+
+        if not scanned_files:
+            return {
+                "success": True,
+                "task_id": task_id,
+                "status": "done",
+                "message": "No files found matching criteria",
+                "mode": mode,
+                "files_processed": 0,
+                "changed_files_count": changed_files_count if mode == "incremental" else None
+            }
+
+        # Ingest files
+        if ctx:
+            await ctx.info(f"Ingesting {len(scanned_files)} files...")
 
         # Format and return
         return [TextContent(type="text", text=format_result(result))]
@@ -304,9 +358,214 @@ async def main():
                     notification_options=None,
                     experimental_capabilities={}
                 )
-            )
+
+                if search_results:
+                    ranked = ranker.rank_files(
+                        files=search_results,
+                        query=keyword,
+                        limit=10
+                    )
+
+                    for file in ranked:
+                        all_nodes.append({
+                            "type": "file",
+                            "path": file["path"],
+                            "lang": file["lang"],
+                            "score": file["score"],
+                            "ref": ranker.generate_ref_handle(path=file["path"])
+                        })
+
+        # Add focus files with high priority
+        if focus_list:
+            for focus_path in focus_list:
+                all_nodes.append({
+                    "type": "file",
+                    "path": focus_path,
+                    "lang": "unknown",
+                    "score": 10.0,  # High priority
+                    "ref": ranker.generate_ref_handle(path=focus_path)
+                })
+
+        # Build context pack
+        if ctx:
+            await ctx.info(f"Packing {len(all_nodes)} candidate files into context...")
+
+        context_result = pack_builder.build_context_pack(
+            nodes=all_nodes,
+            budget=budget,
+            stage=stage,
+            repo_id=repo_id,
+            file_limit=8,
+            symbol_limit=12,
+            enable_deduplication=True
         )
 
+        # Format items
+        items = []
+        for item in context_result.get("items", []):
+            items.append({
+                "kind": item.get("kind", "file"),
+                "title": item.get("title", "Unknown"),
+                "summary": item.get("summary", ""),
+                "ref": item.get("ref", ""),
+                "extra": {
+                    "lang": item.get("extra", {}).get("lang"),
+                    "score": item.get("extra", {}).get("score", 0.0)
+                }
+            })
+
+        if ctx:
+            await ctx.info(f"Context pack built: {len(items)} items, {context_result.get('budget_used', 0)} tokens")
+
+        return {
+            "success": True,
+            "items": items,
+            "budget_used": context_result.get("budget_used", 0),
+            "budget_limit": budget,
+            "stage": stage,
+            "repo_id": repo_id,
+            "category_counts": context_result.get("category_counts", {})
+        }
+
+    except Exception as e:
+        error_msg = f"Context pack generation failed: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+# ===================================
+# MCP Resources
+# ===================================
+
+# MCP resource: knowledge base config
+@mcp.resource("knowledge://config")
+async def get_knowledge_config() -> Dict[str, Any]:
+    """Get knowledge base configuration and settings."""
+    model_info = get_current_model_info()
+    return {
+        "app_name": settings.app_name,
+        "version": settings.app_version,
+        "neo4j_uri": settings.neo4j_uri,
+        "neo4j_database": settings.neo4j_database,
+        "llm_provider": settings.llm_provider,
+        "embedding_provider": settings.embedding_provider,
+        "current_models": model_info,
+        "chunk_size": settings.chunk_size,
+        "chunk_overlap": settings.chunk_overlap,
+        "top_k": settings.top_k,
+        "vector_dimension": settings.vector_dimension,
+        "timeouts": {
+            "connection": settings.connection_timeout,
+            "operation": settings.operation_timeout,
+            "large_document": settings.large_document_timeout
+        }
+    }
+
+# MCP resource: system status
+@mcp.resource("knowledge://status")
+async def get_system_status() -> Dict[str, Any]:
+    """Get current system status and health."""
+    try:
+        await ensure_service_initialized()
+        stats = await knowledge_service.get_statistics()
+        model_info = get_current_model_info()
+        
+        return {
+            "status": "healthy" if stats.get("success") else "degraded",
+            "services": {
+                "neo4j_knowledge_service": _service_initialized,
+                "neo4j_connection": True,  # if initialized, connection is healthy
+            },
+            "current_models": model_info,
+            "statistics": stats
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "services": {
+                "neo4j_knowledge_service": _service_initialized,
+                "neo4j_connection": False,
+            }
+        }
+
+# MCP resource: recent documents
+@mcp.resource("knowledge://recent-documents/{limit}")
+async def get_recent_documents(limit: int = 10) -> Dict[str, Any]:
+    """Get recently added documents."""
+    try:
+        await ensure_service_initialized()
+        # here can be extended to query recent documents from graph database
+        # currently return placeholder information
+        return {
+            "message": f"Recent {limit} documents endpoint",
+            "note": "This feature can be extended to query Neo4j for recently added documents",
+            "limit": limit,
+            "implementation_status": "placeholder"
+        }
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
+
+# MCP prompt: generate query suggestions
+@mcp.prompt
+def suggest_queries(domain: str = "general") -> str:
+    """
+    Generate suggested queries for the Neo4j knowledge graph.
+    
+    Args:
+        domain: Domain to focus suggestions on (e.g., "code", "documentation", "sql", "architecture")
+    """
+    suggestions = {
+        "general": [
+            "What are the main components of this system?",
+            "How does the Neo4j knowledge pipeline work?",
+            "What databases and services are used in this project?",
+            "Show me the overall architecture of the system"
+        ],
+        "code": [
+            "Show me Python functions for data processing",
+            "Find code examples for Neo4j integration",
+            "What are the main classes in the pipeline module?",
+            "How is the knowledge service implemented?"
+        ],
+        "documentation": [
+            "What is the system architecture?",
+            "How to set up the development environment?",
+            "What are the API endpoints available?",
+            "How to configure different LLM providers?"
+        ],
+        "sql": [
+            "Show me table schemas for user management",
+            "What are the relationships between database tables?",
+            "Find SQL queries for reporting",
+            "How is the database schema structured?"
+        ],
+        "architecture": [
+            "What is the GraphRAG architecture?",
+            "How does the vector search work with Neo4j?",
+            "What are the different query modes available?",
+            "How are documents processed and stored?"
+        ]
+    }
+    
+    domain_suggestions = suggestions.get(domain, suggestions["general"])
+    
+    return f"""Here are some suggested queries for the {domain} domain in the Neo4j Knowledge Graph:
+
+{chr(10).join(f"• {suggestion}" for suggestion in domain_suggestions)}
+
+Available query modes:
+• hybrid: Combines graph traversal and vector search (recommended)
+• graph_only: Uses only graph relationships
+• vector_only: Uses only vector similarity search
+
+You can use the query_knowledge tool with any of these questions or create your own queries."""
 
 if __name__ == "__main__":
     asyncio.run(main())
