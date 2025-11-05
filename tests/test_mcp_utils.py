@@ -446,4 +446,4 @@ class TestFormatResult:
 
         assert "[note] Test" in output
         # When no tags, should not show tags line
-        # The code checks if mem.get('tags') which would be None/empty
+        # If mem.get('tags') is None or empty, the tags line should be omitted from the output
