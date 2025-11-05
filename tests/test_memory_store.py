@@ -401,6 +401,158 @@ async def test_multiple_projects(memory_store):
     assert result2["total_count"] >= 1
 
 
+# ============================================================================
+# Soft Delete Filter Tests (Bug Fixes)
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_search_excludes_deleted_memories(memory_store, test_project_id):
+    """
+    Test that search_memories excludes soft-deleted memories
+    Bug fix: P1 - soft-deleted memories were appearing in search results
+    """
+    # Add a memory
+    add_result = await memory_store.add_memory(
+        project_id=test_project_id,
+        memory_type="decision",
+        title="Memory to be deleted",
+        content="This should not appear after deletion"
+    )
+    assert add_result["success"] is True
+    memory_id = add_result["memory_id"]
+
+    # Verify it appears in search
+    search_before = await memory_store.search_memories(project_id=test_project_id)
+    assert search_before["success"] is True
+    ids_before = [m["id"] for m in search_before["memories"]]
+    assert memory_id in ids_before, "Memory should appear before deletion"
+
+    # Soft delete the memory
+    delete_result = await memory_store.delete_memory(memory_id=memory_id)
+    assert delete_result["success"] is True
+
+    # Search again - deleted memory should NOT appear
+    search_after = await memory_store.search_memories(project_id=test_project_id)
+    assert search_after["success"] is True
+    ids_after = [m["id"] for m in search_after["memories"]]
+    assert memory_id not in ids_after, "Deleted memory should NOT appear in search"
+
+
+@pytest.mark.asyncio
+async def test_get_memory_excludes_deleted(memory_store, test_project_id):
+    """
+    Test that get_memory returns not found for soft-deleted memories
+    Bug fix: P1 - get_memory should not return deleted memories
+    """
+    # Add a memory
+    add_result = await memory_store.add_memory(
+        project_id=test_project_id,
+        memory_type="note",
+        title="Memory to delete",
+        content="Test content"
+    )
+    assert add_result["success"] is True
+    memory_id = add_result["memory_id"]
+
+    # Get memory before deletion - should work
+    get_before = await memory_store.get_memory(memory_id=memory_id)
+    assert get_before["success"] is True
+    assert get_before["memory"]["id"] == memory_id
+
+    # Soft delete the memory
+    delete_result = await memory_store.delete_memory(memory_id=memory_id)
+    assert delete_result["success"] is True
+
+    # Get memory after deletion - should fail
+    get_after = await memory_store.get_memory(memory_id=memory_id)
+    assert get_after["success"] is False
+    assert "not found" in get_after["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_search_with_query_excludes_deleted(memory_store, test_project_id):
+    """
+    Test that fulltext search also excludes soft-deleted memories
+    Bug fix: P1 - fulltext search path was also missing deleted filter
+    """
+    # Add two memories with similar content
+    add1 = await memory_store.add_memory(
+        project_id=test_project_id,
+        memory_type="decision",
+        title="Use PostgreSQL database",
+        content="PostgreSQL for relational data"
+    )
+    add2 = await memory_store.add_memory(
+        project_id=test_project_id,
+        memory_type="decision",
+        title="Use PostgreSQL replication",
+        content="PostgreSQL replication for HA"
+    )
+    assert add1["success"] is True
+    assert add2["success"] is True
+    memory_id1 = add1["memory_id"]
+    memory_id2 = add2["memory_id"]
+
+    # Search for "PostgreSQL" - both should appear
+    search_before = await memory_store.search_memories(
+        project_id=test_project_id,
+        query="PostgreSQL"
+    )
+    assert search_before["success"] is True
+    ids_before = [m["id"] for m in search_before["memories"]]
+    assert memory_id1 in ids_before
+    assert memory_id2 in ids_before
+
+    # Delete one memory
+    await memory_store.delete_memory(memory_id=memory_id1)
+
+    # Search again - only non-deleted should appear
+    search_after = await memory_store.search_memories(
+        project_id=test_project_id,
+        query="PostgreSQL"
+    )
+    assert search_after["success"] is True
+    ids_after = [m["id"] for m in search_after["memories"]]
+    assert memory_id1 not in ids_after, "Deleted memory should not appear"
+    assert memory_id2 in ids_after, "Non-deleted memory should still appear"
+
+
+@pytest.mark.asyncio
+async def test_project_summary_excludes_deleted(memory_store, test_project_id):
+    """
+    Test that get_project_summary excludes soft-deleted memories
+    This was already implemented correctly but adding test for completeness
+    """
+    # Add memories
+    add1 = await memory_store.add_memory(
+        project_id=test_project_id,
+        memory_type="decision",
+        title="Decision 1",
+        content="Test"
+    )
+    add2 = await memory_store.add_memory(
+        project_id=test_project_id,
+        memory_type="decision",
+        title="Decision 2",
+        content="Test"
+    )
+    memory_id1 = add1["memory_id"]
+
+    # Get summary before deletion
+    summary_before = await memory_store.get_project_summary(project_id=test_project_id)
+    assert summary_before["success"] is True
+    count_before = summary_before["total_memories"]
+
+    # Delete one memory
+    await memory_store.delete_memory(memory_id=memory_id1)
+
+    # Get summary after deletion - count should decrease
+    summary_after = await memory_store.get_project_summary(project_id=test_project_id)
+    assert summary_after["success"] is True
+    count_after = summary_after["total_memories"]
+    assert count_after == count_before - 1, "Deleted memory should not count in summary"
+
+
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "-s"])

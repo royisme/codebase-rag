@@ -262,7 +262,10 @@ class MemoryStore:
         try:
             async with self.driver.session(database=settings.neo4j_database) as session:
                 # Build query dynamically based on filters
-                where_clauses = ["(m)-[:BELONGS_TO]->(:Project {id: $project_id})"]
+                where_clauses = [
+                    "(m)-[:BELONGS_TO]->(:Project {id: $project_id})",
+                    "(m.deleted IS NULL OR m.deleted = false)"  # Exclude soft-deleted memories
+                ]
                 params = {
                     "project_id": project_id,
                     "min_importance": min_importance,
@@ -343,6 +346,7 @@ class MemoryStore:
                 result = await session.run(
                     """
                     MATCH (m:Memory {id: $memory_id})
+                    WHERE (m.deleted IS NULL OR m.deleted = false)
                     OPTIONAL MATCH (m)-[:RELATES_TO]->(related)
                     RETURN m,
                            collect(DISTINCT {type: labels(related)[0],
