@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from services.sql_parser import sql_analyzer
 from services.graph_service import graph_service
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
+from services.neo4j_knowledge_service import neo4j_knowledge_service
 from services.universal_sql_schema_parser import parse_sql_schema_smart
 from services.task_queue import task_queue
 from security.casbin_enforcer import require_permission
@@ -16,7 +16,7 @@ from loguru import logger
 router = APIRouter()
 
 # initialize Neo4j knowledge service
-knowledge_service = Neo4jKnowledgeService()
+knowledge_service = neo4j_knowledge_service
 
 # request models
 class HealthResponse(BaseModel):
@@ -60,7 +60,7 @@ async def health_check():
     """health check interface"""
     try:
         # check Neo4j knowledge service status
-        neo4j_connected = knowledge_service._initialized if hasattr(knowledge_service, '_initialized') else False
+        neo4j_connected = getattr(knowledge_service, "_initialized", False)
         
         services_status = {
             "neo4j_knowledge_service": neo4j_connected,

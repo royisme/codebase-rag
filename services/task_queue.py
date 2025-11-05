@@ -287,7 +287,12 @@ class TaskQueue:
             # for now, we use a placeholder, actual implementation needs task registration mechanism
             logger.info(f"Task {task_id} about to execute by type: {task.type}")
             result = await self._execute_task_by_type(task)
-            logger.info(f"Task {task_id} execution completed with result: {type(result)}")
+            if isinstance(result, dict):
+                preview = {key: result[key] for key in list(result)[:5]}
+                logger.info("Task {} execution completed with result keys: {}", task_id, list(result.keys()))
+                logger.debug("Task {} result preview: {}", task_id, preview)
+            else:
+                logger.info("Task {} execution completed with result: {}", task_id, repr(result)[:200])
             
             # task completed
             task_result.status = TaskStatus.SUCCESS

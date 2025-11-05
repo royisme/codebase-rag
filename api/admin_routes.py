@@ -10,7 +10,12 @@ from fastapi.responses import JSONResponse
 
 from database import async_session_factory
 from database.models import ParseStatus
-from services.source_service import get_source_service, SourceServiceError, SourceNotFoundError
+from services.source_service import (
+    get_source_service,
+    SourceServiceError,
+    SourceNotFoundError,
+    SourceValidationError,
+)
 from services.task_queue import submit_knowledge_source_sync_task
 from services.code_indexing import validate_git_connection
 from security.casbin_enforcer import require_permission
@@ -353,11 +358,14 @@ async def create_parse_job(
                 raise HTTPException(status_code=404, detail="知识源不存在")
 
             # 创建解析任务
-            job = await source_service.create_parse_job(
-                job_data,
-                created_by=actor_info.get("user_id"),
-                actor_info=actor_info,
-            )
+            try:
+                job = await source_service.create_parse_job(
+                    job_data,
+                    created_by=actor_info.get("user_id"),
+                    actor_info=actor_info,
+                )
+            except SourceValidationError as validation_error:
+                raise HTTPException(status_code=409, detail=str(validation_error)) from validation_error
 
             await session.commit()
 
@@ -487,6 +495,7 @@ async def get_parse_job(
         400: {"description": "知识源未激活或请求参数不合法"},
         403: {"description": "RBAC：权限不足"},
         404: {"description": "知识源不存在"},
+        409: {"description": "存在正在运行的解析任务"},
         500: {"description": "内部服务器错误"},
     },
 )
@@ -515,11 +524,15 @@ async def sync_knowledge_source(
                 job_config=sync_config or {},
             )
 
-            job = await source_service.create_parse_job(
-                job_data,
-                created_by=actor_info.get("user_id"),
-                actor_info=actor_info,
-            )
+            try:
+                job = await source_service.create_parse_job(
+                    job_data,
+                    created_by=actor_info.get("user_id"),
+                    actor_info=actor_info,
+                )
+            except SourceValidationError as exc:
+                await session.rollback()
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
 
             await session.commit()
 

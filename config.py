@@ -1,7 +1,8 @@
+import json
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, field_validator
 from typing import Optional, Literal
 from urllib.parse import quote_plus
 
@@ -133,7 +134,40 @@ class Settings(BaseSettings):
     max_payload_size: int = Field(default=50 * 1024 * 1024, description="Maximum task payload size for storage (50MB)")
     
     # API Settings
-    cors_origins: list = Field(default=["*"], description="CORS allowed origins")
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173"],
+        description="CORS allowed origins",
+    )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        if value is None or value == "":
+            return ["http://localhost:5173"]
+
+        if isinstance(value, str):
+            value = value.strip()
+            if value.startswith("["):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        value = parsed
+                    elif isinstance(parsed, str):
+                        value = [parsed]
+                    else:
+                        raise ValueError("CORS origins must be a list or comma separated string")
+                except json.JSONDecodeError as exc:
+                    raise ValueError("Invalid JSON for CORS origins") from exc
+            else:
+                value = [item.strip() for item in value.split(",") if item.strip()]
+
+        if isinstance(value, list):
+            origins = [str(item).strip() for item in value if str(item).strip()]
+            if not origins or origins == ["*"]:
+                return ["http://localhost:5173"]
+            return origins
+
+        raise ValueError("Unsupported CORS origins format")
     api_key: Optional[str] = Field(default=None, description="API authentication key")
     
     # logging
@@ -149,7 +183,7 @@ class Settings(BaseSettings):
     knowledge_retry_attempts: int = Field(default=3, description="Number of retry attempts for failed knowledge source jobs", alias="KNOWLEDGE_RETRY_ATTEMPTS")
 
     # Code Repository Indexing Defaults
-    code_repo_root: str = Field(default="/data/repos", description="Root directory for cloning code repositories", alias="CODE_REPO_ROOT")
+    code_repo_root: str = Field(default="data/repos", description="Root directory for cloning code repositories", alias="CODE_REPO_ROOT")
     code_git_depth: int = Field(default=1, description="Default git clone depth for repository sync", alias="CODE_GIT_DEPTH")
     code_include_patterns: list[str] = Field(
         default_factory=lambda: ["*.py", "*.ts", "*.js", "*.go"],
@@ -186,6 +220,8 @@ class Settings(BaseSettings):
         description="Cache TTL for GraphRAG query results (seconds)",
         alias="GRAPHRAG_QUERY_CACHE_TTL_SECONDS",
     )
+    graphrag_use_demo: bool = Field(default=True, description="Use demo provider for GraphRAG if Neo4j/LLM not available", alias="GRAPHRAG_USE_DEMO")
+    graphrag_demo_answers_path: str = Field(default="data/demo_answers", description="Path to demo answers JSON files", alias="GRAPHRAG_DEMO_ANSWERS_PATH")
 
     @property
     def database_dsn_async(self) -> str:
@@ -200,6 +236,12 @@ class Settings(BaseSettings):
         db_path = Path(self.db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return f"sqlite:///{self.db_path}"
+
+    @property
+    def code_repo_root_path(self) -> Path:
+        repo_root = Path(self.code_repo_root)
+        repo_root.mkdir(parents=True, exist_ok=True)
+        return repo_root
 
 settings = Settings()
 

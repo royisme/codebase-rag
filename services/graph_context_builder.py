@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 from loguru import logger
 
 from services.graph_service import Neo4jGraphService, graph_service
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
+from services.neo4j_knowledge_service import Neo4jKnowledgeService, neo4j_knowledge_service
 
 
 class GraphQueryIntent(str, Enum):
@@ -79,7 +79,7 @@ class GraphContextBuilder:
         knowledge_service: Neo4jKnowledgeService | None = None,
     ) -> None:
         self.graph_db = graph_db or graph_service
-        self.knowledge_service = knowledge_service or Neo4jKnowledgeService()
+        self.knowledge_service = knowledge_service or neo4j_knowledge_service or Neo4jKnowledgeService()
         self._graph_connected = asyncio.Lock()
         self._neo4j_ready = False
 
@@ -171,7 +171,7 @@ class GraphContextBuilder:
                collect(DISTINCT {
                    id: coalesce(c.id, c.commit_id),
                    message: coalesce(c.message, ''),
-                   committed_at: coalesce(c.committed_at, c.timestamp, ''),
+                   timestamp: coalesce(c.timestamp, c.date, c.created_at, ''),
                    author: coalesce(p.name, p.email, '')
                })[0..5] AS commits,
                collect(DISTINCT coalesce(m.name, ''))[0..3] AS modules,

@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional, List
 
 from loguru import logger
 
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
+from services.neo4j_knowledge_service import neo4j_knowledge_service, Neo4jKnowledgeService
 from services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
 from services.task_processors import processor_registry
 from config import settings, get_current_model_info
@@ -12,7 +12,7 @@ from config import settings, get_current_model_info
 mcp = FastMCP("Neo4j Knowledge Graph MCP Server")
 
 # initialize Neo4j knowledge service
-knowledge_service = Neo4jKnowledgeService()
+knowledge_service = neo4j_knowledge_service or Neo4jKnowledgeService()
 
 # service initialization status
 _service_initialized = False

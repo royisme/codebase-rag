@@ -7,7 +7,9 @@
   "paths": {
     "/api/v1/auth/register": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Register:Register",
         "operationId": "register_register_api_v1_auth_register_post",
         "requestBody": {
@@ -73,7 +75,9 @@
     },
     "/api/v1/auth/login": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Auth:Jwt.Login",
         "operationId": "auth_jwt_login_api_v1_auth_login_post",
         "requestBody": {
@@ -140,7 +144,9 @@
     },
     "/api/v1/auth/logout": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Auth:Jwt.Logout",
         "operationId": "auth_jwt_logout_api_v1_auth_logout_post",
         "responses": {
@@ -165,7 +171,9 @@
     },
     "/api/v1/auth/forgot-password": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Reset:Forgot Password",
         "operationId": "reset_forgot_password_api_v1_auth_forgot_password_post",
         "requestBody": {
@@ -202,7 +210,9 @@
     },
     "/api/v1/auth/reset-password": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Reset:Reset Password",
         "operationId": "reset_reset_password_api_v1_auth_reset_password_post",
         "requestBody": {
@@ -264,9 +274,11 @@
         }
       }
     },
-    "/api/v1/auth/me": {
+    "/api/v1/admin/users/me": {
       "get": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Users:Current User",
         "operationId": "users_current_user_api_v1_admin_users_me_get",
         "responses": {
@@ -291,7 +303,9 @@
         ]
       },
       "patch": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Users:Patch Current User",
         "operationId": "users_patch_current_user_api_v1_admin_users_me_patch",
         "requestBody": {
@@ -365,7 +379,9 @@
     },
     "/api/v1/admin/users/{id}": {
       "get": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Users:User",
         "operationId": "users_user_api_v1_admin_users__id__get",
         "security": [
@@ -417,7 +433,9 @@
         }
       },
       "patch": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Users:Patch User",
         "operationId": "users_patch_user_api_v1_admin_users__id__patch",
         "security": [
@@ -506,7 +524,9 @@
         }
       },
       "delete": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Users:Delete User",
         "operationId": "users_delete_user_api_v1_admin_users__id__delete",
         "security": [
@@ -553,7 +573,9 @@
     },
     "/api/v1/auth/refresh": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Refresh Token",
         "description": "基于现有登录状态刷新访问令牌。",
         "operationId": "refresh_token_api_v1_auth_refresh_post",
@@ -574,9 +596,38 @@
         ]
       }
     },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get Current User Profile",
+        "description": "返回当前登录用户的基础资料。",
+        "operationId": "get_current_user_profile_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/roles": {
       "get": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "List Roles",
         "operationId": "list_roles_api_v1_admin_roles_get",
         "responses": {
@@ -599,7 +650,9 @@
     },
     "/api/v1/admin/policies": {
       "get": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "List Policies",
         "operationId": "list_policies_api_v1_admin_policies_get",
         "responses": {
@@ -625,7 +678,9 @@
         ]
       },
       "post": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Create Policy",
         "operationId": "create_policy_api_v1_admin_policies_post",
         "requestBody": {
@@ -669,7 +724,9 @@
     },
     "/api/v1/admin/policies/{policy_id}": {
       "patch": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Update Policy",
         "operationId": "update_policy_api_v1_admin_policies__policy_id__patch",
         "security": [
@@ -722,7 +779,9 @@
         }
       },
       "delete": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Delete Policy",
         "operationId": "delete_policy_api_v1_admin_policies__policy_id__delete",
         "security": [
@@ -760,7 +819,9 @@
     },
     "/api/v1/admin/audit": {
       "get": {
-        "tags": ["RBAC"],
+        "tags": [
+          "RBAC"
+        ],
         "summary": "Get Audit Logs",
         "operationId": "get_audit_logs_api_v1_admin_audit_get",
         "security": [
@@ -901,7 +962,9 @@
     },
     "/api/v1/health": {
       "get": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Health Check",
         "description": "health check interface",
         "operationId": "health_check_api_v1_health_get",
@@ -921,7 +984,9 @@
     },
     "/api/v1/knowledge/query": {
       "post": {
-        "tags": ["knowledge-query"],
+        "tags": [
+          "knowledge-query"
+        ],
         "summary": "执行 GraphRAG 查询",
         "description": "对选定知识源发起 GraphRAG 查询，返回答案、置信度与证据锚点信息。",
         "operationId": "query_knowledge_graph_api_v1_knowledge_query_post",
@@ -1002,7 +1067,9 @@
     },
     "/api/v1/knowledge/search": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Search Knowledge",
         "description": "Search similar nodes in knowledge base",
         "operationId": "search_knowledge_api_v1_knowledge_search_post",
@@ -1045,7 +1112,9 @@
     },
     "/api/v1/documents": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Add Document",
         "description": "Add document to knowledge base",
         "operationId": "add_document_api_v1_documents_post",
@@ -1088,7 +1157,9 @@
     },
     "/api/v1/documents/file": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Add File",
         "description": "Add file to knowledge base",
         "operationId": "add_file_api_v1_documents_file_post",
@@ -1132,7 +1203,9 @@
     },
     "/api/v1/documents/directory": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Add Directory",
         "description": "Add directory to knowledge base",
         "operationId": "add_directory_api_v1_documents_directory_post",
@@ -1175,7 +1248,9 @@
     },
     "/api/v1/sql/parse": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Parse Sql",
         "description": "Parse SQL statement",
         "operationId": "parse_sql_api_v1_sql_parse_post",
@@ -1213,7 +1288,9 @@
     },
     "/api/v1/sql/validate": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Validate Sql",
         "description": "Validate SQL syntax",
         "operationId": "validate_sql_api_v1_sql_validate_post",
@@ -1251,7 +1328,9 @@
     },
     "/api/v1/sql/convert": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Convert Sql Dialect",
         "description": "Convert SQL between dialects",
         "operationId": "convert_sql_dialect_api_v1_sql_convert_post",
@@ -1308,7 +1387,9 @@
     },
     "/api/v1/schema": {
       "get": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Get Graph Schema",
         "description": "Get knowledge graph schema",
         "operationId": "get_graph_schema_api_v1_schema_get",
@@ -1326,7 +1407,9 @@
     },
     "/api/v1/statistics": {
       "get": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Get Statistics",
         "description": "Get knowledge base statistics",
         "operationId": "get_statistics_api_v1_statistics_get",
@@ -1344,7 +1427,9 @@
     },
     "/api/v1/clear": {
       "delete": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Clear Knowledge Base",
         "description": "Clear knowledge base",
         "operationId": "clear_knowledge_base_api_v1_clear_delete",
@@ -1362,7 +1447,9 @@
     },
     "/api/v1/sql/parse-schema": {
       "post": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Parse Sql Schema",
         "description": "Parse SQL schema with smart auto-detection\n\nAutomatically detects:\n- SQL dialect (Oracle, MySQL, PostgreSQL, SQL Server)  \n- Business domain classification\n- Table relationships and statistics",
         "operationId": "parse_sql_schema_api_v1_sql_parse_schema_post",
@@ -1400,7 +1487,9 @@
     },
     "/api/v1/config": {
       "get": {
-        "tags": ["General"],
+        "tags": [
+          "General"
+        ],
         "summary": "Get System Config",
         "description": "Get system configuration",
         "operationId": "get_system_config_api_v1_config_get",
@@ -1416,9 +1505,67 @@
         }
       }
     },
+    "/api/v1/admin/sources/validate": {
+      "post": {
+        "tags": [
+          "knowledge-sources"
+        ],
+        "summary": "验证知识源连接",
+        "description": "校验 Git 仓库凭据及可访问分支列表。",
+        "operationId": "validate_knowledge_source_connection_api_v1_admin_sources_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeSourceValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "验证结果返回",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSourceValidationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数不合法"
+          },
+          "403": {
+            "description": "RBAC：权限不足"
+          },
+          "500": {
+            "description": "内部服务器错误"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/sources": {
       "post": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "创建知识源",
         "description": "创建新的知识源记录，并立即返回规范化响应结构。",
         "operationId": "create_knowledge_source_api_v1_admin_sources_post",
@@ -1470,7 +1617,9 @@
         }
       },
       "get": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "分页获取知识源列表",
         "description": "支持分页、状态、类型与关键字搜索的知识源管理列表。",
         "operationId": "list_knowledge_sources_api_v1_admin_sources_get",
@@ -1613,7 +1762,9 @@
     },
     "/api/v1/admin/sources/{source_id}": {
       "get": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "获取单个知识源详情",
         "description": "根据知识源ID返回完整信息，包含最近一次同步信息。",
         "operationId": "get_knowledge_source_api_v1_admin_sources__source_id__get",
@@ -1667,7 +1818,9 @@
         }
       },
       "patch": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "更新知识源",
         "description": "支持更新名称、描述、配置、状态等字段，返回最新信息。",
         "operationId": "update_knowledge_source_api_v1_admin_sources__source_id__patch",
@@ -1734,7 +1887,9 @@
         }
       },
       "delete": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "软删除知识源",
         "description": "将知识源标记为非活跃状态，并记录审计日志。",
         "operationId": "delete_knowledge_source_api_v1_admin_sources__source_id__delete",
@@ -1783,7 +1938,9 @@
     },
     "/api/v1/admin/sources/{source_id}/stats": {
       "get": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "获取知识源统计信息",
         "description": "返回指定知识源的同步情况、任务统计等信息。",
         "operationId": "get_source_statistics_api_v1_admin_sources__source_id__stats_get",
@@ -1837,7 +1994,9 @@
     },
     "/api/v1/admin/sources/{source_id}/jobs": {
       "post": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "为知识源创建解析任务",
         "description": "创建解析任务并提交同步队列，返回任务详情。",
         "operationId": "create_parse_job_api_v1_admin_sources__source_id__jobs_post",
@@ -1904,7 +2063,9 @@
         }
       },
       "get": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "列出知识源解析任务",
         "description": "分页返回指定知识源的解析任务列表，支持状态与创建者过滤。",
         "operationId": "list_parse_jobs_api_v1_admin_sources__source_id__jobs_get",
@@ -2024,7 +2185,9 @@
     },
     "/api/v1/admin/sources/jobs/{job_id}": {
       "get": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "获取解析任务详情",
         "description": "根据任务ID返回解析任务的完整状态、进度与结果信息。",
         "operationId": "get_parse_job_api_v1_admin_sources_jobs__job_id__get",
@@ -2080,7 +2243,9 @@
     },
     "/api/v1/admin/sources/{source_id}/sync": {
       "post": {
-        "tags": ["knowledge-sources"],
+        "tags": [
+          "knowledge-sources"
+        ],
         "summary": "手动触发知识源同步",
         "description": "创建新的解析任务并提交到后台同步队列。",
         "operationId": "sync_knowledge_source_api_v1_admin_sources__source_id__sync_post",
@@ -2155,7 +2320,9 @@
     },
     "/api/v1/knowledge/sources": {
       "get": {
-        "tags": ["knowledge-query"],
+        "tags": [
+          "knowledge-query"
+        ],
         "summary": "列出可供查询的知识源",
         "description": "返回激活状态的知识源元数据，供前端在 GraphRAG 查询时选择。",
         "operationId": "list_available_sources_api_v1_knowledge_sources_get",
@@ -2231,9 +2398,36 @@
         }
       }
     },
+    "/api/v1/knowledge/sessions": {
+      "get": {
+        "tags": [
+          "knowledge-query"
+        ],
+        "summary": "最近提问记录",
+        "description": "返回最近提问摘要列表。",
+        "operationId": "recent_sessions_api_v1_knowledge_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/knowledge/query/{query_id}": {
       "get": {
-        "tags": ["knowledge-query"],
+        "tags": [
+          "knowledge-query"
+        ],
         "summary": "查询历史记录详情",
         "description": "根据查询 ID 返回缓存的查询结果，当前版本为占位实现。",
         "operationId": "get_query_result_api_v1_knowledge_query__query_id__get",
@@ -2282,9 +2476,58 @@
         }
       }
     },
+    "/api/v1/knowledge/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "knowledge-query"
+        ],
+        "summary": "知识源详情",
+        "description": "返回更详细的知识源信息。",
+        "operationId": "get_source_detail_api_v1_knowledge_sources__source_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/knowledge/stats": {
       "get": {
-        "tags": ["knowledge-query"],
+        "tags": [
+          "knowledge-query"
+        ],
         "summary": "获取知识图谱运行统计",
         "description": "汇总 Neo4j 统计、知识源数量以及 GraphRAG 服务能力。",
         "operationId": "get_knowledge_stats_api_v1_knowledge_stats_get",
@@ -2311,9 +2554,219 @@
         ]
       }
     },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard Summary",
+        "operationId": "dashboard_summary_api_v1_dashboard_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dashboard/query-trend": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard Query Trend",
+        "operationId": "dashboard_query_trend_api_v1_dashboard_query_trend_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 7,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/source-status": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard Source Status",
+        "description": "获取知识源状态列表用于仪表盘展示。",
+        "operationId": "dashboard_source_status_api_v1_dashboard_source_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge/notes": {
+      "get": {
+        "tags": [
+          "knowledge-notes"
+        ],
+        "summary": "List Notes",
+        "operationId": "list_notes_api_v1_knowledge_notes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "knowledge-notes"
+        ],
+        "summary": "Upsert Note",
+        "operationId": "upsert_note_api_v1_knowledge_notes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeNotePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge/notes/{note_id}": {
+      "delete": {
+        "tags": [
+          "knowledge-notes"
+        ],
+        "summary": "Delete Note",
+        "operationId": "delete_note_api_v1_knowledge_notes__note_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/neo4j-knowledge/initialize": {
       "post": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Initialize Service",
         "description": "initialize Neo4j knowledge graph service",
         "operationId": "initialize_service_api_v1_neo4j_knowledge_initialize_post",
@@ -2331,7 +2784,10 @@
     },
     "/api/v1/neo4j-knowledge/documents": {
       "post": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Add Document",
         "description": "add document to knowledge graph",
         "operationId": "add_document_api_v1_neo4j_knowledge_documents_post",
@@ -2369,7 +2825,10 @@
     },
     "/api/v1/neo4j-knowledge/files": {
       "post": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Add File",
         "description": "upload and add file to knowledge graph",
         "operationId": "add_file_api_v1_neo4j_knowledge_files_post",
@@ -2407,7 +2866,10 @@
     },
     "/api/v1/neo4j-knowledge/directories": {
       "post": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Add Directory",
         "description": "add files in directory to knowledge graph",
         "operationId": "add_directory_api_v1_neo4j_knowledge_directories_post",
@@ -2445,7 +2907,10 @@
     },
     "/api/v1/neo4j-knowledge/query": {
       "post": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Query Knowledge Graph",
         "description": "query knowledge graph",
         "operationId": "query_knowledge_graph_api_v1_neo4j_knowledge_query_post",
@@ -2483,7 +2948,10 @@
     },
     "/api/v1/neo4j-knowledge/search": {
       "post": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Search Similar Nodes",
         "description": "search similar nodes based on vector similarity",
         "operationId": "search_similar_nodes_api_v1_neo4j_knowledge_search_post",
@@ -2521,7 +2989,10 @@
     },
     "/api/v1/neo4j-knowledge/schema": {
       "get": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Get Graph Schema",
         "description": "get graph schema information",
         "operationId": "get_graph_schema_api_v1_neo4j_knowledge_schema_get",
@@ -2539,7 +3010,10 @@
     },
     "/api/v1/neo4j-knowledge/statistics": {
       "get": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Get Statistics",
         "description": "get knowledge graph statistics",
         "operationId": "get_statistics_api_v1_neo4j_knowledge_statistics_get",
@@ -2557,7 +3031,10 @@
     },
     "/api/v1/neo4j-knowledge/clear": {
       "delete": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Clear Knowledge Base",
         "description": "clear knowledge base",
         "operationId": "clear_knowledge_base_api_v1_neo4j_knowledge_clear_delete",
@@ -2575,7 +3052,10 @@
     },
     "/api/v1/neo4j-knowledge/health": {
       "get": {
-        "tags": ["Neo4j Knowledge", "Neo4j Knowledge Graph"],
+        "tags": [
+          "Neo4j Knowledge",
+          "Neo4j Knowledge Graph"
+        ],
         "summary": "Health Check",
         "description": "health check",
         "operationId": "health_check_api_v1_neo4j_knowledge_health_get",
@@ -2593,7 +3073,10 @@
     },
     "/api/v1/tasks/": {
       "post": {
-        "tags": ["Task Management", "Task Management"],
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
         "summary": "Create Task",
         "description": "create new task",
         "operationId": "create_task_api_v1_tasks__post",
@@ -2635,7 +3118,10 @@
         }
       },
       "get": {
-        "tags": ["Task Management", "Task Management"],
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
         "summary": "List Tasks",
         "description": "get task list",
         "operationId": "list_tasks_api_v1_tasks__get",
@@ -2730,7 +3216,10 @@
     },
     "/api/v1/tasks/{task_id}": {
       "get": {
-        "tags": ["Task Management", "Task Management"],
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
         "summary": "Get Task Status",
         "description": "get task status",
         "operationId": "get_task_status_api_v1_tasks__task_id__get",
@@ -2769,7 +3258,10 @@
         }
       },
       "delete": {
-        "tags": ["Task Management", "Task Management"],
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
         "summary": "Cancel Task",
         "description": "cancel task",
         "operationId": "cancel_task_api_v1_tasks__task_id__delete",
@@ -2808,7 +3300,10 @@
     },
     "/api/v1/tasks/stats/overview": {
       "get": {
-        "tags": ["Task Management", "Task Management"],
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
         "summary": "Get Task Stats",
         "description": "get task statistics",
         "operationId": "get_task_stats_api_v1_tasks_stats_overview_get",
@@ -2828,7 +3323,10 @@
     },
     "/api/v1/tasks/{task_id}/retry": {
       "post": {
-        "tags": ["Task Management", "Task Management"],
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
         "summary": "Retry Task",
         "description": "retry failed task",
         "operationId": "retry_task_api_v1_tasks__task_id__retry_post",
@@ -2867,7 +3365,10 @@
     },
     "/api/v1/tasks/queue/status": {
       "get": {
-        "tags": ["Task Management", "Task Management"],
+        "tags": [
+          "Task Management",
+          "Task Management"
+        ],
         "summary": "Get Queue Status",
         "description": "get queue status",
         "operationId": "get_queue_status_api_v1_tasks_queue_status_get",
@@ -2885,7 +3386,10 @@
     },
     "/api/v1/sse/task/{task_id}": {
       "get": {
-        "tags": ["Real-time Updates", "SSE"],
+        "tags": [
+          "Real-time Updates",
+          "SSE"
+        ],
         "summary": "Stream Task Progress",
         "description": "Stream task progress via Server-Sent Events\n\nArgs:\n    task_id: Task ID to monitor",
         "operationId": "stream_task_progress_api_v1_sse_task__task_id__get",
@@ -2924,7 +3428,10 @@
     },
     "/api/v1/sse/tasks": {
       "get": {
-        "tags": ["Real-time Updates", "SSE"],
+        "tags": [
+          "Real-time Updates",
+          "SSE"
+        ],
         "summary": "Stream All Tasks",
         "description": "Stream all tasks progress via Server-Sent Events\n\nArgs:\n    status_filter: Optional status filter (pending, processing, success, failed, cancelled)",
         "operationId": "stream_all_tasks_api_v1_sse_tasks_get",
@@ -2970,7 +3477,10 @@
     },
     "/api/v1/sse/stats": {
       "get": {
-        "tags": ["Real-time Updates", "SSE"],
+        "tags": [
+          "Real-time Updates",
+          "SSE"
+        ],
         "summary": "Get Sse Stats",
         "description": "Get SSE connection statistics",
         "operationId": "get_sse_stats_api_v1_sse_stats_get",
@@ -3035,7 +3545,10 @@
           }
         },
         "type": "object",
-        "required": ["access_token", "token_type"],
+        "required": [
+          "access_token",
+          "token_type"
+        ],
         "title": "BearerResponse"
       },
       "Body_add_file_api_v1_neo4j_knowledge_files_post": {
@@ -3047,7 +3560,9 @@
           }
         },
         "type": "object",
-        "required": ["file"],
+        "required": [
+          "file"
+        ],
         "title": "Body_add_file_api_v1_neo4j_knowledge_files_post"
       },
       "Body_auth_jwt_login_api_v1_auth_login_post": {
@@ -3103,7 +3618,10 @@
           }
         },
         "type": "object",
-        "required": ["username", "password"],
+        "required": [
+          "username",
+          "password"
+        ],
         "title": "Body_auth_jwt_login_api_v1_auth_login_post"
       },
       "Body_reset_forgot_password_api_v1_auth_forgot_password_post": {
@@ -3115,7 +3633,9 @@
           }
         },
         "type": "object",
-        "required": ["email"],
+        "required": [
+          "email"
+        ],
         "title": "Body_reset_forgot_password_api_v1_auth_forgot_password_post"
       },
       "Body_reset_reset_password_api_v1_auth_reset_password_post": {
@@ -3130,7 +3650,10 @@
           }
         },
         "type": "object",
-        "required": ["token", "password"],
+        "required": [
+          "token",
+          "password"
+        ],
         "title": "Body_reset_reset_password_api_v1_auth_reset_password_post"
       },
       "CreateTaskRequest": {
@@ -3167,7 +3690,11 @@
           }
         },
         "type": "object",
-        "required": ["task_type", "task_name", "payload"],
+        "required": [
+          "task_type",
+          "task_name",
+          "payload"
+        ],
         "title": "CreateTaskRequest"
       },
       "DirectoryProcessRequest": {
@@ -3197,7 +3724,9 @@
           }
         },
         "type": "object",
-        "required": ["directory_path"],
+        "required": [
+          "directory_path"
+        ],
         "title": "DirectoryProcessRequest"
       },
       "DirectoryRequest": {
@@ -3227,7 +3756,9 @@
           }
         },
         "type": "object",
-        "required": ["directory_path"],
+        "required": [
+          "directory_path"
+        ],
         "title": "DirectoryRequest"
       },
       "DocumentAddRequest": {
@@ -3255,7 +3786,9 @@
           }
         },
         "type": "object",
-        "required": ["content"],
+        "required": [
+          "content"
+        ],
         "title": "DocumentAddRequest"
       },
       "DocumentRequest": {
@@ -3289,7 +3822,9 @@
           }
         },
         "type": "object",
-        "required": ["content"],
+        "required": [
+          "content"
+        ],
         "title": "DocumentRequest"
       },
       "ErrorModel": {
@@ -3310,7 +3845,9 @@
           }
         },
         "type": "object",
-        "required": ["detail"],
+        "required": [
+          "detail"
+        ],
         "title": "ErrorModel"
       },
       "EvidenceAnchor": {
@@ -3434,7 +3971,9 @@
           }
         },
         "type": "object",
-        "required": ["snippet"],
+        "required": [
+          "snippet"
+        ],
         "title": "GraphEvidenceItem",
         "description": "证据片段。",
         "example": {
@@ -3478,7 +4017,9 @@
           }
         },
         "type": "object",
-        "required": ["summary"],
+        "required": [
+          "summary"
+        ],
         "title": "GraphRAGAnswerPayload",
         "description": "GraphRAG 查询回答主体。",
         "example": {
@@ -3536,7 +4077,11 @@
           }
         },
         "type": "object",
-        "required": ["error_code", "error_message", "processing_time_ms"],
+        "required": [
+          "error_code",
+          "error_message",
+          "processing_time_ms"
+        ],
         "title": "GraphRAGErrorResponse",
         "description": "GraphRAG 错误响应模式。",
         "example": {
@@ -3608,7 +4153,9 @@
           }
         },
         "type": "object",
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "title": "GraphRAGQueryRequest",
         "description": "GraphRAG 查询请求模式。",
         "example": {
@@ -3696,7 +4243,11 @@
           }
         },
         "type": "object",
-        "required": ["answer", "confidence_score", "processing_time_ms"],
+        "required": [
+          "answer",
+          "confidence_score",
+          "processing_time_ms"
+        ],
         "title": "GraphRAGQueryResponse",
         "description": "GraphRAG 查询响应模式。",
         "example": {
@@ -3733,7 +4284,9 @@
           "issues": [],
           "processing_time_ms": 1432,
           "query_id": "f19bb9b1-30fe-4c3f-ae2e-25a6ca28f0e3",
-          "sources_queried": ["550e8400-e29b-41d4-a716-446655440000"]
+          "sources_queried": [
+            "550e8400-e29b-41d4-a716-446655440000"
+          ]
         }
       },
       "GraphRelatedEntity": {
@@ -3750,7 +4303,11 @@
           },
           "importance": {
             "type": "string",
-            "enum": ["high", "medium", "low"],
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
             "title": "Importance",
             "description": "重要程度",
             "default": "medium"
@@ -3794,7 +4351,10 @@
           }
         },
         "type": "object",
-        "required": ["type", "name"],
+        "required": [
+          "type",
+          "name"
+        ],
         "title": "GraphRelatedEntity",
         "description": "关联实体信息。",
         "example": {
@@ -3837,8 +4397,77 @@
           }
         },
         "type": "object",
-        "required": ["status", "services", "version"],
+        "required": [
+          "status",
+          "services",
+          "version"
+        ],
         "title": "HealthResponse"
+      },
+      "KnowledgeNotePayload": {
+        "properties": {
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "answer_summary": {
+            "type": "string",
+            "title": "Answer Summary"
+          },
+          "code_snippets": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Snippets"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answer_summary"
+        ],
+        "title": "KnowledgeNotePayload"
       },
       "KnowledgeSourceCreate": {
         "properties": {
@@ -3913,7 +4542,9 @@
           }
         },
         "type": "object",
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "title": "KnowledgeSourceCreate",
         "description": "创建知识源请求模式。"
       },
@@ -3944,7 +4575,13 @@
           }
         },
         "type": "object",
-        "required": ["items", "total", "page", "size", "pages"],
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages"
+        ],
         "title": "KnowledgeSourceListResponse",
         "description": "知识源列表响应模式。",
         "example": {
@@ -4080,7 +4717,12 @@
           }
         },
         "type": "object",
-        "required": ["name", "id", "created_at", "updated_at"],
+        "required": [
+          "name",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
         "title": "KnowledgeSourceResponse",
         "description": "知识源响应模式。",
         "example": {
@@ -4193,6 +4835,128 @@
         "title": "KnowledgeSourceUpdate",
         "description": "更新知识源请求模式。"
       },
+      "KnowledgeSourceValidationRequest": {
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "title": "Repo Url",
+            "description": "Git 仓库地址"
+          },
+          "auth_type": {
+            "type": "string",
+            "enum": [
+              "token",
+              "none"
+            ],
+            "title": "Auth Type",
+            "description": "认证方式",
+            "default": "none"
+          },
+          "access_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Token",
+            "description": "访问令牌（按需提供）"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch",
+            "description": "待验证的分支名称"
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo_url"
+        ],
+        "title": "KnowledgeSourceValidationRequest",
+        "description": "知识源连接验证请求。"
+      },
+      "KnowledgeSourceValidationResponse": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid",
+            "description": "是否验证成功"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "验证结果说明"
+          },
+          "accessible_branches": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accessible Branches",
+            "description": "可访问的分支列表"
+          },
+          "default_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Branch",
+            "description": "推断的默认分支名称"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid"
+        ],
+        "title": "KnowledgeSourceValidationResponse",
+        "description": "知识源连接验证响应。",
+        "example": {
+          "items": [
+            {
+              "created_at": "2025-10-20T08:30:59Z",
+              "created_by": "42f687f6-bc62-4e17-b284-1d3d5a2c9d3c",
+              "id": "e1b4c136-b7ca-4f78-8ed3-927076e0af5d",
+              "items_processed": 1200,
+              "knowledge_source_id": "550e8400-e29b-41d4-a716-446655440000",
+              "progress_percentage": 45,
+              "status": "running",
+              "total_items": 2500,
+              "updated_at": "2025-10-20T08:31:45Z"
+            }
+          ],
+          "page": 1,
+          "pages": 1,
+          "size": 20,
+          "total": 1
+        }
+      },
       "ParseJobCreate": {
         "properties": {
           "job_config": {
@@ -4216,7 +4980,9 @@
           }
         },
         "type": "object",
-        "required": ["knowledge_source_id"],
+        "required": [
+          "knowledge_source_id"
+        ],
         "title": "ParseJobCreate",
         "description": "创建解析任务请求模式。"
       },
@@ -4247,28 +5013,15 @@
           }
         },
         "type": "object",
-        "required": ["items", "total", "page", "size", "pages"],
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages"
+        ],
         "title": "ParseJobListResponse",
-        "description": "解析任务列表响应模式。",
-        "example": {
-          "items": [
-            {
-              "created_at": "2025-10-20T08:30:59Z",
-              "created_by": "42f687f6-bc62-4e17-b284-1d3d5a2c9d3c",
-              "id": "e1b4c136-b7ca-4f78-8ed3-927076e0af5d",
-              "items_processed": 1200,
-              "knowledge_source_id": "550e8400-e29b-41d4-a716-446655440000",
-              "progress_percentage": 45,
-              "status": "running",
-              "total_items": 2500,
-              "updated_at": "2025-10-20T08:31:45Z"
-            }
-          ],
-          "page": 1,
-          "pages": 1,
-          "size": 20,
-          "total": 1
-        }
+        "description": "解析任务列表响应模式。"
       },
       "ParseJobResponse": {
         "properties": {
@@ -4439,7 +5192,12 @@
           }
         },
         "type": "object",
-        "required": ["subject", "domain", "resource", "action"],
+        "required": [
+          "subject",
+          "domain",
+          "resource",
+          "action"
+        ],
         "title": "PolicyCreateRequest"
       },
       "PolicySchema": {
@@ -4466,7 +5224,13 @@
           }
         },
         "type": "object",
-        "required": ["id", "subject", "domain", "resource", "action"],
+        "required": [
+          "id",
+          "subject",
+          "domain",
+          "resource",
+          "action"
+        ],
         "title": "PolicySchema"
       },
       "PolicyUpdateRequest": {
@@ -4538,7 +5302,11 @@
           }
         },
         "type": "object",
-        "required": ["name", "description", "permissions"],
+        "required": [
+          "name",
+          "description",
+          "permissions"
+        ],
         "title": "RoleSchema"
       },
       "SQLParseRequest": {
@@ -4554,7 +5322,9 @@
           }
         },
         "type": "object",
-        "required": ["sql"],
+        "required": [
+          "sql"
+        ],
         "title": "SQLParseRequest"
       },
       "SQLSchemaParseRequest": {
@@ -4587,7 +5357,14 @@
       },
       "SourceType": {
         "type": "string",
-        "enum": ["document", "database", "api", "website", "code", "other"],
+        "enum": [
+          "document",
+          "database",
+          "api",
+          "website",
+          "code",
+          "other"
+        ],
         "title": "SourceType",
         "description": "知识源类型枚举。"
       },
@@ -4614,7 +5391,12 @@
           }
         },
         "type": "object",
-        "required": ["tasks", "total", "page", "page_size"],
+        "required": [
+          "tasks",
+          "total",
+          "page",
+          "page_size"
+        ],
         "title": "TaskListResponse"
       },
       "TaskResponse": {
@@ -4829,7 +5611,10 @@
           }
         },
         "type": "object",
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "title": "UserCreate"
       },
       "UserRead": {
@@ -4898,7 +5683,11 @@
           }
         },
         "type": "object",
-        "required": ["id", "email", "role"],
+        "required": [
+          "id",
+          "email",
+          "role"
+        ],
         "title": "UserRead"
       },
       "UserUpdate": {
@@ -5033,7 +5822,11 @@
           }
         },
         "type": "object",
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError"
       },
       "api__neo4j_routes__QueryRequest": {
@@ -5049,7 +5842,9 @@
           }
         },
         "type": "object",
-        "required": ["question"],
+        "required": [
+          "question"
+        ],
         "title": "QueryRequest"
       },
       "api__neo4j_routes__SearchRequest": {
@@ -5065,12 +5860,20 @@
           }
         },
         "type": "object",
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "title": "SearchRequest"
       },
       "database__models__knowledge__ParseStatus": {
         "type": "string",
-        "enum": ["pending", "running", "completed", "failed", "cancelled"],
+        "enum": [
+          "pending",
+          "running",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
         "title": "ParseStatus",
         "description": "解析任务状态枚举。"
       }

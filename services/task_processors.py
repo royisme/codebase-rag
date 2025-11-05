@@ -15,6 +15,7 @@ from loguru import logger
 
 from .task_storage import TaskType, Task
 from services.code_indexing import CodeIndexingPipeline
+from schemas import ParseJobUpdate
 
 class TaskProcessor(ABC):
     """task processor base class"""

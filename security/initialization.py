@@ -49,6 +49,15 @@ async def ensure_default_policies(superuser_id: uuid.UUID | None = None) -> None
     changed = False
 
     for policy in DEFAULT_POLICIES:
+        subject, domain, resource, action = policy
+
+        # 如果存在旧的策略但动作不匹配（如历史版本使用read/write等），则移除后写入最新规则
+        existing = enforcer.get_filtered_policy(0, subject, domain, resource)
+        if existing and not any(p[3] == action for p in existing if len(p) > 3):
+            for old_policy in existing:
+                enforcer.remove_policy(*old_policy)
+            changed = True
+
         if not enforcer.has_policy(*policy):
             enforcer.add_policy(*policy)
             changed = True

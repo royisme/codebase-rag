@@ -71,7 +71,7 @@ class FileScanner:
             try:
                 size_bytes = path.stat().st_size
             except OSError as exc:  # pragma: no cover - filesystem edge case
-                logger.warning("Failed to stat %s: %s", path, exc)
+                logger.warning("Failed to stat {}: {}", path, exc)
                 result.errors.append({"file": str(relative_path), "error": str(exc)})
                 continue
 
@@ -94,7 +94,7 @@ class FileScanner:
             result.language_breakdown[language] = result.language_breakdown.get(language, 0) + 1
 
         logger.info(
-            "Scanned repository at %s: %s files included, %s skipped",
+            "Scanned repository at {}: {} files included, {} skipped",
             root,
             len(result.files),
             result.skipped,

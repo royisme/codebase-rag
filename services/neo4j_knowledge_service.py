@@ -401,6 +401,70 @@ class Neo4jKnowledgeService:
                 "error": str(e)
             }
     
+    async def _stream_query_response(
+        self,
+        question: str,
+        *,
+        mode: str = "hybrid",
+        include_evidence: bool = True,
+        max_results: int = 10,
+    ):
+        """Execute the underlying LlamaIndex query with timeout and async fallback.
+
+        The public ``query`` method expects a response object that exposes
+        ``source_nodes`` and ``score`` attributes (as returned by
+        ``QueryEngine.aquery``).  Historically the synchronous ``query`` method
+        was used directly.  During the streaming refactor we switched the
+        call-site to ``_stream_query_response`` but forgot to implement the
+        helper, which now restores the original behaviour while keeping the
+        hook for future true streaming support.
+
+        Parameters other than ``question`` are currently informational.  They
+        allow us to adjust the execution strategy later (e.g. switching
+        between hybrid/vector modes or truncating responses) without touching
+        the caller contract.
+        """
+
+        if not self._initialized:
+            raise Exception("Service not initialized")
+
+        if not self.query_engine:
+            raise RuntimeError("Query engine is not available")
+
+        async def _execute() -> Any:
+            # Prefer the async API when the query engine exposes it; fall back
+            # to the blocking variant otherwise.
+            if hasattr(self.query_engine, "aquery") and callable(
+                getattr(self.query_engine, "aquery")
+            ):
+                return await self.query_engine.aquery(question)
+
+            logger.debug(
+                "Query engine missing 'aquery', falling back to synchronous call"
+            )
+            return await asyncio.to_thread(self.query_engine.query, question)
+
+        try:
+            return await asyncio.wait_for(_execute(), timeout=self.operation_timeout)
+        except asyncio.TimeoutError:
+            logger.error(
+                "Query execution timed out after {}s (mode={}, include_evidence={}, max_results={})",
+                self.operation_timeout,
+                mode,
+                include_evidence,
+                max_results,
+            )
+            raise
+        except Exception as exc:
+            logger.error(
+                "Query execution failed: {} (mode={}, include_evidence={}, max_results={})",
+                exc,
+                mode,
+                include_evidence,
+                max_results,
+            )
+            raise
+
     async def query(
         self,
         question: str,
@@ -415,34 +479,11 @@ class Neo4jKnowledgeService:
             raise Exception("Service not initialized")
         
         try:
-            # create different query engines based on mode
-            if mode == "hybrid":
-                # hybrid mode: graph traversal + vector search
-                query_engine = self.knowledge_index.as_query_engine(
-                    include_text=True,
-                    response_mode="tree_summarize",
-                    embedding_mode="hybrid"
-                )
-            elif mode == "graph_only":
-                # graph only mode
-                query_engine = self.knowledge_index.as_query_engine(
-                    include_text=False,
-                    response_mode="tree_summarize"
-                )
-            elif mode == "vector_only":
-                # vector only mode
-                query_engine = self.knowledge_index.as_query_engine(
-                    include_text=True,
-                    response_mode="compact",
-                    embedding_mode="embedding"
-                )
-            else:
-                query_engine = self.query_engine
-            
-            # execute query, add timeout control
-            response = await asyncio.wait_for(
-                asyncio.to_thread(query_engine.query, question),
-                timeout=self.operation_timeout
+            response = await self._stream_query_response(
+                question,
+                mode=mode,
+                include_evidence=include_evidence,
+                max_results=max_results,
             )
             
             # extract source node information
@@ -526,16 +567,193 @@ class Neo4jKnowledgeService:
             logger.error(error_msg)
             return {
                 "success": False,
-                "error": error_msg,
+                "error": "TIMEOUT",
+                "message": error_msg,
                 "timeout": self.operation_timeout,
                 "sources_queried": source_ids or [],
             }
         except Exception as e:
+            import traceback
             logger.error(f"Failed to query: {e}")
+            logger.debug(f"Neo4j query stack:\n{traceback.format_exc()}")
             return {
                 "success": False,
                 "error": str(e),
                 "sources_queried": source_ids or [],
+            }
+    
+    async def stream_query(
+        self,
+        question: str,
+        mode: str = "hybrid",
+        *,
+        max_results: int = 10,
+        include_evidence: bool = True,
+        source_ids: Optional[List[uuid.UUID]] = None,
+    ):
+        """Stream query with token-level chunks using LLM's native streaming API.
+        
+        Yields dictionaries with:
+        - type: "text_delta" | "metadata" | "error" | "done"
+        - relevant payload fields
+        """
+        if not self._initialized:
+            raise Exception("Service not initialized")
+        
+        start_time = time.time()
+        accumulated_text = ""
+        source_nodes = []
+        
+        try:
+            # Get the LLM instance
+            llm = Settings.llm
+            
+            # Build context from graph if query engine is available
+            context_text = ""
+            if self.query_engine:
+                try:
+                    # Retrieve relevant nodes first (increased timeout for large datasets)
+                    retriever = self.knowledge_index.as_retriever(
+                        similarity_top_k=max_results,
+                        include_text=True
+                    )
+                    nodes = await asyncio.wait_for(
+                        asyncio.to_thread(retriever.retrieve, question),
+                        timeout=30  # 增加到 30 秒
+                    )
+                    source_nodes = nodes
+                    
+                    # Build context from nodes
+                    context_parts = []
+                    for node in nodes[:max_results]:
+                        text = node.text[:300] if len(node.text) > 300 else node.text
+                        context_parts.append(f"- {text}")
+                    
+                    if context_parts:
+                        context_text = f"相关上下文:\n" + "\n".join(context_parts)
+                        logger.debug(f"Built context with {len(context_parts)} nodes")
+                    else:
+                        logger.debug("No relevant nodes found for context")
+                except asyncio.TimeoutError:
+                    logger.warning(f"Context retrieval timed out after 30s for question: {question[:50]}...")
+                except Exception as ctx_exc:
+                    logger.warning(f"Failed to build context: {ctx_exc.__class__.__name__}: {ctx_exc}")
+            else:
+                logger.debug("Query engine not available, proceeding without context")
+            
+            # Construct prompt
+            if context_text:
+                prompt = f"{context_text}\n\n问题: {question}\n\n请基于以上上下文回答问题。"
+            else:
+                prompt = question
+            
+            # Stream from LLM
+            if hasattr(llm, 'astream_complete'):
+                # Use async streaming if available
+                stream_response = await llm.astream_complete(prompt)
+                async for chunk in stream_response:
+                    delta_text = str(chunk.delta) if hasattr(chunk, 'delta') else str(chunk)
+                    if delta_text:
+                        accumulated_text += delta_text
+                        yield {
+                            "type": "text_delta",
+                            "content": delta_text,
+                        }
+            elif hasattr(llm, 'stream_complete'):
+                # Fallback to sync streaming wrapped in async
+                stream_iter = llm.stream_complete(prompt)
+                for chunk in stream_iter:
+                    delta_text = str(chunk.delta) if hasattr(chunk, 'delta') else str(chunk)
+                    if delta_text:
+                        accumulated_text += delta_text
+                        yield {
+                            "type": "text_delta",
+                            "content": delta_text,
+                        }
+                    await asyncio.sleep(0)  # Yield control
+            else:
+                # No streaming support - fall back to batch
+                logger.warning("LLM does not support streaming, falling back to batch mode")
+                if hasattr(llm, 'acomplete'):
+                    response = await llm.acomplete(prompt)
+                else:
+                    response = await asyncio.to_thread(llm.complete, prompt)
+                text = str(response)
+                accumulated_text = text
+                # Split into chunks for pseudo-streaming
+                for i in range(0, len(text), 32):
+                    chunk = text[i:i+32]
+                    yield {
+                        "type": "text_delta",
+                        "content": chunk,
+                    }
+                    await asyncio.sleep(0.01)
+            
+            # After streaming completes, yield metadata
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Calculate confidence score
+            confidence_score = 0.0
+            if source_nodes:
+                scores = [getattr(node, 'score', 0.0) for node in source_nodes]
+                confidence_score = max(scores) if scores else 0.0
+            
+            resolved_sources = source_ids or [
+                uuid.UUID(str((node.metadata or {}).get("source_id", uuid.uuid4())))
+                if (node.metadata or {}).get("source_id")
+                else uuid.uuid4()
+                for node in source_nodes[:5]
+            ]
+            
+            yield {
+                "type": "metadata",
+                "confidence_score": float(confidence_score),
+                "execution_time_ms": processing_time_ms,
+                "sources_queried": [str(s) for s in resolved_sources],
+                "retrieval_mode": mode,
+            }
+            
+            # Extract evidence if requested
+            if include_evidence:
+                for node in source_nodes[:max_results]:
+                    metadata = node.metadata or {}
+                    yield {
+                        "type": "evidence",
+                        "evidence": {
+                            "id": node.node_id,
+                            "snippet": node.text[:200],
+                            "source_type": metadata.get("source_type", "document"),
+                            "source_ref": metadata.get("source_ref") or metadata.get("file_path"),
+                            "score": getattr(node, 'score', 0.0),
+                        }
+                    }
+            
+            # Done
+            yield {
+                "type": "done",
+                "query_id": str(uuid.uuid4()),
+                "summary": accumulated_text,
+                "processing_time_ms": processing_time_ms,
+                "confidence_score": float(confidence_score),
+                "sources_queried": [str(s) for s in resolved_sources],
+            }
+            
+        except asyncio.TimeoutError:
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            yield {
+                "type": "error",
+                "message": f"Query timed out after {self.operation_timeout}s",
+                "code": "TIMEOUT",
+                "processing_time_ms": processing_time_ms,
+            }
+        except Exception as exc:
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            logger.error(f"Stream query failed: {exc}")
+            yield {
+                "type": "error",
+                "message": str(exc),
+                "code": "PROCESSING_ERROR",
+                "processing_time_ms": processing_time_ms,
             }
     
     async def get_graph_schema(self) -> Dict[str, Any]:

@@ -4,7 +4,6 @@ from .knowledge import (
     # SourceType and ParseStatus
     SourceType,
     ParseStatus,
-
     # KnowledgeSource schemas
     KnowledgeSourceBase,
     KnowledgeSourceCreate,
@@ -13,19 +12,18 @@ from .knowledge import (
     KnowledgeSourceListResponse,
     KnowledgeSourceValidationRequest,
     KnowledgeSourceValidationResponse,
-
     # ParseJob schemas
     ParseJobBase,
     ParseJobCreate,
     ParseJobUpdate,
     ParseJobResponse,
     ParseJobListResponse,
-
     # GraphRAG schemas
     GraphRelatedEntity,
     GraphEvidenceItem,
     GraphRAGAnswerPayload,
     GraphRAGQueryRequest,
+    StreamQueryRequest,
     GraphRAGQueryResponse,
     GraphRAGErrorResponse,
     EvidenceAnchor,
@@ -35,7 +33,6 @@ __all__ = [
     # SourceType and ParseStatus
     "SourceType",
     "ParseStatus",
-
     # KnowledgeSource schemas
     "KnowledgeSourceBase",
     "KnowledgeSourceCreate",
@@ -44,19 +41,18 @@ __all__ = [
     "KnowledgeSourceListResponse",
     "KnowledgeSourceValidationRequest",
     "KnowledgeSourceValidationResponse",
-
     # ParseJob schemas
     "ParseJobBase",
     "ParseJobCreate",
     "ParseJobUpdate",
     "ParseJobResponse",
     "ParseJobListResponse",
-
     # GraphRAG schemas
     "GraphRelatedEntity",
     "GraphEvidenceItem",
     "GraphRAGAnswerPayload",
     "GraphRAGQueryRequest",
+    "StreamQueryRequest",
     "GraphRAGQueryResponse",
     "GraphRAGErrorResponse",
     "EvidenceAnchor",

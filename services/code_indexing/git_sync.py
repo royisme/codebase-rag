@@ -102,6 +102,7 @@ class GithubRepositoryClient(RepositoryClient):
         self._api = GhApi(token=token)
         self._owner = owner
         self._repo = repo
+        self._token = token
 
     def download_branch(
         self,
@@ -121,18 +122,47 @@ class GithubRepositoryClient(RepositoryClient):
 
         commit_sha = _extract_commit_sha(branch_info, self.sanitized_url)
 
+        download_tarball = getattr(self._api.repos, "download_tarball", None)
+        if not callable(download_tarball):
+            logger.warning(
+                "GhApi download_tarball unavailable for {}, falling back to git CLI",
+                self.sanitized_url,
+            )
+            return self._clone_with_git(branch, target_folder, depth)
+
         try:
-            archive_response = self._api.repos.download_tarball(
+            archive_response = download_tarball(
                 owner=self._owner, repo=self._repo, ref=branch
             )
+            archive_bytes = _coerce_archive_bytes(archive_response, self.sanitized_url)
+            _extract_archive_bytes(archive_bytes, target_folder, self.sanitized_url)
+            return commit_sha
         except Exception as exc:
-            raise RepositoryClientError(
-                _sanitize_message(str(exc), self.sanitized_url), self.sanitized_url
-            ) from exc
+            logger.warning(
+                "GhApi download failed for {} (fallback to git): {}",
+                self.sanitized_url,
+                exc,
+            )
+            return self._clone_with_git(branch, target_folder, depth)
 
-        archive_bytes = _coerce_archive_bytes(archive_response, self.sanitized_url)
-        _extract_archive_bytes(archive_bytes, target_folder, self.sanitized_url)
-        return commit_sha
+    def _clone_with_git(
+        self,
+        branch: str,
+        target_folder: Path,
+        depth: Optional[int],
+    ) -> str:
+        repo_url = f"https://github.com/{self._owner}/{self._repo}.git"
+        auth_type = "token" if self._token else "none"
+        cli_client = GitCliRepositoryClient(
+            repo_url,
+            auth_type=auth_type,
+            access_token=self._token,
+        )
+        return cli_client.download_branch(
+            branch,
+            target_folder,
+            depth=depth,
+        )
 
     def list_branches(self) -> List[str]:
         try:
@@ -279,7 +309,7 @@ class GitCliRepositoryClient(RepositoryClient):
 
         if not target_folder.exists():
             logger.info(
-                "Cloning repository %s into %s (branch=%s, depth=%s)",
+                "Cloning repository {} into {} (branch={}, depth={})",
                 self.sanitized_url,
                 target_folder,
                 branch,
@@ -292,7 +322,7 @@ class GitCliRepositoryClient(RepositoryClient):
             _run_git_command(cmd, env=env)
         else:
             logger.info(
-                "Updating repository %s in %s (branch=%s)",
+                "Updating repository {} in {} (branch={})",
                 self.sanitized_url,
                 target_folder,
                 branch,
@@ -342,8 +372,9 @@ class GitSyncService:
     """Service responsible for cloning and updating repositories."""
 
     def __init__(self, repo_root: Optional[Path] = None, depth: Optional[int] = None):
-        self.repo_root = Path(repo_root or settings.code_repo_root)
-        self.repo_root.mkdir(parents=True, exist_ok=True)
+        base_root = Path(repo_root) if repo_root is not None else settings.code_repo_root_path
+        base_root.mkdir(parents=True, exist_ok=True)
+        self.repo_root = base_root
         self.depth = depth if depth is not None else settings.code_git_depth
 
     async def clone_or_pull(
@@ -367,7 +398,7 @@ class GitSyncService:
 
         previous_sha = _read_commit_marker(target_folder)
         logger.info(
-            "Syncing repository %s into %s (branch=%s)",
+            "Syncing repository {} into {} (branch={})",
             client.sanitized_url,
             target_folder,
             branch,
@@ -460,7 +491,7 @@ def _write_commit_marker(target_folder: Path, commit_sha: str) -> None:
     try:
         marker.write_text(commit_sha)
     except OSError:
-        logger.debug("Failed to write commit marker for %s", target_folder)
+        logger.debug("Failed to write commit marker for {}", target_folder)
 
 
 def _extract_commit_sha(branch_info, sanitized_url: str) -> str:
@@ -613,7 +644,7 @@ def _run_git_command(
         sanitized_parts = sanitize_command_parts(command)
         debug_command = " ".join(sanitized_parts)
 
-    logger.debug("Executing command: %s", debug_command)
+    logger.debug("Executing command: {}", debug_command)
 
     try:
         result = subprocess.run(

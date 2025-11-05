@@ -185,6 +185,11 @@ class SourceService:
 
         # 更新字段
         update_dict = update_data.model_dump(exclude_unset=True)
+        updated_fields = list(update_dict.keys())
+
+        if "metadata" in update_dict:
+            source.source_metadata = update_dict.pop("metadata")
+
         for field, value in update_dict.items():
             setattr(source, field, value)
 
@@ -199,7 +204,7 @@ class SourceService:
             status="success",
             target=str(source.id),
             details=f"更新知识源: {source.name}",
-            metadata={"updated_fields": list(update_dict.keys())},
+            metadata={"updated_fields": updated_fields},
             ip_address=actor_info.get("ip_address") if actor_info else None,
             session=self.session,
         )
@@ -407,7 +412,7 @@ class SourceService:
     ) -> None:
         """验证任务状态转换是否合法。"""
         valid_transitions = {
-            ParseStatus.PENDING: [ParseStatus.RUNNING, ParseStatus.CANCELLED],
+            ParseStatus.PENDING: [ParseStatus.RUNNING, ParseStatus.CANCELLED, ParseStatus.FAILED],
             ParseStatus.RUNNING: [ParseStatus.COMPLETED, ParseStatus.FAILED, ParseStatus.CANCELLED],
             ParseStatus.COMPLETED: [],  # 终态
             ParseStatus.FAILED: [ParseStatus.PENDING],  # 可以重试

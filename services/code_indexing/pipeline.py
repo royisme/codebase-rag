@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from loguru import logger
+
 from config import settings
 from database.models import ParseStatus
 from schemas import ParseJobUpdate
@@ -52,6 +54,7 @@ class CodeIndexingPipeline:
         "code_parse": 60,
         "embedding": 80,
         "graph_build": 95,
+        "completed": 100,
     }
 
     def __init__(
@@ -149,7 +152,8 @@ class CodeIndexingPipeline:
         job_uuid = None
         if job_id:
             job_uuid = job_id if isinstance(job_id, uuid.UUID) else uuid.UUID(str(job_id))
-        repo_path = Path(settings.code_repo_root) / str(source.id)
+        repo_root = settings.code_repo_root_path
+        repo_path = repo_root / str(source.id)
 
         git_result = await self._sync_repository(
             repo_url,
@@ -205,6 +209,27 @@ class CodeIndexingPipeline:
         }
 
         self.summary["duration_seconds"] = duration
+        await self._update_stage(
+            "completed",
+            progress=self.STAGE_PROGRESS["completed"],
+            job_uuid=job_uuid,
+            status=ParseStatus.COMPLETED,
+            payload={
+                "duration_seconds": duration,
+                "nodes_created": graph_result.nodes_created,
+                "edges_created": graph_result.edges_created,
+                "languages": graph_result.languages,
+                "files_parsed": parse_summary.files_parsed,
+                "functions_embedded": embedding_summary.functions_embedded,
+                "errors": self.summary.get("errors", []),
+            },
+            message="Indexing completed",
+            progress_callback=progress_callback,
+            task_progress_callback=task_progress_callback,
+        )
+
+        source.last_synced_at = dt.datetime.now(dt.timezone.utc)
+
         result = CodeIndexingResult(
             repository_path=str(repo_path),
             branch=branch,
@@ -372,6 +397,12 @@ class CodeIndexingPipeline:
         progress_callback: Optional[Callable[[float, str], None]],
         task_progress_callback: Optional[Callable[[float, str], None]],
     ) -> GraphBuildResult:
+        job_label = str(job_uuid) if job_uuid else "in-memory job"
+        logger.info(
+            "Job {} entering graph_build stage with {} parsed files.",
+            job_label,
+            len(parsed_files),
+        )
         start = time.perf_counter()
         result = await self.graph_builder.build(parsed_files)
         duration = time.perf_counter() - start
@@ -395,6 +426,13 @@ class CodeIndexingPipeline:
             message="Graph metadata updated",
             progress_callback=progress_callback,
             task_progress_callback=task_progress_callback,
+        )
+        logger.info(
+            "Job {} graph_build stage completed in {:.2f} seconds (nodes={}, edges={}).",
+            job_label,
+            duration,
+            result.nodes_created,
+            result.edges_created,
         )
         return result
 

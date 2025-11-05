@@ -4,6 +4,7 @@ from .user import PasswordResetToken, User, UserOAuthAccount
 from .casbin import CasbinRule
 from .audit import AuditEvent
 from .knowledge import KnowledgeSource, ParseJob, SourceType, ParseStatus
+from .knowledge_user import KnowledgeQuery, KnowledgeNote
 
 __all__ = [
     "User",
@@ -15,4 +16,6 @@ __all__ = [
     "ParseJob",
     "SourceType",
     "ParseStatus",
+    "KnowledgeQuery",
+    "KnowledgeNote",
 ]

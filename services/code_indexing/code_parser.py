@@ -65,7 +65,7 @@ class CodeParser:
             try:
                 content = scanned.absolute_path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
-                logger.warning("Failed to decode file as UTF-8: %s", scanned.relative_path)
+                logger.warning("Failed to decode file as UTF-8: {}", scanned.relative_path)
                 errors.append(
                     {
                         "file": scanned.relative_path.as_posix(),
@@ -74,7 +74,7 @@ class CodeParser:
                 )
                 continue
             except OSError as exc:  # pragma: no cover - filesystem issues
-                logger.warning("Failed to read file %s: %s", scanned.relative_path, exc)
+                logger.warning("Failed to read file {}: {}", scanned.relative_path, exc)
                 errors.append(
                     {
                         "file": scanned.relative_path.as_posix(),
@@ -90,7 +90,7 @@ class CodeParser:
             elif scanned.language == "go":
                 parsed = self._parse_go(scanned, content)
             else:
-                logger.debug("Skipping unsupported language for parsing: %s", scanned.language)
+                logger.debug("Skipping unsupported language for parsing: {}", scanned.language)
                 continue
 
             parsed_files.append(parsed)
@@ -112,7 +112,7 @@ class CodeParser:
         try:
             tree = ast.parse(content)
         except SyntaxError as exc:
-            logger.warning("Python syntax error in %s: %s", scanned.relative_path, exc)
+            logger.info("Skipping file with Python syntax error: {} ({})", scanned.relative_path, exc)
             errors.append(
                 {
                     "file": scanned.relative_path.as_posix(),
