@@ -926,12 +926,23 @@ async def code_graph_ingest_repo(
             if ctx:
                 await ctx.info("Using incremental mode - detecting changed files")
 
-            changed_files = git_utils.get_changed_files(
+            changed_files_result = git_utils.get_changed_files(
                 repo_path,
                 since_commit=since_commit,
                 include_untracked=True
             )
-            changed_files_count = len(changed_files)
+            
+            if not changed_files_result.get("success"):
+                return {
+                    "success": False,
+                    "task_id": task_id,
+                    "status": "failed",
+                    "error": changed_files_result.get("error", "Failed to get changed files"),
+                    "mode": "incremental"
+                }
+            
+            changed_files = changed_files_result.get("changed_files", [])
+            changed_files_count = changed_files_result.get("count", 0)
 
             if changed_files_count == 0:
                 return {
