@@ -11,13 +11,14 @@ from mcp.types import Tool
 
 def get_tool_definitions() -> List[Tool]:
     """
-    Get all 25 tool definitions for MCP server.
+    Get all 30 tool definitions for MCP server.
 
     Returns:
         List of Tool objects organized by category:
         - Knowledge Base (5 tools)
         - Code Graph (4 tools)
         - Memory Store (7 tools)
+        - Memory Extraction v0.7 (5 tools)
         - Task Management (6 tools)
         - System (3 tools)
     """
@@ -389,6 +390,149 @@ Memory Types:
                 "type": "object",
                 "properties": {"project_id": {"type": "string"}},
                 "required": ["project_id"]
+            }
+        ),
+
+        # ===== Memory Extraction Tools (v0.7) - 5 tools =====
+        Tool(
+            name="extract_from_conversation",
+            description="""Extract memories from conversation using LLM analysis (v0.7).
+
+Analyzes conversation messages to identify:
+- Design decisions and rationale
+- Problems encountered and solutions
+- Preferences and conventions
+- Important architectural choices
+
+Can auto-save high-confidence memories or return suggestions for manual review.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "conversation": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "role": {"type": "string"},
+                                "content": {"type": "string"}
+                            }
+                        },
+                        "description": "List of conversation messages"
+                    },
+                    "auto_save": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Auto-save high-confidence memories (>= 0.7)"
+                    }
+                },
+                "required": ["project_id", "conversation"]
+            }
+        ),
+
+        Tool(
+            name="extract_from_git_commit",
+            description="""Extract memories from git commit using LLM analysis (v0.7).
+
+Analyzes commit message and changed files to identify:
+- Feature additions (decisions)
+- Bug fixes (experiences)
+- Refactoring (experiences/conventions)
+- Breaking changes (high importance decisions)""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "commit_sha": {"type": "string", "description": "Git commit SHA"},
+                    "commit_message": {"type": "string", "description": "Full commit message"},
+                    "changed_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of changed file paths"
+                    },
+                    "auto_save": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Auto-save high-confidence memories"
+                    }
+                },
+                "required": ["project_id", "commit_sha", "commit_message", "changed_files"]
+            }
+        ),
+
+        Tool(
+            name="extract_from_code_comments",
+            description="""Extract memories from code comments in source file (v0.7).
+
+Identifies special markers:
+- TODO: → plan
+- FIXME: / BUG: → experience
+- NOTE: / IMPORTANT: → convention
+- DECISION: → decision
+
+Extracts and saves as structured memories with file references.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "file_path": {"type": "string", "description": "Path to source file"}
+                },
+                "required": ["project_id", "file_path"]
+            }
+        ),
+
+        Tool(
+            name="suggest_memory_from_query",
+            description="""Suggest creating memory from knowledge base query (v0.7).
+
+Uses LLM to determine if Q&A represents important knowledge worth saving.
+Returns suggestion with confidence score (not auto-saved).
+
+Useful for:
+- Frequently asked questions
+- Important architectural information
+- Non-obvious solutions or workarounds""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "query": {"type": "string", "description": "User query"},
+                    "answer": {"type": "string", "description": "LLM answer"}
+                },
+                "required": ["project_id", "query", "answer"]
+            }
+        ),
+
+        Tool(
+            name="batch_extract_from_repository",
+            description="""Batch extract memories from entire repository (v0.7).
+
+Comprehensive analysis of:
+- Recent git commits (configurable count)
+- Code comments in source files
+- Documentation files (README, CHANGELOG, etc.)
+
+This is a long-running operation that may take several minutes.
+Returns summary of extracted memories by source type.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "repo_path": {"type": "string", "description": "Path to git repository"},
+                    "max_commits": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200,
+                        "default": 50,
+                        "description": "Maximum commits to analyze"
+                    },
+                    "file_patterns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "File patterns to scan (e.g., ['*.py', '*.js'])"
+                    }
+                },
+                "required": ["project_id", "repo_path"]
             }
         ),
 

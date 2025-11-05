@@ -31,6 +31,12 @@ from .memory_handlers import (
     handle_delete_memory,
     handle_supersede_memory,
     handle_get_project_summary,
+    # v0.7 Automatic extraction
+    handle_extract_from_conversation,
+    handle_extract_from_git_commit,
+    handle_extract_from_code_comments,
+    handle_suggest_memory_from_query,
+    handle_batch_extract_from_repository,
 )
 
 # Task management handlers
@@ -83,6 +89,12 @@ __all__ = [
     "handle_delete_memory",
     "handle_supersede_memory",
     "handle_get_project_summary",
+    # v0.7 Extraction handlers
+    "handle_extract_from_conversation",
+    "handle_extract_from_git_commit",
+    "handle_extract_from_code_comments",
+    "handle_suggest_memory_from_query",
+    "handle_batch_extract_from_repository",
     # Task handlers
     "handle_get_task_status",
     "handle_watch_task",

@@ -41,6 +41,7 @@ from loguru import logger
 # Import services
 from services.neo4j_knowledge_service import Neo4jKnowledgeService
 from services.memory_store import memory_store
+from services.memory_extractor import memory_extractor
 from services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
 from services.task_processors import processor_registry
 from services.graph_service import graph_service
@@ -69,6 +70,13 @@ from mcp_tools import (
     handle_delete_memory,
     handle_supersede_memory,
     handle_get_project_summary,
+    # v0.7 Extraction handlers
+    handle_extract_from_conversation,
+    handle_extract_from_git_commit,
+    handle_extract_from_code_comments,
+    handle_suggest_memory_from_query,
+    handle_batch_extract_from_repository,
+    # Task handlers
     handle_get_task_status,
     handle_watch_task,
     handle_watch_tasks,

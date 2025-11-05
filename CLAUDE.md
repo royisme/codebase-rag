@@ -16,7 +16,7 @@ Code Graph Knowledge System is a Neo4j-based intelligent knowledge management sy
 - **Task Queue System** (`services/task_queue.py`, `monitoring/task_monitor.py`): Async background processing with web monitoring
 - **MCP Server** (`mcp_server.py`, `start_mcp.py`): Model Context Protocol integration for AI assistants using official MCP SDK
   - Modular architecture with handlers in `mcp_tools/` package
-  - 25 tools across 5 categories (Knowledge, Code Graph, Memory, Tasks, System)
+  - 30 tools across 6 categories (Knowledge, Code Graph, Memory, Memory Extraction v0.7, Tasks, System)
   - Official SDK features: session management, streaming support, multi-transport
 
 ### Multi-Provider LLM Support
@@ -36,7 +36,7 @@ Configuration is handled via environment variables in `.env` file (see `env.exam
 # Start main application
 python start.py
 
-# Start MCP server (Official MCP SDK - All 25 tools)
+# Start MCP server (Official MCP SDK - All 30 tools)
 python start_mcp.py
 
 # Using script entry points (after uv sync)
@@ -261,8 +261,9 @@ When AI agents work on a project over time, they need to remember:
 
 ### MCP Tools for AI Agents
 
-The Memory Store provides 7 MCP tools (available in Claude Desktop, VSCode with MCP, etc.):
+The Memory Store provides 12 MCP tools (available in Claude Desktop, VSCode with MCP, etc.):
 
+**Manual Memory Management (v0.6):**
 1. **add_memory**: Save new project knowledge
 2. **search_memories**: Find relevant memories when starting tasks
 3. **get_memory**: Retrieve specific memory by ID
@@ -270,6 +271,13 @@ The Memory Store provides 7 MCP tools (available in Claude Desktop, VSCode with 
 5. **delete_memory**: Remove memory (soft delete)
 6. **supersede_memory**: Create new memory that replaces old one
 7. **get_project_summary**: Get overview of all project memories
+
+**Automatic Extraction (v0.7):**
+8. **extract_from_conversation**: Extract memories from AI conversations
+9. **extract_from_git_commit**: Analyze git commits for decisions and experiences
+10. **extract_from_code_comments**: Mine TODO, FIXME, NOTE markers from code
+11. **suggest_memory_from_query**: Suggest memories from knowledge base Q&A
+12. **batch_extract_from_repository**: Comprehensive repository analysis
 
 ### Typical AI Agent Workflow
 
@@ -370,11 +378,89 @@ supersede_memory(
 - User can manually add memories via API
 - Full control over what gets saved
 
-**Future (v0.7+)**: Automatic extraction
-- Extract from git commits
-- Mine from code comments
-- Analyze conversations
-- Auto-suggest important memories
+**v0.7 (Current)**: Automatic extraction (IMPLEMENTED ✅)
+- ✅ Extract from git commits - LLM-powered analysis of commit messages and changes
+- ✅ Mine from code comments - Automatic extraction of TODO, FIXME, NOTE, DECISION markers
+- ✅ Analyze conversations - Extract decisions and learnings from AI conversations
+- ✅ Auto-suggest important memories - Intelligent Q&A analysis for knowledge worth saving
+- ✅ Batch repository extraction - Comprehensive analysis of entire codebase
+
+#### v0.7 Automatic Extraction Features
+
+**1. Conversation Analysis**
+```python
+# HTTP API
+POST /api/v1/memory/extract/conversation
+{
+  "project_id": "myapp",
+  "conversation": [
+    {"role": "user", "content": "Should we use Redis?"},
+    {"role": "assistant", "content": "Yes, Redis is best for caching..."}
+  ],
+  "auto_save": false  # Set true to auto-save high-confidence (>0.7) memories
+}
+
+# MCP Tool
+extract_from_conversation(project_id, conversation, auto_save)
+```
+
+**2. Git Commit Analysis**
+```python
+# HTTP API
+POST /api/v1/memory/extract/commit
+{
+  "project_id": "myapp",
+  "commit_sha": "abc123...",
+  "commit_message": "feat: add JWT authentication\n\nImplemented JWT for stateless auth",
+  "changed_files": ["src/auth/jwt.py", "src/middleware/auth.py"],
+  "auto_save": true
+}
+
+# MCP Tool
+extract_from_git_commit(project_id, commit_sha, commit_message, changed_files, auto_save)
+```
+
+**3. Code Comment Mining**
+```python
+# HTTP API
+POST /api/v1/memory/extract/comments
+{
+  "project_id": "myapp",
+  "file_path": "/path/to/file.py"
+}
+
+# MCP Tool
+extract_from_code_comments(project_id, file_path)
+```
+
+**4. Query-based Memory Suggestions**
+```python
+# HTTP API
+POST /api/v1/memory/suggest
+{
+  "project_id": "myapp",
+  "query": "How does authentication work?",
+  "answer": "The system uses JWT tokens..."
+}
+
+# MCP Tool
+suggest_memory_from_query(project_id, query, answer)
+```
+
+**5. Batch Repository Extraction**
+```python
+# HTTP API
+POST /api/v1/memory/extract/batch
+{
+  "project_id": "myapp",
+  "repo_path": "/path/to/repo",
+  "max_commits": 50,
+  "file_patterns": ["*.py", "*.js"]
+}
+
+# MCP Tool
+batch_extract_from_repository(project_id, repo_path, max_commits, file_patterns)
+```
 
 ### Best Practices
 
