@@ -177,7 +177,7 @@ def extract_file_metadata(file_path: str) -> Dict[str, Any]:
     }
     
     # code file specific metadata
-    if path.suffix in ['.py', '.js', '.ts', '.java', '.cpp', '.c', '.h', '.cs', '.go', '.rs']:
+    if path.suffix in ['.py', '.js', '.ts', '.java', '.cpp', '.c', '.h', '.cs', '.go', '.rs', '.php']:
         metadata["language"] = get_language_from_extension(path.suffix)
     
     return metadata
