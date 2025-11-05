@@ -402,14 +402,14 @@ async def test_multiple_projects(memory_store):
 
 
 # ============================================================================
-# Soft Delete Filter Tests (Bug Fixes)
+# Hard Delete Tests
 # ============================================================================
 
 @pytest.mark.asyncio
-async def test_search_excludes_deleted_memories(memory_store, test_project_id):
+async def test_hard_delete_removes_from_search(memory_store, test_project_id):
     """
-    Test that search_memories excludes soft-deleted memories
-    Bug fix: P1 - soft-deleted memories were appearing in search results
+    Test that hard delete permanently removes memory from search results
+    Fixed: Changed from soft-delete to hard-delete to save resources
     """
     # Add a memory
     add_result = await memory_store.add_memory(
@@ -427,22 +427,22 @@ async def test_search_excludes_deleted_memories(memory_store, test_project_id):
     ids_before = [m["id"] for m in search_before["memories"]]
     assert memory_id in ids_before, "Memory should appear before deletion"
 
-    # Soft delete the memory
+    # Hard delete the memory
     delete_result = await memory_store.delete_memory(memory_id=memory_id)
     assert delete_result["success"] is True
 
-    # Search again - deleted memory should NOT appear
+    # Search again - deleted memory should NOT appear (permanently removed)
     search_after = await memory_store.search_memories(project_id=test_project_id)
     assert search_after["success"] is True
     ids_after = [m["id"] for m in search_after["memories"]]
-    assert memory_id not in ids_after, "Deleted memory should NOT appear in search"
+    assert memory_id not in ids_after, "Hard deleted memory should NOT appear in search"
 
 
 @pytest.mark.asyncio
-async def test_get_memory_excludes_deleted(memory_store, test_project_id):
+async def test_hard_delete_memory_not_found(memory_store, test_project_id):
     """
-    Test that get_memory returns not found for soft-deleted memories
-    Bug fix: P1 - get_memory should not return deleted memories
+    Test that get_memory returns not found for hard-deleted memories
+    Fixed: Hard delete permanently removes the node
     """
     # Add a memory
     add_result = await memory_store.add_memory(
@@ -459,21 +459,21 @@ async def test_get_memory_excludes_deleted(memory_store, test_project_id):
     assert get_before["success"] is True
     assert get_before["memory"]["id"] == memory_id
 
-    # Soft delete the memory
+    # Hard delete the memory
     delete_result = await memory_store.delete_memory(memory_id=memory_id)
     assert delete_result["success"] is True
 
-    # Get memory after deletion - should fail
+    # Get memory after deletion - should fail (node doesn't exist)
     get_after = await memory_store.get_memory(memory_id=memory_id)
     assert get_after["success"] is False
     assert "not found" in get_after["error"].lower()
 
 
 @pytest.mark.asyncio
-async def test_search_with_query_excludes_deleted(memory_store, test_project_id):
+async def test_hard_delete_with_fulltext_search(memory_store, test_project_id):
     """
-    Test that fulltext search also excludes soft-deleted memories
-    Bug fix: P1 - fulltext search path was also missing deleted filter
+    Test that fulltext search also excludes hard-deleted memories
+    Fixed: Hard delete removes node completely, so it won't appear in any search
     """
     # Add two memories with similar content
     add1 = await memory_store.add_memory(
@@ -503,7 +503,7 @@ async def test_search_with_query_excludes_deleted(memory_store, test_project_id)
     assert memory_id1 in ids_before
     assert memory_id2 in ids_before
 
-    # Delete one memory
+    # Hard delete one memory
     await memory_store.delete_memory(memory_id=memory_id1)
 
     # Search again - only non-deleted should appear
@@ -513,15 +513,15 @@ async def test_search_with_query_excludes_deleted(memory_store, test_project_id)
     )
     assert search_after["success"] is True
     ids_after = [m["id"] for m in search_after["memories"]]
-    assert memory_id1 not in ids_after, "Deleted memory should not appear"
+    assert memory_id1 not in ids_after, "Hard deleted memory should not appear"
     assert memory_id2 in ids_after, "Non-deleted memory should still appear"
 
 
 @pytest.mark.asyncio
-async def test_project_summary_excludes_deleted(memory_store, test_project_id):
+async def test_hard_delete_reduces_project_summary(memory_store, test_project_id):
     """
-    Test that get_project_summary excludes soft-deleted memories
-    This was already implemented correctly but adding test for completeness
+    Test that get_project_summary reflects hard-deleted memories
+    Fixed: Hard delete removes node, so it won't be counted
     """
     # Add memories
     add1 = await memory_store.add_memory(
@@ -543,14 +543,40 @@ async def test_project_summary_excludes_deleted(memory_store, test_project_id):
     assert summary_before["success"] is True
     count_before = summary_before["total_memories"]
 
-    # Delete one memory
+    # Hard delete one memory
     await memory_store.delete_memory(memory_id=memory_id1)
 
-    # Get summary after deletion - count should decrease
+    # Get summary after deletion - count should decrease (node removed)
     summary_after = await memory_store.get_project_summary(project_id=test_project_id)
     assert summary_after["success"] is True
     count_after = summary_after["total_memories"]
-    assert count_after == count_before - 1, "Deleted memory should not count in summary"
+    assert count_after == count_before - 1, "Hard deleted memory should not count in summary"
+
+
+@pytest.mark.asyncio
+async def test_hard_delete_removes_relationships(memory_store, test_project_id):
+    """
+    Test that hard delete also removes all relationships (DETACH DELETE)
+    Fixed: Using DETACH DELETE to clean up relationships too
+    """
+    # Add a memory
+    add_result = await memory_store.add_memory(
+        project_id=test_project_id,
+        memory_type="decision",
+        title="Memory with relationships",
+        content="Test content",
+        related_refs=["ref://file/test.py"]
+    )
+    assert add_result["success"] is True
+    memory_id = add_result["memory_id"]
+
+    # Hard delete should succeed even with relationships
+    delete_result = await memory_store.delete_memory(memory_id=memory_id)
+    assert delete_result["success"] is True
+
+    # Memory should not be found anymore
+    get_result = await memory_store.get_memory(memory_id=memory_id)
+    assert get_result["success"] is False
 
 
 if __name__ == "__main__":

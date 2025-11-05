@@ -262,10 +262,7 @@ class MemoryStore:
         try:
             async with self.driver.session(database=settings.neo4j_database) as session:
                 # Build query dynamically based on filters
-                where_clauses = [
-                    "(m)-[:BELONGS_TO]->(:Project {id: $project_id})",
-                    "(m.deleted IS NULL OR m.deleted = false)"  # Exclude soft-deleted memories
-                ]
+                where_clauses = ["(m)-[:BELONGS_TO]->(:Project {id: $project_id})"]
                 params = {
                     "project_id": project_id,
                     "min_importance": min_importance,
@@ -346,7 +343,6 @@ class MemoryStore:
                 result = await session.run(
                     """
                     MATCH (m:Memory {id: $memory_id})
-                    WHERE (m.deleted IS NULL OR m.deleted = false)
                     OPTIONAL MATCH (m)-[:RELATES_TO]->(related)
                     RETURN m,
                            collect(DISTINCT {type: labels(related)[0],
@@ -454,31 +450,30 @@ class MemoryStore:
             }
 
     async def delete_memory(self, memory_id: str) -> Dict[str, Any]:
-        """Delete a memory (soft delete by marking as deleted)"""
+        """Delete a memory (hard delete - permanently removes from database)"""
         if not self._initialized:
             raise Exception("Memory Store not initialized")
 
         try:
             async with self.driver.session(database=settings.neo4j_database) as session:
-                # Soft delete: mark as deleted rather than removing
+                # Hard delete: permanently remove the node and all its relationships
                 result = await session.run(
                     """
                     MATCH (m:Memory {id: $memory_id})
-                    SET m.deleted = true, m.deleted_at = $deleted_at
-                    RETURN m.id as id
+                    DETACH DELETE m
+                    RETURN count(m) as deleted_count
                     """,
-                    memory_id=memory_id,
-                    deleted_at=datetime.utcnow().isoformat()
+                    memory_id=memory_id
                 )
 
                 record = await result.single()
-                if not record:
+                if not record or record["deleted_count"] == 0:
                     return {
                         "success": False,
                         "error": "Memory not found"
                     }
 
-                logger.info(f"Deleted memory {memory_id}")
+                logger.info(f"Hard deleted memory {memory_id}")
 
                 return {
                     "success": True,
@@ -573,7 +568,6 @@ class MemoryStore:
                 result = await session.run(
                     """
                     MATCH (m:Memory)-[:BELONGS_TO]->(p:Project {id: $project_id})
-                    WHERE m.deleted IS NULL OR m.deleted = false
                     RETURN m.type as type, count(*) as count,
                            collect({id: m.id, title: m.title, importance: m.importance}) as memories
                     ORDER BY type

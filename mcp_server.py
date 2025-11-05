@@ -101,8 +101,9 @@ server = Server("codebase-rag-complete-v2")
 knowledge_service = Neo4jKnowledgeService()
 _service_initialized = False
 
-# Session tracking
+# Session tracking with thread-safe access
 active_sessions: Dict[str, Dict[str, Any]] = {}
+_sessions_lock = asyncio.Lock()  # Protects active_sessions from race conditions
 
 
 async def ensure_service_initialized():
@@ -129,20 +130,21 @@ async def ensure_service_initialized():
         logger.info("All services initialized successfully")
 
 
-def track_session_activity(session_id: str, tool: str, details: Dict[str, Any]):
-    """Track tool usage in session"""
-    if session_id not in active_sessions:
-        active_sessions[session_id] = {
-            "created_at": datetime.utcnow().isoformat(),
-            "tools_used": [],
-            "memories_accessed": set(),
-        }
+async def track_session_activity(session_id: str, tool: str, details: Dict[str, Any]):
+    """Track tool usage in session (thread-safe with lock)"""
+    async with _sessions_lock:
+        if session_id not in active_sessions:
+            active_sessions[session_id] = {
+                "created_at": datetime.utcnow().isoformat(),
+                "tools_used": [],
+                "memories_accessed": set(),
+            }
 
-    active_sessions[session_id]["tools_used"].append({
-        "tool": tool,
-        "timestamp": datetime.utcnow().isoformat(),
-        **details
-    })
+        active_sessions[session_id]["tools_used"].append({
+            "tool": tool,
+            "timestamp": datetime.utcnow().isoformat(),
+            **details
+        })
 
 
 # ============================================================================
