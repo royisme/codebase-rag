@@ -147,7 +147,7 @@ class TestResourceHandling:
         resources = get_resource_list()
 
         assert len(resources) == 2
-        resource_uris = [r.uri for r in resources]
+        resource_uris = [str(r.uri) for r in resources]
         assert "knowledge://config" in resource_uris
         assert "knowledge://status" in resource_uris
 
@@ -253,7 +253,7 @@ class TestPromptHandling:
         message = messages[0]
         assert message.role == "user"
 
-        content_text = message.content["text"]
+        content_text = message.content.text
         assert "general" in content_text
         assert "main components" in content_text
         assert "hybrid" in content_text
@@ -265,7 +265,7 @@ class TestPromptHandling:
         assert len(messages) == 1
         message = messages[0]
 
-        content_text = message.content["text"]
+        content_text = message.content.text
         assert "code" in content_text
         assert "Python functions" in content_text
 
@@ -276,7 +276,7 @@ class TestPromptHandling:
         assert len(messages) == 1
         message = messages[0]
 
-        content_text = message.content["text"]
+        content_text = message.content.text
         assert "memory" in content_text
         assert "decisions" in content_text
 
@@ -287,7 +287,7 @@ class TestPromptHandling:
         assert len(messages) == 1
         message = messages[0]
 
-        content_text = message.content["text"]
+        content_text = message.content.text
         assert "general" in content_text
 
     def test_get_prompt_content_unknown_prompt(self):

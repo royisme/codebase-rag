@@ -27,9 +27,10 @@ def format_result(result: Dict[str, Any]) -> str:
     if "answer" in result:
         # Query result
         output = [f"Answer: {result['answer']}\n"]
-        if result.get("source_nodes"):
-            output.append(f"\nSources ({len(result['source_nodes'])} nodes):")
-            for i, node in enumerate(result['source_nodes'][:5], 1):
+        if "source_nodes" in result:
+            source_nodes = result["source_nodes"]
+            output.append(f"\nSources ({len(source_nodes)} nodes):")
+            for i, node in enumerate(source_nodes[:5], 1):
                 output.append(f"{i}. {node.get('text', '')[:100]}...")
         return "\n".join(output)
 
