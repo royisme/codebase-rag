@@ -881,9 +881,9 @@ async def code_graph_ingest_repo(
 
         # Set defaults
         if include_globs is None:
-            include_globs = ["**/*.py", "**/*.ts", "**/*.tsx"]
+            include_globs = ["**/*.py", "**/*.ts", "**/*.tsx", "**/*.java", "**/*.php", "**/*.go"]
         if exclude_globs is None:
-            exclude_globs = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**"]
+            exclude_globs = ["**/node_modules/**", "**/.git/**", "**/__pycache__/**", "**/.venv/**", "**/vendor/**", "**/target/**"]
 
         # Generate task ID
         task_id = f"ing-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
