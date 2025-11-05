@@ -844,7 +844,7 @@ Respond with a single JSON object."""
             # Extract first few paragraphs as project overview
             lines = content.split('\n')
             description = []
-            for line in lines[1:self.MAX_README_LINES]:  # Skip first line (usually title)
+            for line in lines[1:self.MAX_README_LINES + 1]:  # Skip first line (usually title)
                 if line.strip() and not line.startswith('#'):
                     description.append(line.strip())
                 if len(description) >= 5:
