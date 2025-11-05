@@ -931,17 +931,6 @@ async def code_graph_ingest_repo(
                 since_commit=since_commit,
                 include_untracked=True
             )
-            
-            if not changed_files_result.get("success"):
-                return {
-                    "success": False,
-                    "task_id": task_id,
-                    "status": "failed",
-                    "error": changed_files_result.get("error", "Failed to get changed files"),
-                    "mode": "incremental"
-                }
-            
-            changed_files = changed_files_result.get("changed_files", [])
             changed_files_count = changed_files_result.get("count", 0)
 
             if changed_files_count == 0:
@@ -956,7 +945,7 @@ async def code_graph_ingest_repo(
                 }
 
             # Filter changed files by globs
-            files_to_process = [f["path"] for f in changed_files if f["action"] != "deleted"]
+            files_to_process = [f["path"] for f in changed_files_result.get("changed_files", []) if f["action"] != "deleted"]
 
             if ctx:
                 await ctx.info(f"Found {changed_files_count} changed files")
@@ -1288,6 +1277,8 @@ async def context_pack(
         context_result = pack_builder.build_context_pack(
             nodes=all_nodes,
             budget=budget,
+            stage=stage,
+            repo_id=repo_id,
             file_limit=8,
             symbol_limit=12,
             enable_deduplication=True
@@ -1297,13 +1288,13 @@ async def context_pack(
         items = []
         for item in context_result.get("items", []):
             items.append({
-                "kind": item.get("type", "file"),
-                "title": item.get("path", "Unknown"),
+                "kind": item.get("kind", "file"),
+                "title": item.get("title", "Unknown"),
                 "summary": item.get("summary", ""),
                 "ref": item.get("ref", ""),
                 "extra": {
-                    "lang": item.get("lang"),
-                    "score": item.get("score", 0.0)
+                    "lang": item.get("extra", {}).get("lang"),
+                    "score": item.get("extra", {}).get("score", 0.0)
                 }
             })
 
