@@ -9,6 +9,13 @@ This module contains handlers for memory management operations:
 - Delete memory
 - Supersede memory
 - Get project summary
+
+v0.7 Automatic Extraction:
+- Extract from conversation
+- Extract from git commit
+- Extract from code comments
+- Suggest memory from query
+- Batch extract from repository
 """
 
 from typing import Dict, Any
@@ -165,4 +172,115 @@ async def handle_get_project_summary(args: Dict, memory_store) -> Dict:
     if result.get("success"):
         summary = result.get("summary", {})
         logger.info(f"Project summary: {summary.get('total_memories', 0)} memories")
+    return result
+
+
+# ============================================================================
+# v0.7 Automatic Extraction Handlers
+# ============================================================================
+
+async def handle_extract_from_conversation(args: Dict, memory_extractor) -> Dict:
+    """
+    Extract memories from conversation using LLM analysis.
+
+    Args:
+        args: Arguments containing project_id, conversation, auto_save
+        memory_extractor: Memory extractor instance
+
+    Returns:
+        Extracted memories with confidence scores
+    """
+    result = await memory_extractor.extract_from_conversation(
+        project_id=args["project_id"],
+        conversation=args["conversation"],
+        auto_save=args.get("auto_save", False)
+    )
+    if result.get("success"):
+        logger.info(f"Extracted {result.get('total_extracted', 0)} memories from conversation")
+    return result
+
+
+async def handle_extract_from_git_commit(args: Dict, memory_extractor) -> Dict:
+    """
+    Extract memories from git commit using LLM analysis.
+
+    Args:
+        args: Arguments containing project_id, commit_sha, commit_message, changed_files, auto_save
+        memory_extractor: Memory extractor instance
+
+    Returns:
+        Extracted memories from commit
+    """
+    result = await memory_extractor.extract_from_git_commit(
+        project_id=args["project_id"],
+        commit_sha=args["commit_sha"],
+        commit_message=args["commit_message"],
+        changed_files=args["changed_files"],
+        auto_save=args.get("auto_save", False)
+    )
+    if result.get("success"):
+        logger.info(f"Extracted {result.get('auto_saved_count', 0)} memories from commit {args['commit_sha'][:8]}")
+    return result
+
+
+async def handle_extract_from_code_comments(args: Dict, memory_extractor) -> Dict:
+    """
+    Extract memories from code comments in source file.
+
+    Args:
+        args: Arguments containing project_id, file_path
+        memory_extractor: Memory extractor instance
+
+    Returns:
+        Extracted memories from code comments
+    """
+    result = await memory_extractor.extract_from_code_comments(
+        project_id=args["project_id"],
+        file_path=args["file_path"]
+    )
+    if result.get("success"):
+        logger.info(f"Extracted {result.get('total_extracted', 0)} memories from {args['file_path']}")
+    return result
+
+
+async def handle_suggest_memory_from_query(args: Dict, memory_extractor) -> Dict:
+    """
+    Suggest creating memory based on knowledge query and answer.
+
+    Args:
+        args: Arguments containing project_id, query, answer
+        memory_extractor: Memory extractor instance
+
+    Returns:
+        Memory suggestion with confidence (not auto-saved)
+    """
+    result = await memory_extractor.suggest_memory_from_query(
+        project_id=args["project_id"],
+        query=args["query"],
+        answer=args["answer"]
+    )
+    if result.get("success") and result.get("should_save"):
+        logger.info(f"Memory suggested from query: {result.get('suggested_memory', {}).get('title', 'N/A')}")
+    return result
+
+
+async def handle_batch_extract_from_repository(args: Dict, memory_extractor) -> Dict:
+    """
+    Batch extract memories from entire repository.
+
+    Args:
+        args: Arguments containing project_id, repo_path, max_commits, file_patterns
+        memory_extractor: Memory extractor instance
+
+    Returns:
+        Summary of extracted memories by source
+    """
+    result = await memory_extractor.batch_extract_from_repository(
+        project_id=args["project_id"],
+        repo_path=args["repo_path"],
+        max_commits=args.get("max_commits", 50),
+        file_patterns=args.get("file_patterns")
+    )
+    if result.get("success"):
+        logger.info(f"Batch extraction: {result.get('total_extracted', 0)} memories from {args['repo_path']}")
     return result

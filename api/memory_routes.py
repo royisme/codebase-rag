@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 
 from services.memory_store import memory_store
+from services.memory_extractor import memory_extractor
 from loguru import logger
 
 
@@ -108,6 +109,97 @@ class SupersedeMemoryRequest(BaseModel):
                 "new_content": "Switched to PostgreSQL for better JSON support",
                 "new_reason": "Need advanced JSON querying capabilities",
                 "new_importance": 0.8
+            }
+        }
+
+
+# ============================================================================
+# v0.7 Extraction Request Models
+# ============================================================================
+
+class ExtractFromConversationRequest(BaseModel):
+    """Request model for extracting memories from conversation"""
+    project_id: str = Field(..., description="Project identifier")
+    conversation: List[Dict[str, str]] = Field(..., description="Conversation messages")
+    auto_save: bool = Field(False, description="Auto-save high-confidence memories")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "project_id": "myapp",
+                "conversation": [
+                    {"role": "user", "content": "Should we use Redis or Memcached?"},
+                    {"role": "assistant", "content": "Let's use Redis because it supports data persistence"}
+                ],
+                "auto_save": False
+            }
+        }
+
+
+class ExtractFromGitCommitRequest(BaseModel):
+    """Request model for extracting memories from git commit"""
+    project_id: str = Field(..., description="Project identifier")
+    commit_sha: str = Field(..., description="Git commit SHA")
+    commit_message: str = Field(..., description="Commit message")
+    changed_files: List[str] = Field(..., description="List of changed files")
+    auto_save: bool = Field(False, description="Auto-save high-confidence memories")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "project_id": "myapp",
+                "commit_sha": "abc123def456",
+                "commit_message": "feat: add JWT authentication\n\nImplemented JWT-based auth for stateless API",
+                "changed_files": ["src/auth/jwt.py", "src/middleware/auth.py"],
+                "auto_save": True
+            }
+        }
+
+
+class ExtractFromCodeCommentsRequest(BaseModel):
+    """Request model for extracting memories from code comments"""
+    project_id: str = Field(..., description="Project identifier")
+    file_path: str = Field(..., description="Path to source file")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "project_id": "myapp",
+                "file_path": "/path/to/project/src/service.py"
+            }
+        }
+
+
+class SuggestMemoryRequest(BaseModel):
+    """Request model for suggesting memory from query"""
+    project_id: str = Field(..., description="Project identifier")
+    query: str = Field(..., description="User query")
+    answer: str = Field(..., description="LLM answer")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "project_id": "myapp",
+                "query": "How does the authentication work?",
+                "answer": "The system uses JWT tokens with refresh token rotation..."
+            }
+        }
+
+
+class BatchExtractRequest(BaseModel):
+    """Request model for batch extraction from repository"""
+    project_id: str = Field(..., description="Project identifier")
+    repo_path: str = Field(..., description="Path to git repository")
+    max_commits: int = Field(50, ge=1, le=200, description="Maximum commits to analyze")
+    file_patterns: Optional[List[str]] = Field(None, description="File patterns to scan")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "project_id": "myapp",
+                "repo_path": "/path/to/repository",
+                "max_commits": 50,
+                "file_patterns": ["*.py", "*.js"]
             }
         }
 
@@ -352,6 +444,166 @@ async def get_project_summary(project_id: str) -> Dict[str, Any]:
 
 
 # ============================================================================
+# v0.7 Automatic Extraction Endpoints
+# ============================================================================
+
+@router.post("/extract/conversation")
+async def extract_from_conversation(request: ExtractFromConversationRequest) -> Dict[str, Any]:
+    """
+    Extract memories from a conversation using LLM analysis.
+
+    Analyzes conversation for important decisions, preferences, and experiences.
+    Can auto-save high-confidence memories or return suggestions for manual review.
+
+    Returns:
+        Extracted memories with confidence scores
+    """
+    try:
+        result = await memory_extractor.extract_from_conversation(
+            project_id=request.project_id,
+            conversation=request.conversation,
+            auto_save=request.auto_save
+        )
+
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Extraction failed"))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in extract_from_conversation endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/extract/commit")
+async def extract_from_git_commit(request: ExtractFromGitCommitRequest) -> Dict[str, Any]:
+    """
+    Extract memories from a git commit using LLM analysis.
+
+    Analyzes commit message and changes to identify important decisions,
+    bug fixes, and architectural changes.
+
+    Returns:
+        Extracted memories from the commit
+    """
+    try:
+        result = await memory_extractor.extract_from_git_commit(
+            project_id=request.project_id,
+            commit_sha=request.commit_sha,
+            commit_message=request.commit_message,
+            changed_files=request.changed_files,
+            auto_save=request.auto_save
+        )
+
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Extraction failed"))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in extract_from_git_commit endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/extract/comments")
+async def extract_from_code_comments(request: ExtractFromCodeCommentsRequest) -> Dict[str, Any]:
+    """
+    Extract memories from code comments in a source file.
+
+    Identifies special markers like TODO, FIXME, NOTE, DECISION and
+    extracts them as structured memories.
+
+    Returns:
+        Extracted memories from code comments
+    """
+    try:
+        result = await memory_extractor.extract_from_code_comments(
+            project_id=request.project_id,
+            file_path=request.file_path
+        )
+
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Extraction failed"))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in extract_from_code_comments endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/suggest")
+async def suggest_memory_from_query(request: SuggestMemoryRequest) -> Dict[str, Any]:
+    """
+    Suggest creating a memory based on a knowledge query and answer.
+
+    Uses LLM to determine if the Q&A represents important knowledge
+    worth saving for future sessions.
+
+    Returns:
+        Memory suggestion with confidence score (not auto-saved)
+    """
+    try:
+        result = await memory_extractor.suggest_memory_from_query(
+            project_id=request.project_id,
+            query=request.query,
+            answer=request.answer
+        )
+
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Suggestion failed"))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in suggest_memory_from_query endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/extract/batch")
+async def batch_extract_from_repository(request: BatchExtractRequest) -> Dict[str, Any]:
+    """
+    Batch extract memories from an entire repository.
+
+    Analyzes:
+    - Recent git commits
+    - Code comments in source files
+    - Documentation files (README, CHANGELOG, etc.)
+
+    This is a comprehensive operation that may take several minutes.
+
+    Returns:
+        Summary of extracted memories by source type
+    """
+    try:
+        result = await memory_extractor.batch_extract_from_repository(
+            project_id=request.project_id,
+            repo_path=request.repo_path,
+            max_commits=request.max_commits,
+            file_patterns=request.file_patterns
+        )
+
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Batch extraction failed"))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in batch_extract_from_repository endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
 # Health Check
 # ============================================================================
 
@@ -366,5 +618,6 @@ async def memory_health() -> Dict[str, Any]:
     return {
         "service": "memory_store",
         "status": "healthy" if memory_store._initialized else "not_initialized",
-        "initialized": memory_store._initialized
+        "initialized": memory_store._initialized,
+        "extraction_enabled": memory_extractor.extraction_enabled
     }
