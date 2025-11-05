@@ -29,7 +29,6 @@ dependencies = [
     "isort",
     "llama-index-vector-stores-neo4jvector>=0.3.0",
     "llama-index-embeddings-ollama>=0.6.0",
-    "fastmcp>=2.7.1",
     "mcp>=1.1.0",
     "llama-index-llms-gemini>=0.5.0",
     "llama-index-embeddings-gemini>=0.3.2",
@@ -43,8 +42,7 @@ dependencies = [
 [project.scripts]
 server = "start:main"
 mcp_client = "start_mcp:main"
-mcp_client_v2 = "start_mcp_v2:main"
 
 [tool.setuptools]
-packages = ["api", "core", "services", "monitoring"]
-py-modules = ["start", "start_mcp", "start_mcp_v2", "mcp_server", "mcp_server_v2", "config", "main"]
+packages = ["api", "core", "services", "monitoring", "mcp_tools"]
+py-modules = ["start", "start_mcp", "mcp_server", "config", "main"]

@@ -14,9 +14,10 @@ Code Graph Knowledge System is a Neo4j-based intelligent knowledge management sy
 - **Memory Store** (`services/memory_store.py`): Project knowledge persistence for AI agents - stores decisions, preferences, experiences, and conventions (v0.6)
 - **SQL Parsers** (`services/sql_parser.py`, `services/universal_sql_schema_parser.py`): Database schema analysis and parsing
 - **Task Queue System** (`services/task_queue.py`, `monitoring/task_monitor.py`): Async background processing with web monitoring
-- **MCP Server** (`mcp_server.py`, `start_mcp.py`): Model Context Protocol integration for AI assistants
-  - **v1 (FastMCP)**: `mcp_server.py` - Full feature set with 25 tools (stable)
-  - **v2 (Official SDK)**: `mcp_server_v2.py` - Official MCP SDK with all 25 tools, feature-complete
+- **MCP Server** (`mcp_server.py`, `start_mcp.py`): Model Context Protocol integration for AI assistants using official MCP SDK
+  - Modular architecture with handlers in `mcp_tools/` package
+  - 25 tools across 5 categories (Knowledge, Code Graph, Memory, Tasks, System)
+  - Official SDK features: session management, streaming support, multi-transport
 
 ### Multi-Provider LLM Support
 The system supports multiple LLM and embedding providers:
@@ -35,26 +36,23 @@ Configuration is handled via environment variables in `.env` file (see `env.exam
 # Start main application
 python start.py
 
-# Start MCP server v1 (FastMCP - all 25 tools)
+# Start MCP server (Official MCP SDK - All 25 tools)
 python start_mcp.py
-
-# Start MCP server v2 (Official SDK - All 25 tools, feature-complete)
-python start_mcp_v2.py
 
 # Using script entry points (after uv sync)
 uv run server
-uv run mcp_client        # MCP v1
-uv run mcp_client_v2     # MCP v2
+uv run mcp_client
 
 # Direct FastAPI startup
 python main.py
 ```
 
-**MCP Server Versions**:
-- **v1** (FastMCP): Stable, 25 tools, all features
-- **v2** (Official SDK): Feature-complete, all 25 tools, advanced features (session management, streaming)
-- See `docs/MCP_MIGRATION_GUIDE.md` for detailed comparison
-- **Recommendation**: New projects should use v2 for better long-term support
+**MCP Server Architecture**:
+- Uses official Model Context Protocol SDK (`mcp>=1.1.0`)
+- Modular design with handlers organized in `mcp_tools/` package
+- 310-line main server file (78% smaller than original monolithic version)
+- Advanced features: session management framework, streaming support, multi-transport capability
+- See `docs/MCP_V2_MODULARIZATION.md` for architecture details
 
 ### Testing
 ```bash
