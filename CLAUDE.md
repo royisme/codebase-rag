@@ -15,6 +15,8 @@ Code Graph Knowledge System is a Neo4j-based intelligent knowledge management sy
 - **SQL Parsers** (`services/sql_parser.py`, `services/universal_sql_schema_parser.py`): Database schema analysis and parsing
 - **Task Queue System** (`services/task_queue.py`, `monitoring/task_monitor.py`): Async background processing with web monitoring
 - **MCP Server** (`mcp_server.py`, `start_mcp.py`): Model Context Protocol integration for AI assistants
+  - **v1 (FastMCP)**: `mcp_server.py` - Full feature set with 25 tools (stable)
+  - **v2 (Official SDK)**: `mcp_server_v2.py` - Official MCP SDK with advanced features (Memory Store, 7 tools)
 
 ### Multi-Provider LLM Support
 The system supports multiple LLM and embedding providers:
@@ -33,16 +35,25 @@ Configuration is handled via environment variables in `.env` file (see `env.exam
 # Start main application
 python start.py
 
-# Start MCP server (for AI assistant integration)
+# Start MCP server v1 (FastMCP - all 25 tools)
 python start_mcp.py
+
+# Start MCP server v2 (Official SDK - Memory Store only, 7 tools)
+python start_mcp_v2.py
 
 # Using script entry points (after uv sync)
 uv run server
-uv run mcp_client
+uv run mcp_client        # MCP v1
+uv run mcp_client_v2     # MCP v2
 
 # Direct FastAPI startup
 python main.py
 ```
+
+**MCP Server Versions**:
+- **v1** (FastMCP): Stable, 25 tools, all features
+- **v2** (Official SDK): New, 7 Memory tools, advanced features (session management, streaming)
+- See `docs/MCP_MIGRATION_GUIDE.md` for detailed comparison
 
 ### Testing
 ```bash
