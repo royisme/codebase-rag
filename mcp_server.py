@@ -11,6 +11,7 @@ from services.code_ingestor import get_code_ingestor
 from services.ranker import ranker
 from services.pack_builder import pack_builder
 from services.git_utils import git_utils
+from services.memory_store import memory_store
 from config import settings, get_current_model_info
 from datetime import datetime
 import uuid
@@ -30,12 +31,17 @@ async def ensure_service_initialized():
     if not _service_initialized:
         success = await knowledge_service.initialize()
         if success:
+            # initialize memory store
+            memory_success = await memory_store.initialize()
+            if not memory_success:
+                logger.warning("Memory Store initialization failed, continuing without memory features")
+
             _service_initialized = True
             # start task queue
             await task_queue.start()
             # initialize task processors
             processor_registry.initialize_default_processors(knowledge_service)
-            logger.info("Neo4j Knowledge Service, Task Queue, and Processors initialized for MCP")
+            logger.info("Neo4j Knowledge Service, Memory Store, Task Queue, and Processors initialized for MCP")
         else:
             raise Exception("Failed to initialize Neo4j Knowledge Service")
 
@@ -1392,6 +1398,490 @@ async def get_recent_documents(limit: int = 10) -> Dict[str, Any]:
     except Exception as e:
         return {
             "error": str(e)
+        }
+
+# ============================================================================
+# Memory Management Tools
+# ============================================================================
+
+@mcp.tool
+async def add_memory(
+    project_id: str,
+    memory_type: str,
+    title: str,
+    content: str,
+    reason: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    importance: float = 0.5,
+    related_refs: Optional[List[str]] = None,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Add a new memory to the project knowledge base.
+
+    Use this to manually save important information about the project:
+    - Design decisions and their rationale
+    - Team preferences and conventions
+    - Problems encountered and solutions
+    - Future plans and improvements
+
+    Args:
+        project_id: Project identifier (e.g., repo name)
+        memory_type: Type of memory - "decision", "preference", "experience", "convention", "plan", or "note"
+        title: Short title/summary of the memory
+        content: Detailed content and context
+        reason: Rationale or explanation (optional)
+        tags: Tags for categorization, e.g., ["auth", "security"] (optional)
+        importance: Importance score 0-1, higher = more important (default 0.5)
+        related_refs: List of ref:// handles this memory relates to (optional)
+
+    Returns:
+        Result with memory_id if successful
+
+    Examples:
+        # Decision memory
+        add_memory(
+            project_id="myapp",
+            memory_type="decision",
+            title="Use JWT for authentication",
+            content="Decided to use JWT tokens instead of session-based auth",
+            reason="Need stateless authentication for mobile clients and microservices",
+            tags=["auth", "architecture"],
+            importance=0.9,
+            related_refs=["ref://file/src/auth/jwt.py"]
+        )
+
+        # Experience memory
+        add_memory(
+            project_id="myapp",
+            memory_type="experience",
+            title="Redis connection timeout in Docker",
+            content="Redis connections fail with localhost in Docker environment",
+            reason="Docker networking requires service name instead of localhost",
+            tags=["docker", "redis", "bug"],
+            importance=0.7
+        )
+
+        # Preference memory
+        add_memory(
+            project_id="myapp",
+            memory_type="preference",
+            title="Use raw SQL instead of ORM",
+            content="Team prefers writing raw SQL queries over using ORM",
+            reason="Better performance control and team is more familiar with SQL",
+            tags=["database", "style"],
+            importance=0.6
+        )
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Adding {memory_type} memory: {title}")
+
+        # Validate memory_type
+        valid_types = ["decision", "preference", "experience", "convention", "plan", "note"]
+        if memory_type not in valid_types:
+            return {
+                "success": False,
+                "error": f"Invalid memory_type. Must be one of: {', '.join(valid_types)}"
+            }
+
+        # Validate importance
+        if not 0 <= importance <= 1:
+            return {
+                "success": False,
+                "error": "Importance must be between 0 and 1"
+            }
+
+        result = await memory_store.add_memory(
+            project_id=project_id,
+            memory_type=memory_type,
+            title=title,
+            content=content,
+            reason=reason,
+            tags=tags,
+            importance=importance,
+            related_refs=related_refs
+        )
+
+        if ctx and result.get("success"):
+            await ctx.info(f"Memory saved with ID: {result.get('memory_id')}")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to add memory: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+@mcp.tool
+async def search_memories(
+    project_id: str,
+    query: Optional[str] = None,
+    memory_type: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    min_importance: float = 0.0,
+    limit: int = 20,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Search project memories with various filters.
+
+    Use this to find relevant memories when:
+    - Starting a new feature (search for related decisions)
+    - Debugging an issue (search for similar experiences)
+    - Understanding project conventions
+
+    Args:
+        project_id: Project identifier
+        query: Search query (searches title, content, reason, tags) (optional)
+        memory_type: Filter by type - "decision", "preference", "experience", "convention", "plan", or "note" (optional)
+        tags: Filter by tags (matches any tag in the list) (optional)
+        min_importance: Minimum importance score 0-1 (default 0.0)
+        limit: Maximum number of results (default 20)
+
+    Returns:
+        List of matching memories sorted by relevance
+
+    Examples:
+        # Search for authentication-related decisions
+        search_memories(project_id="myapp", query="authentication", memory_type="decision")
+
+        # Find all high-importance decisions
+        search_memories(project_id="myapp", memory_type="decision", min_importance=0.7)
+
+        # Search by tags
+        search_memories(project_id="myapp", tags=["docker", "redis"])
+
+        # Get all memories
+        search_memories(project_id="myapp", limit=50)
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            filters = []
+            if query:
+                filters.append(f"query='{query}'")
+            if memory_type:
+                filters.append(f"type={memory_type}")
+            if tags:
+                filters.append(f"tags={tags}")
+            filter_str = ", ".join(filters) if filters else "no filters"
+            await ctx.info(f"Searching memories with {filter_str}")
+
+        result = await memory_store.search_memories(
+            project_id=project_id,
+            query=query,
+            memory_type=memory_type,
+            tags=tags,
+            min_importance=min_importance,
+            limit=limit
+        )
+
+        if ctx and result.get("success"):
+            count = result.get("total_count", 0)
+            await ctx.info(f"Found {count} matching memories")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to search memories: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+@mcp.tool
+async def get_memory(
+    memory_id: str,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Get a specific memory by ID with all details and related references.
+
+    Args:
+        memory_id: Memory identifier
+
+    Returns:
+        Full memory details including related code references
+
+    Example:
+        get_memory(memory_id="abc-123-def-456")
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Retrieving memory: {memory_id}")
+
+        result = await memory_store.get_memory(memory_id)
+
+        if ctx and result.get("success"):
+            memory = result.get("memory", {})
+            await ctx.info(f"Retrieved: {memory.get('title')} ({memory.get('type')})")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to get memory: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+@mcp.tool
+async def update_memory(
+    memory_id: str,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+    reason: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    importance: Optional[float] = None,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Update an existing memory.
+
+    Args:
+        memory_id: Memory identifier
+        title: New title (optional)
+        content: New content (optional)
+        reason: New reason (optional)
+        tags: New tags (optional)
+        importance: New importance score 0-1 (optional)
+
+    Returns:
+        Result with success status
+
+    Example:
+        update_memory(
+            memory_id="abc-123",
+            importance=0.9,
+            tags=["auth", "security", "critical"]
+        )
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Updating memory: {memory_id}")
+
+        # Validate importance if provided
+        if importance is not None and not 0 <= importance <= 1:
+            return {
+                "success": False,
+                "error": "Importance must be between 0 and 1"
+            }
+
+        result = await memory_store.update_memory(
+            memory_id=memory_id,
+            title=title,
+            content=content,
+            reason=reason,
+            tags=tags,
+            importance=importance
+        )
+
+        if ctx and result.get("success"):
+            await ctx.info(f"Memory updated successfully")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to update memory: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+@mcp.tool
+async def delete_memory(
+    memory_id: str,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Delete a memory (soft delete - marks as deleted but retains data).
+
+    Args:
+        memory_id: Memory identifier
+
+    Returns:
+        Result with success status
+
+    Example:
+        delete_memory(memory_id="abc-123-def-456")
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Deleting memory: {memory_id}")
+
+        result = await memory_store.delete_memory(memory_id)
+
+        if ctx and result.get("success"):
+            await ctx.info(f"Memory deleted (soft delete)")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to delete memory: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+@mcp.tool
+async def supersede_memory(
+    old_memory_id: str,
+    new_memory_type: str,
+    new_title: str,
+    new_content: str,
+    new_reason: Optional[str] = None,
+    new_tags: Optional[List[str]] = None,
+    new_importance: float = 0.5,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Create a new memory that supersedes an old one.
+
+    Use this when a decision changes or a better solution is found.
+    The old memory will be marked as superseded and linked to the new one.
+
+    Args:
+        old_memory_id: ID of the memory to supersede
+        new_memory_type: Type of the new memory
+        new_title: Title of the new memory
+        new_content: Content of the new memory
+        new_reason: Reason for the change (optional)
+        new_tags: Tags for the new memory (optional)
+        new_importance: Importance score for the new memory (default 0.5)
+
+    Returns:
+        Result with new_memory_id and old_memory_id
+
+    Example:
+        supersede_memory(
+            old_memory_id="abc-123",
+            new_memory_type="decision",
+            new_title="Use PostgreSQL instead of MySQL",
+            new_content="Switched to PostgreSQL for better JSON support",
+            new_reason="Need advanced JSON querying capabilities",
+            new_importance=0.8
+        )
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Creating new memory to supersede: {old_memory_id}")
+
+        # Validate memory_type
+        valid_types = ["decision", "preference", "experience", "convention", "plan", "note"]
+        if new_memory_type not in valid_types:
+            return {
+                "success": False,
+                "error": f"Invalid memory_type. Must be one of: {', '.join(valid_types)}"
+            }
+
+        # Validate importance
+        if not 0 <= new_importance <= 1:
+            return {
+                "success": False,
+                "error": "Importance must be between 0 and 1"
+            }
+
+        result = await memory_store.supersede_memory(
+            old_memory_id=old_memory_id,
+            new_memory_data={
+                "memory_type": new_memory_type,
+                "title": new_title,
+                "content": new_content,
+                "reason": new_reason,
+                "tags": new_tags,
+                "importance": new_importance
+            }
+        )
+
+        if ctx and result.get("success"):
+            await ctx.info(f"New memory created: {result.get('new_memory_id')}")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to supersede memory: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+@mcp.tool
+async def get_project_summary(
+    project_id: str,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """
+    Get a summary of all memories for a project, organized by type.
+
+    Use this to get an overview of project knowledge:
+    - How many decisions have been made
+    - What conventions are in place
+    - Key experiences and learnings
+
+    Args:
+        project_id: Project identifier
+
+    Returns:
+        Summary with counts and top memories by type
+
+    Example:
+        get_project_summary(project_id="myapp")
+    """
+    try:
+        await ensure_service_initialized()
+
+        if ctx:
+            await ctx.info(f"Getting project summary for: {project_id}")
+
+        result = await memory_store.get_project_summary(project_id)
+
+        if ctx and result.get("success"):
+            summary = result.get("summary", {})
+            total = summary.get("total_memories", 0)
+            await ctx.info(f"Project has {total} total memories")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Failed to get project summary: {str(e)}"
+        logger.error(error_msg)
+        if ctx:
+            await ctx.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
         }
 
 # MCP prompt: generate query suggestions
