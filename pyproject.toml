@@ -23,13 +23,9 @@ dependencies = [
     "pydantic-settings",
     "python-dotenv",
     "loguru",
-    "pytest",
-    "pytest-asyncio",
-    "black",
-    "isort",
     "llama-index-vector-stores-neo4jvector>=0.3.0",
     "llama-index-embeddings-ollama>=0.6.0",
-    "fastmcp>=2.7.1",
+    "mcp>=1.1.0",
     "llama-index-llms-gemini>=0.5.0",
     "llama-index-embeddings-gemini>=0.3.2",
     "google-generativeai>=0.3.0",
@@ -44,5 +40,94 @@ server = "start:main"
 mcp_client = "start_mcp:main"
 
 [tool.setuptools]
-packages = ["api", "core", "services", "monitoring"]
+packages = ["api", "core", "services", "monitoring", "mcp_tools"]
 py-modules = ["start", "start_mcp", "mcp_server", "config", "main"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: mark test as a unit test (no external dependencies)",
+    "integration: mark test as an integration test (requires Neo4j, etc.)",
+    "slow: mark test as slow running",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+source = ["mcp_tools", "services", "api", "core"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py311', 'py312', 'py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]

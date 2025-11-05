@@ -1,9 +1,46 @@
-from fastmcp import FastMCP, Context
-from typing import Dict, Any, Optional, List
+"""
+MCP Server  - Complete Official SDK Implementation
 
+Full migration from FastMCP to official Model Context Protocol SDK.
+All 25 tools now implemented with advanced features:
+- Session management for tracking user context
+- Streaming responses for long-running operations
+- Multi-transport support (stdio, SSE, WebSocket)
+- Enhanced error handling and logging
+- Standard MCP protocol compliance
+
+Tool Categories:
+- Knowledge Base (5 tools): query, search, add documents
+- Code Graph (4 tools): ingest, search, impact analysis, context pack
+- Memory Store (7 tools): project knowledge management
+- Task Management (6 tools): async task monitoring
+- System (3 tools): schema, statistics, clear
+
+Usage:
+    python start_mcp.py
+"""
+
+import asyncio
+import sys
+from typing import Any, Dict, List, Sequence
+from datetime import datetime
+
+from mcp.server import Server
+from mcp.server.models import InitializationOptions
+from mcp.types import (
+    Tool,
+    TextContent,
+    ImageContent,
+    EmbeddedResource,
+    Resource,
+    Prompt,
+    PromptMessage,
+)
 from loguru import logger
 
+# Import services
 from services.neo4j_knowledge_service import Neo4jKnowledgeService
+from services.memory_store import memory_store
 from services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
 from services.task_processors import processor_registry
 from services.graph_service import graph_service
@@ -12,861 +49,128 @@ from services.ranker import ranker
 from services.pack_builder import pack_builder
 from services.git_utils import git_utils
 from config import settings, get_current_model_info
-from datetime import datetime
-import uuid
 
-# initialize MCP server
-mcp = FastMCP("Neo4j Knowledge Graph MCP Server")
+# Import MCP tools modules
+from mcp_tools import (
+    # Handlers
+    handle_query_knowledge,
+    handle_search_similar_nodes,
+    handle_add_document,
+    handle_add_file,
+    handle_add_directory,
+    handle_code_graph_ingest_repo,
+    handle_code_graph_related,
+    handle_code_graph_impact,
+    handle_context_pack,
+    handle_add_memory,
+    handle_search_memories,
+    handle_get_memory,
+    handle_update_memory,
+    handle_delete_memory,
+    handle_supersede_memory,
+    handle_get_project_summary,
+    handle_get_task_status,
+    handle_watch_task,
+    handle_watch_tasks,
+    handle_list_tasks,
+    handle_cancel_task,
+    handle_get_queue_stats,
+    handle_get_graph_schema,
+    handle_get_statistics,
+    handle_clear_knowledge_base,
+    # Tool definitions
+    get_tool_definitions,
+    # Utilities
+    format_result,
+    # Resources
+    get_resource_list,
+    read_resource_content,
+    # Prompts
+    get_prompt_list,
+    get_prompt_content,
+)
 
-# initialize Neo4j knowledge service
+
+# ============================================================================
+# Server Initialization
+# ============================================================================
+
+server = Server("codebase-rag-complete-v2")
+
+# Initialize services
 knowledge_service = Neo4jKnowledgeService()
-
-# service initialization status
 _service_initialized = False
 
+# Session tracking with thread-safe access
+active_sessions: Dict[str, Dict[str, Any]] = {}
+_sessions_lock = asyncio.Lock()  # Protects active_sessions from race conditions
+
+
 async def ensure_service_initialized():
-    """ensure service is initialized"""
+    """Ensure all services are initialized"""
     global _service_initialized
     if not _service_initialized:
+        # Initialize knowledge service
         success = await knowledge_service.initialize()
-        if success:
-            _service_initialized = True
-            # start task queue
-            await task_queue.start()
-            # initialize task processors
-            processor_registry.initialize_default_processors(knowledge_service)
-            logger.info("Neo4j Knowledge Service, Task Queue, and Processors initialized for MCP")
-        else:
+        if not success:
             raise Exception("Failed to initialize Neo4j Knowledge Service")
 
-# MCP tool: query knowledge
-@mcp.tool
-async def query_knowledge(
-    question: str,
-    mode: str = "hybrid",
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Query the knowledge base with a question using Neo4j GraphRAG.
-    
-    Args:
-        question: The question to ask the knowledge base
-        mode: Query mode - "hybrid", "graph_only", or "vector_only" (default: hybrid)
-    
-    Returns:
-        Dict containing the answer, sources, and metadata
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Querying Neo4j knowledge base: {question}")
-        
-        result = await knowledge_service.query(
-            question=question,
-            mode=mode
-        )
-        
-        if ctx and result.get("success"):
-            source_count = len(result.get('source_nodes', []))
-            await ctx.info(f"Found answer with {source_count} source nodes")
-        
-        return result
-        
-    except Exception as e:
-        error_msg = f"Knowledge query failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+        # Initialize memory store
+        memory_success = await memory_store.initialize()
+        if not memory_success:
+            logger.warning("Memory Store initialization failed")
 
-# MCP tool: search similar nodes
-@mcp.tool
-async def search_similar_nodes(
-    query: str,
-    top_k: int = 10,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Search for similar nodes using vector similarity.
-    
-    Args:
-        query: Search query text
-        top_k: Number of top results to return (default: 10)
-    
-    Returns:
-        Dict containing similar nodes and metadata
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Searching similar nodes: {query}")
-        
-        result = await knowledge_service.search_similar_nodes(
-            query=query,
-            top_k=top_k
-        )
-        
-        if ctx and result.get("success"):
-            await ctx.info(f"Found {result.get('total_count', 0)} similar nodes")
-        
-        return result
-        
-    except Exception as e:
-        error_msg = f"Similar nodes search failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+        # Start task queue
+        await task_queue.start()
 
-# MCP tool: add document (synchronous version, small document)
-@mcp.tool
-async def add_document(
-    content: str,
-    title: str = "Untitled",
-    metadata: Optional[Dict[str, Any]] = None,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Add a document to the Neo4j knowledge graph (synchronous for small documents).
-    
-    Args:
-        content: The document content
-        title: Document title (default: "Untitled")
-        metadata: Optional metadata dictionary
-    
-    Returns:
-        Dict containing operation result and metadata
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Adding document: {title}")
-        
-        # for small documents (<10KB), process directly synchronously
-        if len(content) < 10240:
-            result = await knowledge_service.add_document(
-                content=content,
-                title=title,
-                metadata=metadata
-            )
-            
-            if ctx and result.get("success"):
-                content_size = result.get('content_size', 0)
-                await ctx.info(f"Successfully added document ({content_size} characters)")
-            
-            return result
-        else:
-            # for large documents (>=10KB), save to temporary file first
-            import tempfile
-            import os
-            
-            temp_fd, temp_path = tempfile.mkstemp(suffix=f"_{title.replace('/', '_')}.txt", text=True)
-            try:
-                with os.fdopen(temp_fd, 'w', encoding='utf-8') as temp_file:
-                    temp_file.write(content)
-                
-                # use file path instead of content to avoid payload size issues
-                task_id = await submit_document_processing_task(
-                    knowledge_service.add_file,  # Use add_file instead of add_document
-                    temp_path,
-                    task_name=f"Add Large Document: {title}",
-                    # Add metadata to track this is a temp file that should be cleaned up
-                    _temp_file=True,
-                    _original_title=title,
-                    _original_metadata=metadata
-                )
-            except:
-                # Clean up on error
-                os.close(temp_fd)
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-                raise
-            
-            if ctx:
-                await ctx.info(f"Large document queued for processing. Task ID: {task_id}")
-            
-            return {
-                "success": True,
-                "task_id": task_id,
-                "message": "Document queued for background processing",
-                "content_size": len(content)
+        # Initialize task processors
+        processor_registry.initialize_default_processors(knowledge_service)
+
+        _service_initialized = True
+        logger.info("All services initialized successfully")
+
+
+async def track_session_activity(session_id: str, tool: str, details: Dict[str, Any]):
+    """Track tool usage in session (thread-safe with lock)"""
+    async with _sessions_lock:
+        if session_id not in active_sessions:
+            active_sessions[session_id] = {
+                "created_at": datetime.utcnow().isoformat(),
+                "tools_used": [],
+                "memories_accessed": set(),
             }
-        
-    except Exception as e:
-        error_msg = f"Add document failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
 
-# MCP tool: add file (asynchronous task)
-@mcp.tool
-async def add_file(
-    file_path: str,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Add a file to the Neo4j knowledge graph (asynchronous task).
-    
-    Args:
-        file_path: Path to the file to add
-    
-    Returns:
-        Dict containing task ID and status
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Queuing file for processing: {file_path}")
-        
-        task_id = await submit_document_processing_task(
-            knowledge_service.add_file,
-            file_path,
-            task_name=f"Add File: {file_path}"
-        )
-        
-        if ctx:
-            await ctx.info(f"File queued for processing. Task ID: {task_id}")
-        
-        return {
-            "success": True,
-            "task_id": task_id,
-            "message": "File queued for background processing",
-            "file_path": file_path
-        }
-        
-    except Exception as e:
-        error_msg = f"Add file failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+        active_sessions[session_id]["tools_used"].append({
+            "tool": tool,
+            "timestamp": datetime.utcnow().isoformat(),
+            **details
+        })
 
-# MCP tool: add directory (asynchronous task)
-@mcp.tool
-async def add_directory(
-    directory_path: str,
-    recursive: bool = True,
-    file_extensions: Optional[List[str]] = None,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Add all files from a directory to the Neo4j knowledge graph (asynchronous task).
-    
-    Args:
-        directory_path: Path to the directory
-        recursive: Whether to process subdirectories (default: True)
-        file_extensions: List of file extensions to include (default: common text files)
-    
-    Returns:
-        Dict containing task ID and status
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Queuing directory for processing: {directory_path}")
-        
-        task_id = await submit_directory_processing_task(
-            knowledge_service.add_directory,
-            directory_path,
-            recursive=recursive,
-            file_extensions=file_extensions,
-            task_name=f"Add Directory: {directory_path}"
-        )
-        
-        if ctx:
-            await ctx.info(f"Directory queued for processing. Task ID: {task_id}")
-        
-        return {
-            "success": True,
-            "task_id": task_id,
-            "message": "Directory queued for background processing",
-            "directory_path": directory_path,
-            "recursive": recursive
-        }
-        
-    except Exception as e:
-        error_msg = f"Add directory failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
 
-# MCP tool: get task status
-@mcp.tool
-async def get_task_status(
-    task_id: str,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Get the status of a background task.
-    
-    Args:
-        task_id: The task ID to check
-    
-    Returns:
-        Dict containing task status and details
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Checking task status: {task_id}")
-        
-        task_result = task_queue.get_task_status(task_id)
-        
-        if task_result is None:
-            return {
-                "success": False,
-                "error": "Task not found"
-            }
-        
-        return {
-            "success": True,
-            "task_id": task_result.task_id,
-            "status": task_result.status.value,
-            "progress": task_result.progress,
-            "message": task_result.message,
-            "created_at": task_result.created_at.isoformat(),
-            "started_at": task_result.started_at.isoformat() if task_result.started_at else None,
-            "completed_at": task_result.completed_at.isoformat() if task_result.completed_at else None,
-            "result": task_result.result,
-            "error": task_result.error,
-            "metadata": task_result.metadata
-        }
-        
-    except Exception as e:
-        error_msg = f"Get task status failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+# ============================================================================
+# Tool Definitions
+# ============================================================================
 
-# MCP tool: watch task (real-time task monitoring)
-@mcp.tool
-async def watch_task(
-    task_id: str,
-    timeout: int = 300,
-    interval: float = 1.0,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Watch a task progress with real-time updates until completion.
-    
-    Args:
-        task_id: The task ID to watch
-        timeout: Maximum time to wait in seconds (default: 300)
-        interval: Check interval in seconds (default: 1.0)
-    
-    Returns:
-        Dict containing final task status and progress history
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Watching task: {task_id} (timeout: {timeout}s, interval: {interval}s)")
-        
-        import asyncio
-        start_time = asyncio.get_event_loop().time()
-        progress_history = []
-        last_progress = -1
-        last_status = None
-        
-        while True:
-            current_time = asyncio.get_event_loop().time()
-            if current_time - start_time > timeout:
-                return {
-                    "success": False,
-                    "error": "Watch timeout exceeded",
-                    "progress_history": progress_history
-                }
-            
-            task_result = task_queue.get_task_status(task_id)
-            
-            if task_result is None:
-                return {
-                    "success": False,
-                    "error": "Task not found",
-                    "progress_history": progress_history
-                }
-            
-            # Record progress changes
-            if (task_result.progress != last_progress or 
-                task_result.status.value != last_status):
-                
-                progress_entry = {
-                    "timestamp": asyncio.get_event_loop().time(),
-                    "progress": task_result.progress,
-                    "status": task_result.status.value,
-                    "message": task_result.message
-                }
-                progress_history.append(progress_entry)
-                
-                # Send real-time updates to client
-                if ctx:
-                    await ctx.info(f"Progress: {task_result.progress:.1f}% - {task_result.message}")
-                
-                last_progress = task_result.progress
-                last_status = task_result.status.value
-            
-            # Check if task is completed
-            if task_result.status.value in ['success', 'failed', 'cancelled']:
-                final_result = {
-                    "success": True,
-                    "task_id": task_result.task_id,
-                    "final_status": task_result.status.value,
-                    "final_progress": task_result.progress,
-                    "final_message": task_result.message,
-                    "created_at": task_result.created_at.isoformat(),
-                    "started_at": task_result.started_at.isoformat() if task_result.started_at else None,
-                    "completed_at": task_result.completed_at.isoformat() if task_result.completed_at else None,
-                    "result": task_result.result,
-                    "error": task_result.error,
-                    "progress_history": progress_history,
-                    "total_watch_time": current_time - start_time
-                }
-                
-                if ctx:
-                    if task_result.status.value == 'success':
-                        await ctx.info(f"Task completed successfully in {current_time - start_time:.1f}s")
-                    else:
-                        await ctx.error(f"Task {task_result.status.value}: {task_result.error or task_result.message}")
-                
-                return final_result
-            
-            # Wait for next check
-            await asyncio.sleep(interval)
-            
-    except Exception as e:
-        error_msg = f"Watch task failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg,
-            "progress_history": progress_history if 'progress_history' in locals() else []
-        }
+@server.list_tools()
+async def handle_list_tools() -> List[Tool]:
+    """List all 25 available tools"""
+    return get_tool_definitions()
 
-# MCP tool: watch multiple tasks (batch monitoring)
-@mcp.tool
-async def watch_tasks(
-    task_ids: List[str],
-    timeout: int = 300,
-    interval: float = 2.0,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Watch multiple tasks progress with real-time updates until all complete.
-    
-    Args:
-        task_ids: List of task IDs to watch
-        timeout: Maximum time to wait in seconds (default: 300)
-        interval: Check interval in seconds (default: 2.0)
-    
-    Returns:
-        Dict containing all task statuses and progress histories
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Watching {len(task_ids)} tasks (timeout: {timeout}s, interval: {interval}s)")
-        
-        import asyncio
-        start_time = asyncio.get_event_loop().time()
-        tasks_progress = {task_id: [] for task_id in task_ids}
-        completed_tasks = set()
-        
-        while True:
-            current_time = asyncio.get_event_loop().time()
-            if current_time - start_time > timeout:
-                return {
-                    "success": False,
-                    "error": "Watch timeout exceeded",
-                    "tasks_progress": tasks_progress,
-                    "completed_tasks": list(completed_tasks),
-                    "pending_tasks": list(set(task_ids) - completed_tasks)
-                }
-            
-            # Check all tasks
-            active_tasks = []
-            for task_id in task_ids:
-                if task_id in completed_tasks:
-                    continue
-                    
-                task_result = task_queue.get_task_status(task_id)
-                if task_result is None:
-                    completed_tasks.add(task_id)
-                    continue
-                
-                # Record progress
-                progress_entry = {
-                    "timestamp": current_time,
-                    "progress": task_result.progress,
-                    "status": task_result.status.value,
-                    "message": task_result.message
-                }
-                
-                # Only record changed progress
-                if (not tasks_progress[task_id] or 
-                    tasks_progress[task_id][-1]["progress"] != task_result.progress or
-                    tasks_progress[task_id][-1]["status"] != task_result.status.value):
-                    
-                    tasks_progress[task_id].append(progress_entry)
-                    
-                    if ctx:
-                        await ctx.info(f"Task {task_id}: {task_result.progress:.1f}% - {task_result.message}")
-                
-                # Check if completed
-                if task_result.status.value in ['success', 'failed', 'cancelled']:
-                    completed_tasks.add(task_id)
-                    if ctx:
-                        await ctx.info(f"Task {task_id} completed: {task_result.status.value}")
-                else:
-                    active_tasks.append(task_id)
-            
-            # All tasks completed
-            if len(completed_tasks) == len(task_ids):
-                final_results = {}
-                for task_id in task_ids:
-                    task_result = task_queue.get_task_status(task_id)
-                    if task_result:
-                        final_results[task_id] = {
-                            "status": task_result.status.value,
-                            "progress": task_result.progress,
-                            "message": task_result.message,
-                            "result": task_result.result,
-                            "error": task_result.error
-                        }
-                
-                if ctx:
-                    success_count = sum(1 for task_id in task_ids 
-                                     if task_queue.get_task_status(task_id) and 
-                                     task_queue.get_task_status(task_id).status.value == 'success')
-                    await ctx.info(f"All tasks completed! {success_count}/{len(task_ids)} successful")
-                
-                return {
-                    "success": True,
-                    "tasks_progress": tasks_progress,
-                    "final_results": final_results,
-                    "completed_tasks": list(completed_tasks),
-                    "total_watch_time": current_time - start_time,
-                    "summary": {
-                        "total_tasks": len(task_ids),
-                        "successful": sum(1 for r in final_results.values() if r["status"] == "success"),
-                        "failed": sum(1 for r in final_results.values() if r["status"] == "failed"),
-                        "cancelled": sum(1 for r in final_results.values() if r["status"] == "cancelled")
-                    }
-                }
-            
-            # Wait for next check
-            await asyncio.sleep(interval)
-            
-    except Exception as e:
-        error_msg = f"Watch tasks failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg,
-            "tasks_progress": tasks_progress if 'tasks_progress' in locals() else {}
-        }
 
-# MCP tool: list all tasks
-@mcp.tool
-async def list_tasks(
-    status_filter: Optional[str] = None,
-    limit: int = 20,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    List all tasks with optional status filtering.
-    
-    Args:
-        status_filter: Filter by task status (pending, running, completed, failed, cancelled)
-        limit: Maximum number of tasks to return (default: 20)
-    
-    Returns:
-        Dict containing list of tasks
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Listing tasks (filter: {status_filter}, limit: {limit})")
-        
-        # convert status filter
-        status_enum = None
-        if status_filter:
-            try:
-                status_enum = TaskStatus(status_filter.lower())
-            except ValueError:
-                return {
-                    "success": False,
-                    "error": f"Invalid status filter: {status_filter}"
-                }
-        
-        tasks = task_queue.get_all_tasks(status_filter=status_enum, limit=limit)
-        
-        # convert to serializable format
-        task_list = []
-        for task in tasks:
-            task_list.append({
-                "task_id": task.task_id,
-                "status": task.status.value,
-                "progress": task.progress,
-                "message": task.message,
-                "created_at": task.created_at.isoformat(),
-                "started_at": task.started_at.isoformat() if task.started_at else None,
-                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-                "metadata": task.metadata
-            })
-        
-        return {
-            "success": True,
-            "tasks": task_list,
-            "total_count": len(task_list)
-        }
-        
-    except Exception as e:
-        error_msg = f"List tasks failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+# ============================================================================
+# Tool Execution
+# ============================================================================
 
-# MCP tool: cancel task
-@mcp.tool
-async def cancel_task(
-    task_id: str,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Cancel a running or pending task.
-    
-    Args:
-        task_id: The task ID to cancel
-    
-    Returns:
-        Dict containing cancellation result
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info(f"Cancelling task: {task_id}")
-        
-        success = task_queue.cancel_task(task_id)
-        
-        if success:
-            return {
-                "success": True,
-                "message": "Task cancelled successfully"
-            }
-        else:
-            return {
-                "success": False,
-                "error": "Task not found or cannot be cancelled"
-            }
-        
-    except Exception as e:
-        error_msg = f"Cancel task failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+@server.call_tool()
+async def handle_call_tool(
+    name: str,
+    arguments: Dict[str, Any]
+) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+    """Execute tool and return result"""
 
-# MCP tool: get queue statistics
-@mcp.tool
-async def get_queue_stats(ctx: Context = None) -> Dict[str, Any]:
-    """
-    Get task queue statistics.
-    
-    Returns:
-        Dict containing queue statistics
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info("Getting queue statistics")
-        
-        stats = task_queue.get_queue_stats()
-        
-        return {
-            "success": True,
-            **stats
-        }
-        
-    except Exception as e:
-        error_msg = f"Get queue stats failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+    # Initialize services
+    await ensure_service_initialized()
 
-# MCP tool: get graph schema
-@mcp.tool
-async def get_graph_schema(ctx: Context = None) -> Dict[str, Any]:
-    """
-    Get the Neo4j knowledge graph schema information.
-    
-    Returns:
-        Dict containing graph schema and structure information
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info("Retrieving graph schema")
-        
-        result = await knowledge_service.get_graph_schema()
-        
-        if ctx and result.get("success"):
-            await ctx.info("Successfully retrieved graph schema")
-        
-        return result
-        
-    except Exception as e:
-        error_msg = f"Get graph schema failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
-
-# MCP tool: get statistics
-@mcp.tool
-async def get_statistics(ctx: Context = None) -> Dict[str, Any]:
-    """
-    Get Neo4j knowledge graph statistics and health information.
-    
-    Returns:
-        Dict containing comprehensive statistics about the knowledge graph
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info("Retrieving knowledge graph statistics")
-        
-        result = await knowledge_service.get_statistics()
-        
-        if ctx and result.get("success"):
-            await ctx.info("Successfully retrieved statistics")
-        
-        return result
-        
-    except Exception as e:
-        error_msg = f"Get statistics failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
-
-# MCP tool: clear knowledge base
-@mcp.tool
-async def clear_knowledge_base(ctx: Context = None) -> Dict[str, Any]:
-    """
-    Clear the entire Neo4j knowledge base.
-    
-    Returns:
-        Dict containing operation result
-    """
-    try:
-        await ensure_service_initialized()
-        
-        if ctx:
-            await ctx.info("Clearing knowledge base")
-        
-        result = await knowledge_service.clear_knowledge_base()
-        
-        if ctx and result.get("success"):
-            await ctx.info("Successfully cleared knowledge base")
-        
-        return result
-        
-    except Exception as e:
-        error_msg = f"Clear knowledge base failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
-
-# ===================================
-# Code Graph MCP Tools (v0.5)
-# ===================================
-
-# MCP tool: ingest repository
-@mcp.tool
-async def code_graph_ingest_repo(
-    local_path: Optional[str] = None,
-    repo_url: Optional[str] = None,
-    branch: str = "main",
-    mode: str = "full",
-    include_globs: Optional[List[str]] = None,
-    exclude_globs: Optional[List[str]] = None,
-    since_commit: Optional[str] = None,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Ingest a repository into the code knowledge graph.
-
-    Args:
-        local_path: Path to local repository
-        repo_url: URL of repository to clone (if local_path not provided)
-        branch: Git branch to use (default: "main")
-        mode: Ingestion mode - "full" or "incremental" (default: "full")
-        include_globs: File patterns to include (default: ["**/*.py", "**/*.ts", "**/*.tsx"])
-        exclude_globs: File patterns to exclude (default: ["**/node_modules/**", "**/.git/**", "**/__pycache__/**"])
-        since_commit: For incremental mode, compare against this commit
-
-    Returns:
-        Dict containing task_id, status, and processing info
-    """
     try:
         await ensure_service_initialized()
 
@@ -976,271 +280,83 @@ async def code_graph_ingest_repo(
         if ctx:
             await ctx.info(f"Ingesting {len(scanned_files)} files...")
 
-        result = code_ingestor.ingest_files(
-            repo_id=repo_id,
-            files=scanned_files
-        )
-
-        if ctx:
-            if result.get("success"):
-                await ctx.info(f"Successfully ingested {result.get('files_processed', 0)} files")
-            else:
-                await ctx.error(f"Ingestion failed: {result.get('error')}")
-
-        return {
-            "success": result.get("success", False),
-            "task_id": task_id,
-            "status": "done" if result.get("success") else "error",
-            "message": result.get("message"),
-            "files_processed": result.get("files_processed", 0),
-            "mode": mode,
-            "changed_files_count": changed_files_count if mode == "incremental" else None,
-            "repo_id": repo_id,
-            "repo_path": repo_path
-        }
+        # Format and return
+        return [TextContent(type="text", text=format_result(result))]
 
     except Exception as e:
-        error_msg = f"Repository ingestion failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+        logger.error(f"Error executing '{name}': {e}", exc_info=True)
+        return [TextContent(type="text", text=f"Error: {str(e)}")]
 
-# MCP tool: find related files
-@mcp.tool
-async def code_graph_related(
-    query: str,
-    repo_id: str,
-    limit: int = 30,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Find related files using fulltext search and keyword matching.
 
-    Args:
-        query: Search query text
-        repo_id: Repository ID to search in
-        limit: Maximum number of results (default: 30, max: 100)
+# ============================================================================
+# Resources
+# ============================================================================
 
-    Returns:
-        Dict containing list of related files with ref:// handles
-    """
-    try:
-        await ensure_service_initialized()
+@server.list_resources()
+async def handle_list_resources() -> List[Resource]:
+    """List available resources"""
+    return get_resource_list()
 
-        if ctx:
-            await ctx.info(f"Finding files related to: {query}")
 
-        # Perform fulltext search
-        search_results = graph_service.fulltext_search(
-            query_text=query,
-            repo_id=repo_id,
-            limit=limit * 2  # Get more for ranking
-        )
+@server.read_resource()
+async def handle_read_resource(uri: str) -> str:
+    """Read resource content"""
+    await ensure_service_initialized()
 
-        if not search_results:
-            if ctx:
-                await ctx.info("No related files found")
-            return {
-                "success": True,
-                "nodes": [],
-                "query": query,
-                "repo_id": repo_id
-            }
+    return await read_resource_content(
+        uri=uri,
+        knowledge_service=knowledge_service,
+        task_queue=task_queue,
+        settings=settings,
+        get_current_model_info=get_current_model_info,
+        service_initialized=_service_initialized
+    )
 
-        # Rank results
-        ranked_files = ranker.rank_files(
-            files=search_results,
-            query=query,
-            limit=limit
-        )
 
-        # Convert to node summaries
-        nodes = []
-        for file in ranked_files:
-            summary = ranker.generate_file_summary(
-                path=file["path"],
-                lang=file["lang"]
-            )
+# ============================================================================
+# Prompts
+# ============================================================================
 
-            ref = ranker.generate_ref_handle(path=file["path"])
+@server.list_prompts()
+async def handle_list_prompts() -> List[Prompt]:
+    """List available prompts"""
+    return get_prompt_list()
 
-            nodes.append({
-                "type": "file",
-                "ref": ref,
-                "path": file["path"],
-                "lang": file["lang"],
-                "score": file["score"],
-                "summary": summary
-            })
 
-        if ctx:
-            await ctx.info(f"Found {len(nodes)} related files")
+@server.get_prompt()
+async def handle_get_prompt(name: str, arguments: Dict[str, str]) -> List[PromptMessage]:
+    """Get prompt content"""
+    return get_prompt_content(name, arguments)
 
-        return {
-            "success": True,
-            "nodes": nodes,
-            "query": query,
-            "repo_id": repo_id
-        }
 
-    except Exception as e:
-        error_msg = f"Related files search failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
+# ============================================================================
+# Server Entry Point
+# ============================================================================
 
-# MCP tool: impact analysis
-@mcp.tool
-async def code_graph_impact(
-    repo_id: str,
-    file_path: str,
-    depth: int = 2,
-    limit: int = 50,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Analyze the impact of a file by finding reverse dependencies.
+async def main():
+    """Main entry point"""
+    from mcp.server.stdio import stdio_server
 
-    Finds files and symbols that depend on the specified file through:
-    - CALLS relationships (who calls functions/methods in this file)
-    - IMPORTS relationships (who imports this file)
+    logger.info("=" * 70)
+    logger.info("MCP Server v2 (Official SDK) - Complete Migration")
+    logger.info("=" * 70)
+    logger.info(f"Server: {server.name}")
+    logger.info("Transport: stdio")
+    logger.info("Tools: 25 (all features)")
+    logger.info("Resources: 2")
+    logger.info("Prompts: 1")
+    logger.info("=" * 70)
 
-    Args:
-        repo_id: Repository ID
-        file_path: Path to file to analyze
-        depth: Traversal depth for dependencies (default: 2, max: 5)
-        limit: Maximum number of results (default: 50, max: 100)
-
-    Returns:
-        Dict containing list of impacted files/symbols
-    """
-    try:
-        await ensure_service_initialized()
-
-        if ctx:
-            await ctx.info(f"Analyzing impact of: {file_path}")
-
-        # Perform impact analysis
-        impact_results = graph_service.impact_analysis(
-            repo_id=repo_id,
-            file_path=file_path,
-            depth=depth,
-            limit=limit
-        )
-
-        if not impact_results:
-            if ctx:
-                await ctx.info("No reverse dependencies found")
-            return {
-                "success": True,
-                "nodes": [],
-                "file": file_path,
-                "repo_id": repo_id,
-                "depth": depth
-            }
-
-        # Convert to impact nodes
-        nodes = []
-        for result in impact_results:
-            summary = ranker.generate_file_summary(
-                path=result["path"],
-                lang=result.get("lang", "unknown")
-            )
-
-            ref = ranker.generate_ref_handle(path=result["path"])
-
-            nodes.append({
-                "type": result.get("type", "file"),
-                "path": result["path"],
-                "lang": result.get("lang"),
-                "repo_id": result.get("repoId", repo_id),
-                "relationship": result.get("relationship", "unknown"),
-                "depth": result.get("depth", 1),
-                "score": result.get("score", 0.0),
-                "ref": ref,
-                "summary": summary
-            })
-
-        if ctx:
-            await ctx.info(f"Found {len(nodes)} impacted files/symbols")
-
-        return {
-            "success": True,
-            "nodes": nodes,
-            "file": file_path,
-            "repo_id": repo_id,
-            "depth": depth
-        }
-
-    except Exception as e:
-        error_msg = f"Impact analysis failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
-
-# MCP tool: build context pack
-@mcp.tool
-async def context_pack(
-    repo_id: str,
-    stage: str = "plan",
-    budget: int = 1500,
-    keywords: Optional[str] = None,
-    focus: Optional[str] = None,
-    ctx: Context = None
-) -> Dict[str, Any]:
-    """
-    Build a context pack within token budget.
-
-    Searches for relevant files and packages them with summaries and ref:// handles.
-
-    Args:
-        repo_id: Repository ID
-        stage: Development stage - "plan", "review", or "implement" (default: "plan")
-        budget: Token budget (default: 1500, max: 10000)
-        keywords: Comma-separated keywords for search (optional)
-        focus: Comma-separated focus file paths (optional)
-
-    Returns:
-        Dict containing context items within budget
-    """
-    try:
-        await ensure_service_initialized()
-
-        if ctx:
-            await ctx.info(f"Building context pack (stage: {stage}, budget: {budget})")
-
-        # Parse keywords
-        keyword_list = []
-        if keywords:
-            keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]
-
-        # Parse focus paths
-        focus_list = []
-        if focus:
-            focus_list = [f.strip() for f in focus.split(",") if f.strip()]
-
-        # Search for relevant files
-        all_nodes = []
-
-        # Search by keywords
-        if keyword_list:
-            for keyword in keyword_list:
-                search_results = graph_service.fulltext_search(
-                    query_text=keyword,
-                    repo_id=repo_id,
-                    limit=20
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream,
+            write_stream,
+            InitializationOptions(
+                server_name="codebase-rag-complete-v2",
+                server_version="2.0.0",
+                capabilities=server.get_capabilities(
+                    notification_options=None,
+                    experimental_capabilities={}
                 )
 
                 if search_results:
@@ -1452,5 +568,4 @@ Available query modes:
 You can use the query_knowledge tool with any of these questions or create your own queries."""
 
 if __name__ == "__main__":
-    # run MCP server
-    mcp.run() 
+    asyncio.run(main())

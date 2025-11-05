@@ -25,6 +25,7 @@ dist/
 
 ## Logs
 logs/
+*.log
 ## data
 data/
 ## .DS_Store
@@ -41,6 +42,4 @@ data/
 
 ## .cursor
 .cursor/
-docs/
-tests/
 .aider*

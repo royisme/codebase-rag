@@ -11,9 +11,13 @@ Code Graph Knowledge System is a Neo4j-based intelligent knowledge management sy
 ### Core Components
 - **FastAPI Application** (`main.py`, `core/app.py`): Main web server with async request handling
 - **Neo4j Knowledge Service** (`services/neo4j_knowledge_service.py`): Primary service handling LlamaIndex + Neo4j integration for knowledge graph operations
+- **Memory Store** (`services/memory_store.py`): Project knowledge persistence for AI agents - stores decisions, preferences, experiences, and conventions (v0.6)
 - **SQL Parsers** (`services/sql_parser.py`, `services/universal_sql_schema_parser.py`): Database schema analysis and parsing
 - **Task Queue System** (`services/task_queue.py`, `monitoring/task_monitor.py`): Async background processing with web monitoring
-- **MCP Server** (`mcp_server.py`, `start_mcp.py`): Model Context Protocol integration for AI assistants
+- **MCP Server** (`mcp_server.py`, `start_mcp.py`): Model Context Protocol integration for AI assistants using official MCP SDK
+  - Modular architecture with handlers in `mcp_tools/` package
+  - 25 tools across 5 categories (Knowledge, Code Graph, Memory, Tasks, System)
+  - Official SDK features: session management, streaming support, multi-transport
 
 ### Multi-Provider LLM Support
 The system supports multiple LLM and embedding providers:
@@ -32,7 +36,7 @@ Configuration is handled via environment variables in `.env` file (see `env.exam
 # Start main application
 python start.py
 
-# Start MCP server (for AI assistant integration)
+# Start MCP server (Official MCP SDK - All 25 tools)
 python start_mcp.py
 
 # Using script entry points (after uv sync)
@@ -42,6 +46,13 @@ uv run mcp_client
 # Direct FastAPI startup
 python main.py
 ```
+
+**MCP Server Architecture**:
+- Uses official Model Context Protocol SDK (`mcp>=1.1.0`)
+- Modular design with handlers organized in `mcp_tools/` package
+- 310-line main server file (78% smaller than original monolithic version)
+- Advanced features: session management framework, streaming support, multi-transport capability
+- See `docs/MCP_V2_MODULARIZATION.md` for architecture details
 
 ### Testing
 ```bash
@@ -125,6 +136,14 @@ The system uses LlamaIndex's `KnowledgeGraphIndex` with Neo4j backend. Global se
 - `/api/v1/knowledge/search`: Vector similarity search
 - `/api/v1/documents/*`: Document management
 - `/api/v1/sql/*`: SQL parsing and analysis
+- `/api/v1/memory/*`: Memory management for AI agents (v0.6)
+  - `POST /add`: Add new memory (decision/preference/experience/convention/plan/note)
+  - `POST /search`: Search memories with filters
+  - `GET /{memory_id}`: Get specific memory
+  - `PUT /{memory_id}`: Update memory
+  - `DELETE /{memory_id}`: Delete memory (soft delete)
+  - `POST /supersede`: Create new memory that supersedes old one
+  - `GET /project/{project_id}/summary`: Get project memory summary
 
 ### Real-time Task Monitoring
 The system provides multiple approaches for real-time task monitoring:
@@ -163,3 +182,231 @@ The system handles large documents through multiple approaches:
 ## Testing Approach
 
 Tests are located in `tests/` directory. The system includes comprehensive testing for SQL parsing functionality. Use `pytest` for running tests.
+
+## Memory Management for AI Agents (v0.6)
+
+The Memory Store provides long-term project knowledge persistence specifically designed for AI agents during continuous development. Unlike short-term conversation history, Memory Store preserves curated project knowledge.
+
+### Core Concept
+
+**Memory = Structured Project Knowledge**
+
+When AI agents work on a project over time, they need to remember:
+- **Decisions**: Architecture choices, technology selections, and their rationale
+- **Preferences**: Coding styles, tools, and team conventions
+- **Experiences**: Problems encountered and their solutions
+- **Conventions**: Team rules, naming patterns, and best practices
+- **Plans**: Future improvements and TODOs
+- **Notes**: Other important project information
+
+### Why Memory is Essential for AI Coding
+
+1. **Cross-Session Continuity**: Remember decisions made in previous sessions
+2. **Avoid Repeating Mistakes**: Recall past problems and solutions
+3. **Maintain Consistency**: Follow established patterns and conventions
+4. **Track Evolution**: Document how decisions change over time
+5. **Preserve Rationale**: Remember *why* something was done, not just *what* was done
+
+### Memory Types and Use Cases
+
+```python
+# Decision - Architecture and technical choices
+{
+    "type": "decision",
+    "title": "Use JWT for authentication",
+    "content": "Decided to use JWT tokens instead of session-based auth",
+    "reason": "Need stateless authentication for mobile clients",
+    "importance": 0.9,
+    "tags": ["auth", "architecture"]
+}
+
+# Preference - Team coding style and tool choices
+{
+    "type": "preference",
+    "title": "Use raw SQL instead of ORM",
+    "content": "Team prefers writing raw SQL queries",
+    "reason": "Better performance control and team familiarity",
+    "importance": 0.6,
+    "tags": ["database", "coding-style"]
+}
+
+# Experience - Problems and solutions
+{
+    "type": "experience",
+    "title": "Redis connection timeout in Docker",
+    "content": "Redis fails with localhost in Docker",
+    "reason": "Docker requires service name instead of localhost",
+    "importance": 0.7,
+    "tags": ["docker", "redis", "networking"]
+}
+
+# Convention - Team rules and standards
+{
+    "type": "convention",
+    "title": "API endpoints must use kebab-case",
+    "content": "All REST API endpoints use kebab-case naming",
+    "importance": 0.5,
+    "tags": ["api", "naming"]
+}
+
+# Plan - Future work and improvements
+{
+    "type": "plan",
+    "title": "Migrate to PostgreSQL 16",
+    "content": "Plan to upgrade PostgreSQL for performance improvements",
+    "importance": 0.4,
+    "tags": ["database", "upgrade"]
+}
+```
+
+### MCP Tools for AI Agents
+
+The Memory Store provides 7 MCP tools (available in Claude Desktop, VSCode with MCP, etc.):
+
+1. **add_memory**: Save new project knowledge
+2. **search_memories**: Find relevant memories when starting tasks
+3. **get_memory**: Retrieve specific memory by ID
+4. **update_memory**: Modify existing memory
+5. **delete_memory**: Remove memory (soft delete)
+6. **supersede_memory**: Create new memory that replaces old one
+7. **get_project_summary**: Get overview of all project memories
+
+### Typical AI Agent Workflow
+
+```
+1. Start working on a feature
+   ↓
+2. search_memories(query="feature area", memory_type="decision")
+   - Find related past decisions
+   - Check team preferences
+   - Review known issues
+   ↓
+3. Implement feature following established patterns
+   ↓
+4. add_memory() to save:
+   - Implementation decisions
+   - Problems encountered
+   - Solutions discovered
+   ↓
+5. Next session: Agent remembers everything
+```
+
+### HTTP API
+
+For web clients and custom integrations:
+
+```bash
+# Add a decision
+POST /api/v1/memory/add
+{
+    "project_id": "myapp",
+    "memory_type": "decision",
+    "title": "Use PostgreSQL",
+    "content": "Selected PostgreSQL for main database",
+    "reason": "Need advanced JSON support",
+    "importance": 0.9,
+    "tags": ["database", "architecture"]
+}
+
+# Search memories
+POST /api/v1/memory/search
+{
+    "project_id": "myapp",
+    "query": "database",
+    "memory_type": "decision",
+    "min_importance": 0.7
+}
+
+# Get project summary
+GET /api/v1/memory/project/myapp/summary
+```
+
+### Memory Evolution
+
+When decisions change, use `supersede_memory` to maintain history:
+
+```python
+# Original decision
+old_id = add_memory(
+    title="Use MySQL",
+    content="Selected MySQL for database",
+    importance=0.7
+)
+
+# Later: Decision changes
+supersede_memory(
+    old_memory_id=old_id,
+    new_title="Migrate to PostgreSQL",
+    new_content="Migrating from MySQL to PostgreSQL",
+    new_reason="Need advanced features",
+    new_importance=0.9
+)
+
+# Result:
+# - New memory becomes primary
+# - Old memory marked as superseded
+# - History preserved
+```
+
+### Implementation Details
+
+**Storage**: Neo4j graph database
+- Nodes: `Memory`, `Project`
+- Relationships: `BELONGS_TO`, `RELATES_TO`, `SUPERSEDES`
+- Indexes: Fulltext search on title, content, reason, tags
+
+**Key Files**:
+- `services/memory_store.py`: Core memory management service
+- `api/memory_routes.py`: HTTP API endpoints
+- `services/memory_extractor.py`: Future auto-extraction (placeholder)
+- `mcp_server.py` (lines 1407-1885): MCP tool implementations
+- `tests/test_memory_store.py`: Comprehensive tests
+- `examples/memory_usage_example.py`: Usage examples
+
+### Manual vs Automatic Memory Curation
+
+**v0.6 (Current)**: Manual curation
+- AI agent explicitly calls `add_memory` to save knowledge
+- User can manually add memories via API
+- Full control over what gets saved
+
+**Future (v0.7+)**: Automatic extraction
+- Extract from git commits
+- Mine from code comments
+- Analyze conversations
+- Auto-suggest important memories
+
+### Best Practices
+
+1. **Importance Scoring**:
+   - 0.9-1.0: Critical decisions, security findings
+   - 0.7-0.8: Important architectural choices
+   - 0.5-0.6: Preferences and conventions
+   - 0.3-0.4: Plans and future work
+   - 0.0-0.2: Minor notes
+
+2. **Tagging Strategy**:
+   - Use domain tags: `auth`, `database`, `api`
+   - Use type tags: `security`, `performance`, `bug`
+   - Use status tags: `critical`, `deprecated`
+
+3. **When to Save Memory**:
+   - After making architecture decisions
+   - When solving a tricky bug
+   - When establishing team conventions
+   - When discovering important limitations
+
+4. **Search Strategy**:
+   - Search before starting work on a feature
+   - Use tags to filter by domain
+   - Use `min_importance` to focus on key decisions
+   - Review project summary periodically
+
+### Examples
+
+See `examples/memory_usage_example.py` for complete working examples of:
+- Direct service usage
+- HTTP API usage
+- AI agent workflow
+- Memory evolution
+- MCP tool invocations
