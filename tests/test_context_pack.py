@@ -153,17 +153,46 @@ class TestPackBuilder:
             assert "important" in first_item["ref"]
 
     @pytest.mark.unit
-    def test_extract_title(self):
-        """Test title extraction from path"""
+    def test_title_extraction_via_build_context_pack(self):
+        """Test that titles are properly extracted from paths via build_context_pack"""
         pack_builder = PackBuilder()
 
-        # Test with multi-level path
-        title = pack_builder._extract_title("src/auth/token.py")
-        assert title == "auth/token.py"
+        nodes = [
+            {
+                "type": "file",
+                "path": "src/auth/token.py",
+                "lang": "python",
+                "score": 0.9,
+                "summary": "Test file",
+                "ref": "ref://file/src/auth/token.py"
+            },
+            {
+                "type": "file",
+                "path": "main.py",
+                "lang": "python",
+                "score": 0.8,
+                "summary": "Test file",
+                "ref": "ref://file/main.py"
+            }
+        ]
 
-        # Test with single level
-        title = pack_builder._extract_title("main.py")
-        assert title == "main.py"
+        pack = pack_builder.build_context_pack(
+            nodes=nodes,
+            budget=1500,
+            stage="plan",
+            repo_id="test-repo"
+        )
+
+        # Verify titles are extracted correctly (last 2 path segments)
+        assert len(pack["items"]) == 2
+        
+        # Multi-level path should show last 2 segments
+        multi_level_item = next(item for item in pack["items"] if "auth" in item["ref"])
+        assert multi_level_item["title"] == "auth/token.py"
+        
+        # Single level path should show as-is
+        single_level_item = next(item for item in pack["items"] if item["ref"] == "ref://file/main.py")
+        assert single_level_item["title"] == "main.py"
 
 
 class TestContextPackAPI:
