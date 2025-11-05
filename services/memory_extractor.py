@@ -34,6 +34,15 @@ class MemoryExtractor:
     - Auto-suggest memories from knowledge queries
     """
 
+    # Processing limits
+    MAX_COMMITS_TO_PROCESS = 20  # Maximum commits to analyze in batch processing
+    MAX_FILES_TO_SAMPLE = 30  # Maximum files to scan for comments
+    MAX_ITEMS_PER_TYPE = 3  # Top items per memory type to include
+    MAX_README_LINES = 20  # Maximum README lines to process for overview
+    MAX_STRING_EXCERPT_LENGTH = 200  # Maximum length for string excerpts in responses
+    MAX_CONTENT_LENGTH = 500  # Maximum length for content fields
+    MAX_TITLE_LENGTH = 100  # Maximum length for title fields
+
     def __init__(self):
         self.extraction_enabled = True
         self.confidence_threshold = 0.7  # Threshold for auto-saving
@@ -349,13 +358,19 @@ Return empty array [] if this is routine maintenance or trivial changes."""
             # Save extracted memories
             saved_memories = []
             for mem_data in extracted:
+                # Add file extension as tag if file has an extension
+                file_tags = mem_data.get("tags", ["code-comment"])
+                file_suffix = Path(file_path).suffix
+                if file_suffix:
+                    file_tags = file_tags + [file_suffix[1:]]
+                
                 result = await memory_store.add_memory(
                     project_id=project_id,
                     memory_type=mem_data["type"],
                     title=mem_data["title"],
                     content=mem_data["content"],
                     reason=mem_data.get("reason"),
-                    tags=mem_data.get("tags", ["code-comment"]) + [Path(file_path).suffix[1:]],
+                    tags=file_tags,
                     importance=mem_data.get("importance", 0.4),
                     related_refs=[f"ref://file/{file_path}#{mem_data.get('line', 0)}"],
                     metadata={
@@ -457,8 +472,8 @@ Respond with a single JSON object."""
             if should_save:
                 suggested_memory = {
                     "type": result.get("type", "note"),
-                    "title": result.get("title", query[:100]),
-                    "content": result.get("content", answer[:500]),
+                    "title": result.get("title", query[:self.MAX_TITLE_LENGTH]),
+                    "content": result.get("content", answer[:self.MAX_CONTENT_LENGTH]),
                     "reason": result.get("reason", "Important Q&A from knowledge query"),
                     "tags": result.get("tags", ["query-based"]),
                     "importance": result.get("importance", 0.5)
@@ -471,7 +486,7 @@ Respond with a single JSON object."""
                     "should_save": True,
                     "suggested_memory": suggested_memory,
                     "query": query,
-                    "answer_excerpt": answer[:200]
+                    "answer_excerpt": answer[:self.MAX_STRING_EXCERPT_LENGTH]
                 }
             else:
                 return {
@@ -532,7 +547,7 @@ Respond with a single JSON object."""
             logger.info(f"Analyzing last {max_commits} git commits...")
             commits = self._get_recent_commits(repo_path, max_commits)
 
-            for commit in commits[:20]:  # Focus on most recent 20 for efficiency
+            for commit in commits[:self.MAX_COMMITS_TO_PROCESS]:  # Focus on most recent commits for efficiency
                 try:
                     result = await self.extract_from_git_commit(
                         project_id=project_id,
@@ -558,7 +573,7 @@ Respond with a single JSON object."""
                 source_files.extend(repo_path_obj.rglob(pattern))
 
             # Sample files to avoid overload
-            sampled_files = list(source_files)[:30]
+            sampled_files = list(source_files)[:self.MAX_FILES_TO_SAMPLE]
 
             for file_path in sampled_files:
                 try:
@@ -636,13 +651,13 @@ Respond with a single JSON object."""
 
         # Remove markdown code blocks if present
         if "```json" in response_text:
-            response_text = re.search(r"```json\s*(.*?)\s*```", response_text, re.DOTALL)
-            if response_text:
-                response_text = response_text.group(1)
+            match = re.search(r"```json\s*(.*?)\s*```", response_text, re.DOTALL)
+            if match:
+                response_text = match.group(1)
         elif "```" in response_text:
-            response_text = re.search(r"```\s*(.*?)\s*```", response_text, re.DOTALL)
-            if response_text:
-                response_text = response_text.group(1)
+            match = re.search(r"```\s*(.*?)\s*```", response_text, re.DOTALL)
+            if match:
+                response_text = match.group(1)
 
         # Try to parse JSON
         try:
@@ -653,7 +668,7 @@ Respond with a single JSON object."""
             return result if isinstance(result, list) else []
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse JSON from LLM: {e}")
-            logger.debug(f"Response text: {response_text[:200]}")
+            logger.debug(f"Response text: {response_text[:self.MAX_STRING_EXCERPT_LENGTH]}")
             return []
 
     def _classify_commit_type(self, commit_message: str) -> str:
@@ -766,11 +781,11 @@ Respond with a single JSON object."""
                 grouped[mem_type] = []
             grouped[mem_type].append(comment)
 
-        # Take top 3 per type by importance
+        # Take top items per type by importance
         combined = []
         for mem_type, items in grouped.items():
             sorted_items = sorted(items, key=lambda x: x.get("importance", 0), reverse=True)
-            combined.extend(sorted_items[:3])
+            combined.extend(sorted_items[:self.MAX_ITEMS_PER_TYPE])
 
         return combined
 
@@ -829,7 +844,7 @@ Respond with a single JSON object."""
             # Extract first few paragraphs as project overview
             lines = content.split('\n')
             description = []
-            for line in lines[1:20]:  # Skip first line (usually title)
+            for line in lines[1:self.MAX_README_LINES]:  # Skip first line (usually title)
                 if line.strip() and not line.startswith('#'):
                     description.append(line.strip())
                 if len(description) >= 5:
@@ -839,7 +854,7 @@ Respond with a single JSON object."""
                 return {
                     "memory_type": "note",
                     "title": f"Project Overview from {filename}",
-                    "content": " ".join(description)[:500],
+                    "content": " ".join(description)[:self.MAX_CONTENT_LENGTH],
                     "reason": "Core project information from README",
                     "tags": ["documentation", "overview"],
                     "importance": 0.6
@@ -850,7 +865,7 @@ Respond with a single JSON object."""
             return {
                 "memory_type": "note",
                 "title": "Project Changelog Summary",
-                "content": content[:500],
+                "content": content[:self.MAX_CONTENT_LENGTH],
                 "reason": "Track project evolution and breaking changes",
                 "tags": ["documentation", "changelog"],
                 "importance": 0.5
@@ -911,7 +926,7 @@ async def auto_save_query_as_memory(
                     reason=suggested_memory.get("reason"),
                     tags=suggested_memory.get("tags", []),
                     importance=importance,
-                    metadata={"source": "auto_query", "query": query[:200]}
+                    metadata={"source": "auto_query", "query": query[:self.MAX_STRING_EXCERPT_LENGTH]}
                 )
 
                 if save_result.get("success"):

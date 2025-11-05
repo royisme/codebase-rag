@@ -24,10 +24,10 @@ class TestToolDefinitions:
     """Test suite for tool definitions"""
 
     def test_get_tool_definitions_count(self):
-        """Test that all 25 tools are defined"""
+        """Test that all 30 tools are defined"""
         tools = get_tool_definitions()
 
-        assert len(tools) == 25, "Should have exactly 25 tools"
+        assert len(tools) == 30, "Should have exactly 30 tools"
 
     def test_get_tool_definitions_knowledge_tools(self):
         """Test knowledge base tool definitions"""
@@ -57,7 +57,7 @@ class TestToolDefinitions:
         tools = get_tool_definitions()
         tool_names = [t.name for t in tools]
 
-        # Memory tools
+        # Manual memory tools
         assert "add_memory" in tool_names
         assert "search_memories" in tool_names
         assert "get_memory" in tool_names
@@ -65,6 +65,13 @@ class TestToolDefinitions:
         assert "delete_memory" in tool_names
         assert "supersede_memory" in tool_names
         assert "get_project_summary" in tool_names
+        
+        # Automatic extraction tools (v0.7)
+        assert "extract_from_conversation" in tool_names
+        assert "extract_from_git_commit" in tool_names
+        assert "extract_from_code_comments" in tool_names
+        assert "suggest_memory_from_query" in tool_names
+        assert "batch_extract_from_repository" in tool_names
 
     def test_get_tool_definitions_task_tools(self):
         """Test task management tool definitions"""
