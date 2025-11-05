@@ -7,6 +7,7 @@ from typing import Dict, Any
 import time
 from functools import wraps
 from loguru import logger
+from config import settings
 
 # Create a custom registry to avoid conflicts
 registry = CollectorRegistry()
@@ -259,7 +260,7 @@ class MetricsService:
                 return
 
             # Get node counts
-            with graph_service.driver.session(database=graph_service.neo4j_database) as session:
+            with graph_service.driver.session(database=settings.neo4j_database) as session:
                 # Count File nodes
                 result = session.run("MATCH (n:File) RETURN count(n) as count")
                 file_count = result.single()["count"]
