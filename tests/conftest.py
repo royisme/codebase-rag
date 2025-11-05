@@ -182,12 +182,7 @@ def mock_graph_service():
 @pytest.fixture
 def mock_code_ingestor():
     """Mock code ingestor factory"""
-    def _factory():
-        ingestor = AsyncMock()
-        ingestor.ingest_repo = AsyncMock()
-        ingestor.ingest_repo_incremental = AsyncMock()
-        return ingestor
-    return _factory
+    return Mock()
 
 
 @pytest.fixture
