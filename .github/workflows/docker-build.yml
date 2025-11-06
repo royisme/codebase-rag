@@ -16,7 +16,50 @@ env:
   DOCKER_REGISTRY: docker.io
 
 jobs:
+  validate-version:
+    name: Validate Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate version consistency
+        run: |
+          echo "=== Version Validation ==="
+
+          # Get version from pyproject.toml
+          PROJECT_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          echo "pyproject.toml version: $PROJECT_VERSION"
+
+          # Get version from __version__.py
+          VERSION_PY=$(grep '__version__ = ' src/__version__.py | cut -d'"' -f2)
+          echo "__version__.py version: $VERSION_PY"
+
+          # Validate Python version file
+          if [[ "$PROJECT_VERSION" != "$VERSION_PY" ]]; then
+            echo "❌ Error: Version mismatch!"
+            echo "  pyproject.toml: $PROJECT_VERSION"
+            echo "  __version__.py: $VERSION_PY"
+            exit 1
+          fi
+
+          # If this is a tag push, validate tag version
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG_VERSION=${GITHUB_REF#refs/tags/v}
+            echo "Git tag version: v$TAG_VERSION"
+
+            if [[ "$PROJECT_VERSION" != "$TAG_VERSION" ]]; then
+              echo "❌ Error: Version mismatch with tag!"
+              echo "  pyproject.toml: $PROJECT_VERSION"
+              echo "  Git tag: $TAG_VERSION"
+              exit 1
+            fi
+          fi
+
+          echo "✅ All versions consistent: $PROJECT_VERSION"
+
   build-minimal:
+    needs: validate-version
     name: Build Minimal Image
     runs-on: ubuntu-latest
     steps:
@@ -59,6 +102,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
 
   build-standard:
+    needs: validate-version
     name: Build Standard Image
     runs-on: ubuntu-latest
     steps:
@@ -101,6 +145,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
 
   build-full:
+    needs: validate-version
     name: Build Full Image
     runs-on: ubuntu-latest
     steps:
