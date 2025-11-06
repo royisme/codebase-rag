@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#3f51b5"/>
+
+  <!-- Simplified graph structure -->
+  <circle cx="32" cy="20" r="5" fill="white" opacity="0.9"/>
+  <circle cx="20" cy="38" r="5" fill="white" opacity="0.9"/>
+  <circle cx="44" cy="38" r="5" fill="white" opacity="0.9"/>
+
+  <line x1="32" y1="20" x2="20" y2="38" stroke="white" stroke-width="2" opacity="0.7"/>
+  <line x1="32" y1="20" x2="44" y2="38" stroke="white" stroke-width="2" opacity="0.7"/>
+  <line x1="20" y1="38" x2="44" y2="38" stroke="white" stroke-width="2" opacity="0.7"/>
+
+  <!-- Code symbol -->
+  <text x="32" y="52" font-family="monospace" font-size="16" font-weight="bold" fill="white" text-anchor="middle">&lt;/&gt;</text>
+</svg>

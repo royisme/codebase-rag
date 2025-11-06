@@ -1,0 +1,59 @@
+name: codebase-rag-minimal
+image: royisme/codebase-rag:minimal
+type: server
+meta:
+  category: development
+  tags:
+    - code-analysis
+    - graph-database
+    - developer-tools
+    - code-intelligence
+about:
+  title: Code Graph Knowledge System (Minimal)
+  description: |
+    Lightweight code intelligence and analysis system powered by Neo4j graph database.
+    Perfect for code navigation without LLM overhead.
+
+    Features:
+    - Repository ingestion and indexing
+    - File relationship discovery (imports, dependencies)
+    - Impact analysis (reverse dependencies)
+    - Context packing for AI assistants
+    - Full-text search on code
+
+    No LLM or embedding model required - pure graph-based intelligence.
+  icon: https://avatars.githubusercontent.com/u/182288589?s=200&v=4
+source:
+  project: https://github.com/royisme/codebase-rag
+  commit: main
+config:
+  description: Configure Neo4j connection for code graph storage
+  env:
+    - name: NEO4J_URI
+      example: bolt://neo4j:7687
+      value: '{{codebase-rag-minimal.neo4j_uri}}'
+    - name: NEO4J_USER
+      example: neo4j
+      value: '{{codebase-rag-minimal.neo4j_user}}'
+    - name: NEO4J_DATABASE
+      example: neo4j
+      value: '{{codebase-rag-minimal.neo4j_database}}'
+  secrets:
+    - name: codebase-rag-minimal.neo4j_password
+      env: NEO4J_PASSWORD
+      example: your_neo4j_password
+  parameters:
+    type: object
+    properties:
+      neo4j_uri:
+        type: string
+        default: bolt://neo4j:7687
+      neo4j_user:
+        type: string
+        default: neo4j
+      neo4j_database:
+        type: string
+        default: neo4j
+    required:
+      - neo4j_uri
+      - neo4j_user

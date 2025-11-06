@@ -1,0 +1,268 @@
+{
+  "tools": [
+    {
+      "name": "code_graph_ingest_repo",
+      "description": "Ingest a code repository into the graph database",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "local_path": {
+            "type": "string"
+          },
+          "repo_url": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["full", "incremental"],
+            "default": "incremental"
+          }
+        },
+        "required": ["local_path"]
+      }
+    },
+    {
+      "name": "code_graph_related",
+      "description": "Find files related to a query",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "repo_id": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 30
+          }
+        },
+        "required": ["query", "repo_id"]
+      }
+    },
+    {
+      "name": "code_graph_impact",
+      "description": "Analyze impact of file changes",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_id": {
+            "type": "string"
+          },
+          "file_path": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer",
+            "default": 2
+          }
+        },
+        "required": ["repo_id", "file_path"]
+      }
+    },
+    {
+      "name": "context_pack",
+      "description": "Build context pack for AI assistants",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_id": {
+            "type": "string"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "budget": {
+            "type": "integer",
+            "default": 8000
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["plan", "implement", "review"],
+            "default": "implement"
+          }
+        },
+        "required": ["repo_id", "keywords"]
+      }
+    },
+    {
+      "name": "add_memory",
+      "description": "Add a new memory to project knowledge base.\n\nMemory types:\n- decision: Architecture and technical choices\n- preference: Team coding styles and preferences\n- experience: Problems encountered and solutions\n- convention: Team rules and standards\n- plan: Future work and improvements\n- note: General notes",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Project identifier"
+          },
+          "memory_type": {
+            "type": "string",
+            "enum": ["decision", "preference", "experience", "convention", "plan", "note"],
+            "description": "Type of memory"
+          },
+          "title": {
+            "type": "string",
+            "description": "Memory title"
+          },
+          "content": {
+            "type": "string",
+            "description": "Memory content"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason or rationale"
+          },
+          "importance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.5,
+            "description": "Importance score (0-1)"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags for categorization"
+          }
+        },
+        "required": ["project_id", "memory_type", "title", "content"]
+      }
+    },
+    {
+      "name": "search_memories",
+      "description": "Search project memories using vector similarity and filters",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "memory_type": {
+            "type": "string",
+            "enum": ["decision", "preference", "experience", "convention", "plan", "note"]
+          },
+          "min_importance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "default": 10
+          }
+        },
+        "required": ["project_id", "query"]
+      }
+    },
+    {
+      "name": "get_memory",
+      "description": "Get a specific memory by ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string"
+          }
+        },
+        "required": ["memory_id"]
+      }
+    },
+    {
+      "name": "update_memory",
+      "description": "Update an existing memory",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "importance": {
+            "type": "number"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["memory_id"]
+      }
+    },
+    {
+      "name": "delete_memory",
+      "description": "Delete a memory (soft delete)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string"
+          }
+        },
+        "required": ["memory_id"]
+      }
+    },
+    {
+      "name": "supersede_memory",
+      "description": "Create a new memory that supersedes an old one (tracks evolution)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "old_memory_id": {
+            "type": "string"
+          },
+          "new_title": {
+            "type": "string"
+          },
+          "new_content": {
+            "type": "string"
+          },
+          "new_reason": {
+            "type": "string"
+          },
+          "new_importance": {
+            "type": "number"
+          }
+        },
+        "required": ["old_memory_id", "new_title", "new_content"]
+      }
+    },
+    {
+      "name": "get_project_summary",
+      "description": "Get summary of all memories for a project",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string"
+          }
+        },
+        "required": ["project_id"]
+      }
+    }
+  ]
+}

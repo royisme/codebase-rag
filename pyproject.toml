@@ -1,7 +1,7 @@
 [project]
 name = "code-graph"
-version = "0.3.0"
-description = "Add your description here"
+version = "0.7.0"
+description = "AI-powered code intelligence and knowledge management system with graph database"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -33,6 +33,17 @@ dependencies = [
     "nicegui>=2.19.0",
     "llama-index-llms-openrouter>=0.3.2",
     "prometheus-client>=0.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "bump-my-version>=0.26.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "ruff>=0.6.0",
 ]
 
 [project.scripts]

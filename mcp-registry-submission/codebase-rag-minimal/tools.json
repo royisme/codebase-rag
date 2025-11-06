@@ -1,0 +1,117 @@
+{
+  "tools": [
+    {
+      "name": "code_graph_ingest_repo",
+      "description": "Ingest a code repository into the graph database.\n\nModes:\n- full: Complete re-ingestion (slow but thorough)\n- incremental: Only changed files (60x faster)\n\nExtracts:\n- File nodes\n- Symbol nodes (functions, classes)\n- IMPORTS relationships\n- Code structure",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "local_path": {
+            "type": "string",
+            "description": "Local repository path"
+          },
+          "repo_url": {
+            "type": "string",
+            "description": "Repository URL (optional)"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["full", "incremental"],
+            "default": "incremental",
+            "description": "Ingestion mode"
+          }
+        },
+        "required": ["local_path"]
+      }
+    },
+    {
+      "name": "code_graph_related",
+      "description": "Find files related to a query using fulltext search.\n\nReturns ranked list of relevant files with ref:// handles.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "repo_id": {
+            "type": "string",
+            "description": "Repository identifier"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 30,
+            "description": "Max results"
+          }
+        },
+        "required": ["query", "repo_id"]
+      }
+    },
+    {
+      "name": "code_graph_impact",
+      "description": "Analyze impact of changes to a file.\n\nFinds all files that depend on the given file (reverse dependencies).\nUseful for understanding blast radius of changes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_id": {
+            "type": "string",
+            "description": "Repository identifier"
+          },
+          "file_path": {
+            "type": "string",
+            "description": "File path to analyze"
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "default": 2,
+            "description": "Traversal depth"
+          }
+        },
+        "required": ["repo_id", "file_path"]
+      }
+    },
+    {
+      "name": "context_pack",
+      "description": "Build context pack for AI coding assistants.\n\nPacks relevant files and symbols into a token-budgeted context suitable for LLM consumption.\n\nStages:\n- plan: Planning phase context\n- implement: Implementation context\n- review: Code review context",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_id": {
+            "type": "string",
+            "description": "Repository identifier"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Keywords to search for"
+          },
+          "budget": {
+            "type": "integer",
+            "default": 8000,
+            "description": "Token budget"
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["plan", "implement", "review"],
+            "default": "implement",
+            "description": "Development stage"
+          },
+          "focus_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Paths to prioritize"
+          }
+        },
+        "required": ["repo_id", "keywords"]
+      }
+    }
+  ]
+}

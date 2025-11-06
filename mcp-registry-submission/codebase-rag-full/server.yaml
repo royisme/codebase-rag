@@ -1,0 +1,111 @@
+name: codebase-rag-full
+image: royisme/codebase-rag:full
+type: server
+meta:
+  category: development
+  tags:
+    - code-analysis
+    - knowledge-management
+    - rag
+    - ai-assistant
+    - developer-tools
+    - llm
+about:
+  title: Code Graph Knowledge System (Full)
+  description: |
+    Complete AI-powered code intelligence and knowledge management system.
+    Combines code graph analysis, memory management, and RAG capabilities.
+
+    Features:
+    - All Code Graph features (repository analysis, impact analysis)
+    - All Memory Store features (manual + vector search)
+    - Automatic memory extraction from:
+      • Git commits and history
+      • AI conversations
+      • Code comments (TODO/FIXME/NOTE)
+    - Knowledge Base RAG:
+      • Document ingestion and indexing
+      • Intelligent Q&A over codebase
+      • Multi-format support (Markdown, PDF, code)
+    - Batch repository analysis
+
+    Requires: LLM + Embedding model (Ollama/OpenAI/Gemini/OpenRouter)
+    Perfect for AI-assisted development workflows.
+  icon: https://avatars.githubusercontent.com/u/182288589?s=200&v=4
+source:
+  project: https://github.com/royisme/codebase-rag
+  commit: main
+config:
+  description: Configure Neo4j connection, LLM provider, and embedding model
+  env:
+    - name: NEO4J_URI
+      example: bolt://neo4j:7687
+      value: '{{codebase-rag-full.neo4j_uri}}'
+    - name: NEO4J_USER
+      example: neo4j
+      value: '{{codebase-rag-full.neo4j_user}}'
+    - name: NEO4J_DATABASE
+      example: neo4j
+      value: '{{codebase-rag-full.neo4j_database}}'
+    - name: LLM_PROVIDER
+      example: ollama
+      value: '{{codebase-rag-full.llm_provider}}'
+    - name: EMBEDDING_PROVIDER
+      example: ollama
+      value: '{{codebase-rag-full.embedding_provider}}'
+    - name: OLLAMA_BASE_URL
+      example: http://host.docker.internal:11434
+      value: '{{codebase-rag-full.ollama_base_url}}'
+    - name: OLLAMA_MODEL
+      example: llama3.2
+      value: '{{codebase-rag-full.ollama_model}}'
+    - name: OLLAMA_EMBEDDING_MODEL
+      example: nomic-embed-text
+      value: '{{codebase-rag-full.ollama_embedding_model}}'
+  secrets:
+    - name: codebase-rag-full.neo4j_password
+      env: NEO4J_PASSWORD
+      example: your_neo4j_password
+    - name: codebase-rag-full.openai_api_key
+      env: OPENAI_API_KEY
+      example: sk-...
+    - name: codebase-rag-full.google_api_key
+      env: GOOGLE_API_KEY
+      example: your_gemini_api_key
+    - name: codebase-rag-full.openrouter_api_key
+      env: OPENROUTER_API_KEY
+      example: your_openrouter_api_key
+  parameters:
+    type: object
+    properties:
+      neo4j_uri:
+        type: string
+        default: bolt://neo4j:7687
+      neo4j_user:
+        type: string
+        default: neo4j
+      neo4j_database:
+        type: string
+        default: neo4j
+      llm_provider:
+        type: string
+        enum: [ollama, openai, gemini, openrouter]
+        default: ollama
+      embedding_provider:
+        type: string
+        enum: [ollama, openai, gemini]
+        default: ollama
+      ollama_base_url:
+        type: string
+        default: http://host.docker.internal:11434
+      ollama_model:
+        type: string
+        default: llama3.2
+      ollama_embedding_model:
+        type: string
+        default: nomic-embed-text
+    required:
+      - neo4j_uri
+      - neo4j_user
+      - llm_provider
+      - embedding_provider
