@@ -596,7 +596,7 @@ curl http://localhost:8000/api/v1/health
 - **[Claude Desktop Setup](claude-desktop.md)**: Configure Claude Desktop
 - **[VS Code Setup](vscode.md)**: Configure VS Code extension
 - **[Deployment Guide](../../deployment/full.md)**: Deploy MCP server
-- **[Custom Tools](../../development/custom-tools.md)**: Create your own tools
+- **[Contributing Guide](../../development/contributing.md)**: Extend with custom tools
 
 ## Additional Resources
 

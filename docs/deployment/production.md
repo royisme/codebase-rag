@@ -509,7 +509,7 @@ docker-compose up -d
 
 ## 📚 Next Steps
 
-- [Monitoring & Observability](monitoring.md)
-- [Performance Tuning](performance.md)
-- [Disaster Recovery](disaster-recovery.md)
-- [Scaling Guide](scaling.md)
+- [System Architecture](../architecture/design.md) - Scalability and disaster recovery
+- [Troubleshooting Guide](../troubleshooting.md) - Common production issues
+- [Docker Guide](docker.md) - Advanced Docker configuration
+- [FAQ](../faq.md) - Frequently asked questions

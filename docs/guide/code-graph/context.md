@@ -1284,7 +1284,7 @@ You've now learned all four Code Graph features:
 
 - **[Installation](../../getting-started/installation.md)**: Set up Code Graph
 - **[Quick Start](../../getting-started/quickstart.md)**: Get started in 5 minutes
-- **[MCP Setup](../../guide/mcp/setup.md)**: Configure Claude Desktop integration
+- **[MCP Setup](../mcp/claude-desktop.md)**: Configure Claude Desktop integration
 
 ## Reference
 

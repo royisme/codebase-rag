@@ -178,6 +178,11 @@ nav:
     - Development Setup: development/setup.md
     - Testing: development/testing.md
     - Release Process: development/release.md
+  - Technical Notes:
+    - Implementation Summary: IMPLEMENTATION_SUMMARY.md
+    - MCP Migration Guide: MCP_MIGRATION_GUIDE.md
+    - MCP V2 Modularization: MCP_V2_MODULARIZATION.md
+    - v0.6 Summary: v0.6-SUMMARY.md
   - Troubleshooting: troubleshooting.md
   - FAQ: faq.md
   - Changelog: changelog.md

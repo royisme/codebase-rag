@@ -57,7 +57,7 @@ Yes! Code Graph Knowledge System is open source under [appropriate license]. You
 
 ### Who maintains this project?
 
-The project is maintained by a team of contributors led by [@royisme](https://github.com/royisme). See [CONTRIBUTORS.md](./CONTRIBUTORS.md) for the full list.
+The project is maintained by a team of contributors led by [@royisme](https://github.com/royisme). See [Contributing Guide](./development/contributing.md) to join the community.
 
 ## Deployment and Installation
 
@@ -514,7 +514,7 @@ extract_from_code_comments(project_id, file_path)
 batch_extract_from_repository(project_id, repo_path)
 ```
 
-See [Memory Extraction Guide](./guide/memory-extraction.md) for details.
+See [Memory Extraction Guide](./guide/memory/extraction.md) for details.
 
 ### How do I search memories?
 
@@ -853,7 +853,7 @@ LOG_LEVEL=INFO  # Log all API access
 - Server-Sent Events (SSE) for task monitoring
 - WebSocket (via NiceGUI monitoring UI)
 
-See [API Documentation](./api/endpoints.md) for details.
+See [REST API Documentation](./api/rest.md) for details.
 
 ### Can I integrate this with my CI/CD pipeline?
 
