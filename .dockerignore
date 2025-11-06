@@ -66,6 +66,8 @@ frontend/coverage/
 node_modules/
 package-lock.json
 yarn.lock
+# But allow frontend's package-lock.json for npm ci
+!frontend/package-lock.json
 
 # Environment
 .env

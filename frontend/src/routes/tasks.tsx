@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
@@ -24,7 +23,6 @@ function TasksPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
   // File upload state
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadMessage, setUploadMessage] = useState<string>('')
 
   // Directory processing state
@@ -71,7 +69,6 @@ function TasksPage() {
     },
     onSuccess: (data) => {
       setUploadMessage(`File uploaded successfully! Task ID: ${data.data.task_id}`)
-      setUploadFile(null)
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
     onError: (error: any) => {

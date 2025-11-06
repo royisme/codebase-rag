@@ -4,7 +4,7 @@ import { taskApi, healthApi } from './api'
 
 // Mock axios
 vi.mock('axios')
-const mockedAxios = axios as jest.Mocked<typeof axios>
+const mockedAxios = axios as any
 
 describe('API', () => {
   beforeEach(() => {

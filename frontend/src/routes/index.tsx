@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { healthApi } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Activity, Database, Server, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { Activity, Database, Server, CheckCircle2, AlertCircle } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,

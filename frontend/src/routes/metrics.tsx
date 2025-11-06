@@ -56,7 +56,7 @@ function MetricsPage() {
   const getMetricSum = (name: string) => {
     const metric = metrics[name]
     if (!metric) return 0
-    return metric.reduce((sum, m) => sum + (m.value || 0), 0)
+    return metric.reduce((sum: number, m: any) => sum + (m.value || 0), 0)
   }
 
   const neo4jConnected = getMetricValue('neo4j_connected')
@@ -156,7 +156,7 @@ function MetricsPage() {
 
             {metrics['graph_queries_total'] && (
               <div className="space-y-2">
-                {metrics['graph_queries_total'].map((m, idx) => {
+                {metrics['graph_queries_total'].map((m: any, idx: number) => {
                   const opMatch = m.full.match(/operation="([^"]+)"/)
                   const statusMatch = m.full.match(/status="([^"]+)"/)
                   return (
@@ -187,7 +187,7 @@ function MetricsPage() {
               <h4 className="text-sm font-medium mb-2">Nodes by Label</h4>
               <div className="space-y-2">
                 {metrics['neo4j_nodes_total'] ? (
-                  metrics['neo4j_nodes_total'].map((m, idx) => {
+                  metrics['neo4j_nodes_total'].map((m: any, idx: number) => {
                     const labelMatch = m.full.match(/label="([^"]+)"/)
                     return (
                       <div key={idx} className="flex items-center justify-between text-sm">
@@ -209,7 +209,7 @@ function MetricsPage() {
               <h4 className="text-sm font-medium mb-2">Relationships by Type</h4>
               <div className="space-y-2">
                 {metrics['neo4j_relationships_total'] ? (
-                  metrics['neo4j_relationships_total'].map((m, idx) => {
+                  metrics['neo4j_relationships_total'].map((m: any, idx: number) => {
                     const typeMatch = m.full.match(/type="([^"]+)"/)
                     return (
                       <div key={idx} className="flex items-center justify-between text-sm">
