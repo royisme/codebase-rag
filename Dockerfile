@@ -109,9 +109,19 @@ RUN if [ -d frontend/dist ]; then \
 # Switch to non-root user
 USER appuser
 
-# Expose port (HTTP API only)
-# Note: MCP service (start_mcp.py) uses stdio, NOT HTTP port
-# MCP runs separately on host machine, calls this HTTP API
+# Expose port 8000 (MCP SSE + HTTP API + Web UI)
+#
+# SERVICE PRIORITY:
+#   PRIMARY: MCP SSE service at /mcp/* (core功能)
+#     - GET  /mcp/sse       - MCP SSE connection endpoint
+#     - POST /mcp/messages/ - MCP message receiving endpoint
+#
+#   SECONDARY: Web UI & REST API (status monitoring)
+#     - GET  /              - Web UI (React SPA)
+#     - *    /api/v1/*      - REST API endpoints
+#     - GET  /metrics       - Prometheus metrics
+#
+# Note: Legacy start_mcp.py (stdio) still available for local development
 EXPOSE 8000
 
 # Health check

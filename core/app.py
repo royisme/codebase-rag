@@ -1,6 +1,10 @@
 """
 FastAPI application configuration module
 Responsible for creating and configuring FastAPI application instance
+
+ARCHITECTURE PRIORITY:
+  PRIMARY: MCP service (SSE transport at /mcp/*)
+  SECONDARY: Web UI & REST API (for status monitoring)
 """
 
 from fastapi import FastAPI, Request
@@ -16,6 +20,7 @@ from .exception_handlers import setup_exception_handlers
 from .middleware import setup_middleware
 from .routes import setup_routes
 from .lifespan import lifespan
+from .mcp_sse import create_mcp_sse_app
 
 
 def create_app() -> FastAPI:
@@ -39,6 +44,26 @@ def create_app() -> FastAPI:
     # set routes
     setup_routes(app)
 
+    # ========================================================================
+    # PRIMARY SERVICE: MCP SSE Transport
+    # ========================================================================
+    # Mount MCP SSE service at /mcp/*
+    # This is the CORE service - MCP tools accessible via network
+    logger.info("="*70)
+    logger.info("MCP SERVICE (PRIMARY)")
+    logger.info("="*70)
+
+    mcp_app = create_mcp_sse_app()
+    app.mount("/mcp", mcp_app)
+
+    logger.info("✅ MCP SSE service mounted at /mcp/*")
+    logger.info("   - MCP SSE endpoint: GET /mcp/sse")
+    logger.info("   - MCP messages: POST /mcp/messages/")
+    logger.info("="*70)
+
+    # ========================================================================
+    # SECONDARY SERVICE: Web UI (Status Monitoring)
+    # ========================================================================
     # Check if static directory exists (contains built React frontend)
     static_dir = "static"
     if os.path.exists(static_dir) and os.path.exists(os.path.join(static_dir, "index.html")):
