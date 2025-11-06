@@ -30,7 +30,7 @@ jobs:
           echo "pyproject.toml version: $PROJECT_VERSION"
 
           # Get version from __version__.py
-          VERSION_PY=$(grep '__version__ = ' src/__version__.py | cut -d'"' -f2)
+          VERSION_PY=$(grep '__version__ = ' src/codebase_rag/__version__.py | cut -d'"' -f2)
           echo "__version__.py version: $VERSION_PY"
 
           # Validate Python version file

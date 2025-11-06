@@ -48,8 +48,11 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 
 # Copy application code
-COPY --chown=appuser:appuser src ./src
-COPY --chown=appuser:appuser start.py start_mcp.py config.py main.py ./
+COPY --chown=appuser:appuser api ./api
+COPY --chown=appuser:appuser core ./core
+COPY --chown=appuser:appuser services ./services
+COPY --chown=appuser:appuser mcp_tools ./mcp_tools
+COPY --chown=appuser:appuser start.py start_mcp.py mcp_server.py config.py main.py ./
 
 # Copy pre-built frontend (MUST exist - run ./build-frontend.sh first)
 COPY --chown=appuser:appuser frontend/dist ./static

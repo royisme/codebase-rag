@@ -50,7 +50,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy application source code for local package installation
 COPY pyproject.toml README.md ./
-COPY src ./src
+COPY api ./api
+COPY core ./core
+COPY services ./services
+COPY mcp_tools ./mcp_tools
 COPY *.py ./
 
 # Install local package (without dependencies, already installed)
