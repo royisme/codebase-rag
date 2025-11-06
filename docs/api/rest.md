@@ -6,21 +6,6 @@ Complete reference for Code Graph Knowledge System REST API endpoints.
 
 **Version**: 1.0.0
 
-## Table of Contents
-
-- [Authentication](#authentication)
-- [Health & System](#health--system)
-- [Knowledge Base](#knowledge-base)
-- [Memory Management](#memory-management)
-- [Memory Extraction (v0.7)](#memory-extraction-v07)
-- [Code Graph](#code-graph)
-- [Task Management](#task-management)
-- [SQL Parsing](#sql-parsing)
-- [Real-time Monitoring (SSE)](#real-time-monitoring-sse)
-- [Error Handling](#error-handling)
-
----
-
 ## Authentication
 
 Currently, the API does not require authentication. This may be added in future versions.

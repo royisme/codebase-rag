@@ -6,23 +6,6 @@ Complete reference for all 30 Model Context Protocol (MCP) tools available in th
 **MCP Protocol Version**: 1.1.0
 **Total Tools**: 30
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Installation & Setup](#installation--setup)
-- [Tool Categories](#tool-categories)
-- [Knowledge Base Tools (5)](#knowledge-base-tools-5)
-- [Code Graph Tools (4)](#code-graph-tools-4)
-- [Memory Store Tools (7)](#memory-store-tools-7)
-- [Memory Extraction Tools (5)](#memory-extraction-tools-5)
-- [Task Management Tools (6)](#task-management-tools-6)
-- [System Tools (3)](#system-tools-3)
-- [Resources](#resources)
-- [Prompts](#prompts)
-- [Error Handling](#error-handling)
-
----
-
 ## Overview
 
 The MCP server provides AI assistants (like Claude Desktop, VS Code with MCP, etc.) with direct access to the Code Graph Knowledge System through the official Model Context Protocol SDK.

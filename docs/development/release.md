@@ -2,19 +2,6 @@
 
 This guide covers the complete release process for the Code Graph Knowledge System, including version management, Docker builds, and deployment.
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Version Strategy](#version-strategy)
-- [Pre-Release Checklist](#pre-release-checklist)
-- [Release Process](#release-process)
-- [Docker Image Builds](#docker-image-builds)
-- [GitHub Release](#github-release)
-- [Documentation Updates](#documentation-updates)
-- [Post-Release Tasks](#post-release-tasks)
-- [Hotfix Process](#hotfix-process)
-- [Rollback Procedures](#rollback-procedures)
-
 ## Overview
 
 ### Release Types
