@@ -58,16 +58,26 @@ tests/
 pytest.ini
 .pytest_cache/
 
-# Frontend - Exclude development artifacts but allow source
+# Frontend - Exclude development artifacts
+# We pre-build frontend outside Docker and include dist/ only
 frontend/node_modules/
-frontend/dist/
 frontend/.vite/
 frontend/coverage/
+frontend/src/
+frontend/public/
+frontend/*.json
+frontend/*.config.*
+frontend/*.md
+frontend/.eslintrc*
+frontend/tsconfig*
+frontend/index.html
 node_modules/
 package-lock.json
 yarn.lock
-# But allow frontend's package-lock.json for npm ci
-!frontend/package-lock.json
+bun.lockb
+
+# Allow pre-built frontend dist (compiled static files)
+!frontend/dist/
 
 # Environment
 .env

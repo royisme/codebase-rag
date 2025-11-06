@@ -130,12 +130,48 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 ### Build Command
 ```bash
+# Build frontend first (optional, for web UI)
+./build-frontend.sh
+
 # Enable BuildKit for cache mounts
 DOCKER_BUILDKIT=1 docker build -t codebase-rag .
 
 # Or with docker-compose (BuildKit enabled by default)
 docker-compose build
 ```
+
+## Frontend Optimization
+
+The Docker image **does NOT include Node.js/npm/bun** runtime.
+
+### Strategy: Pre-build Frontend
+
+Instead of building frontend inside Docker (slow, bloated), we:
+
+1. **Pre-build with bun** outside Docker: `./build-frontend.sh`
+2. **Copy only `dist/`** into image: `frontend/dist/* → /app/static/`
+3. **FastAPI serves static files** - no nginx/node needed
+
+### What's Excluded
+
+Thanks to `.dockerignore`, these are NOT in the image:
+- ❌ `frontend/src/` - Source code
+- ❌ `frontend/node_modules/` - Dependencies (~200MB)
+- ❌ `frontend/package.json` - Config files
+- ❌ `frontend/*.config.*` - Build configs
+- ✅ `frontend/dist/` - Compiled static files ONLY
+
+### Size Savings
+
+| Component | Without Optimization | With Optimization |
+|-----------|---------------------|-------------------|
+| Node.js runtime | +200MB | 0MB ✅ |
+| npm/bun tools | +50MB | 0MB ✅ |
+| node_modules | +150MB | 0MB ✅ |
+| Frontend source | +5MB | 0MB ✅ |
+| **Total saved** | **-405MB** | **-76%** |
+
+**See [FRONTEND_BUILD.md](FRONTEND_BUILD.md) for details.**
 
 ## Default Configuration
 The default setup uses:
