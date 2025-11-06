@@ -48,7 +48,7 @@ Each variant contains:
 ✅ **Dockerfile**: Available in repository (`docker/Dockerfile.*`)
 ✅ **Tools List**: Provided (`tools.json`) - prevents build failures
 ✅ **Public Repository**: https://github.com/royisme/codebase-rag
-✅ **Documentation**: https://docs.vantagecraft.dev (once deployed)
+✅ **Documentation**: https://code-graph.vantagecraft.dev (once deployed)
 
 ## Configuration Requirements
 
@@ -70,11 +70,11 @@ Each variant contains:
 - Images support both AMD64 and ARM64 architectures
 - Neo4j database runs as separate container (configured in docker-compose)
 - Users can choose cloud or local LLM providers
-- Documentation available at https://docs.vantagecraft.dev
+- Documentation available at https://code-graph.vantagecraft.dev
 
 ## Links
 
 - **Repository**: https://github.com/royisme/codebase-rag
 - **Docker Hub**: https://hub.docker.com/r/royisme/codebase-rag
-- **Documentation**: https://docs.vantagecraft.dev
+- **Documentation**: https://code-graph.vantagecraft.dev
 - **Issues**: https://github.com/royisme/codebase-rag/issues

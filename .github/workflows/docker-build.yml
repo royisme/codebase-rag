@@ -180,7 +180,7 @@ jobs:
 
             ## Quick Start
 
-            See [documentation](https://docs.vantagecraft.dev) for detailed setup instructions.
+            See [documentation](https://code-graph.vantagecraft.dev) for detailed setup instructions.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

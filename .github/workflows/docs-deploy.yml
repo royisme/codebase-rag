@@ -70,4 +70,4 @@ jobs:
       - name: Notify deployment
         run: |
           echo "📚 Documentation deployed successfully!"
-          echo "🔗 URL: https://docs.vantagecraft.dev"
+          echo "🔗 URL: https://code-graph.vantagecraft.dev"

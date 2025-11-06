@@ -40,7 +40,7 @@ Value: 185.199.111.153
 1. Create `docs/CNAME` file:
 
 ```bash
-echo "docs.vantagecraft.dev" > docs/CNAME
+echo "code-graph.vantagecraft.dev" > docs/CNAME
 ```
 
 2. Enable GitHub Pages in repository settings:
@@ -57,7 +57,7 @@ git commit -m "Add documentation"
 git push origin main
 ```
 
-Your documentation will be available at: **https://docs.vantagecraft.dev**
+Your documentation will be available at: **https://code-graph.vantagecraft.dev**
 
 ### Option 2: Self-Hosted (Nginx)
 
@@ -84,22 +84,22 @@ mkdocs build
 #### Step 2: Configure Nginx
 
 ```nginx
-# /etc/nginx/sites-available/docs.vantagecraft.dev
+# /etc/nginx/sites-available/code-graph.vantagecraft.dev
 
 server {
     listen 80;
-    server_name docs.vantagecraft.dev;
+    server_name code-graph.vantagecraft.dev;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name docs.vantagecraft.dev;
+    server_name code-graph.vantagecraft.dev;
 
-    ssl_certificate /etc/letsencrypt/live/docs.vantagecraft.dev/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/docs.vantagecraft.dev/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/code-graph.vantagecraft.dev/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/code-graph.vantagecraft.dev/privkey.pem;
 
-    root /var/www/docs.vantagecraft.dev;
+    root /var/www/code-graph.vantagecraft.dev;
     index index.html;
 
     location / {
@@ -123,7 +123,7 @@ server {
 
 ```bash
 # Copy built site to server
-rsync -avz site/ user@server:/var/www/docs.vantagecraft.dev/
+rsync -avz site/ user@server:/var/www/code-graph.vantagecraft.dev/
 
 # Reload Nginx
 ssh user@server 'sudo nginx -t && sudo systemctl reload nginx'
@@ -136,7 +136,7 @@ ssh user@server 'sudo nginx -t && sudo systemctl reload nginx'
 sudo apt install certbot python3-certbot-nginx
 
 # Obtain certificate
-sudo certbot --nginx -d docs.vantagecraft.dev
+sudo certbot --nginx -d code-graph.vantagecraft.dev
 
 # Auto-renewal is configured automatically
 ```
@@ -161,7 +161,7 @@ Root directory: /
 
 #### Step 3: Custom Domain
 
-1. Add custom domain: `docs.vantagecraft.dev`
+1. Add custom domain: `code-graph.vantagecraft.dev`
 2. Cloudflare will configure DNS automatically
 
 ---

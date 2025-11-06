@@ -154,7 +154,7 @@ Optional:
 - [x] **Tools Lists**: All `tools.json` files created
 - [x] **Server Configs**: All `server.yaml` files completed
 - [x] **Public Repository**: ✅ https://github.com/royisme/codebase-rag
-- [ ] **Documentation Site**: ⏳ docs.vantagecraft.dev (pending DNS)
+- [ ] **Documentation Site**: ⏳ code-graph.vantagecraft.dev (pending DNS)
 - [ ] **Images Published**: ⏳ Waiting for GitHub Actions push
 - [ ] **CI Passing**: ⏳ Waiting for Actions completion
 
@@ -253,7 +253,7 @@ Optional:
 
 - **Repository**: https://github.com/royisme/codebase-rag
 - **Docker Hub**: https://hub.docker.com/r/royisme/codebase-rag
-- **Documentation**: https://docs.vantagecraft.dev (pending)
+- **Documentation**: https://code-graph.vantagecraft.dev (pending)
 - **Docker MCP Registry**: https://github.com/docker/mcp-registry
 - **Submission Guide**: `mcp-registry-submission/SUBMISSION_GUIDE.md`
 

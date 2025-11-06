@@ -62,7 +62,7 @@ Minimal → Standard → Full
 - Code highlighting
 - Mermaid diagrams
 - Tabbed content
-- Configured for docs.vantagecraft.dev
+- Configured for code-graph.vantagecraft.dev
 
 **Documentation Structure**:
 ```
@@ -73,7 +73,7 @@ docs/
 ├── deployment/
 │   ├── overview.md              # Mode comparison & decision guide
 │   └── production.md            # Production deployment guide
-└── CNAME                        # docs.vantagecraft.dev
+└── CNAME                        # code-graph.vantagecraft.dev
 ```
 
 **Key Features**:
@@ -92,7 +92,7 @@ docs/
 - Automatic documentation deployment
 - Builds on push to main
 - Deploys to GitHub Pages
-- Accessible at https://docs.vantagecraft.dev
+- Accessible at https://code-graph.vantagecraft.dev
 
 `.github/workflows/docker-build.yml`:
 - Builds all 3 image variants (minimal, standard, full)
@@ -313,7 +313,7 @@ Still need to create:
 
 - Add `DOCKER_HUB_TOKEN` secret to GitHub repository
 - Enable GitHub Pages in repository settings
-- Configure DNS for docs.vantagecraft.dev
+- Configure DNS for code-graph.vantagecraft.dev
 
 ## 📋 Next Steps (Priority Order)
 
@@ -321,7 +321,7 @@ Still need to create:
 2. **Test locally** (all three modes)
 3. **Complete remaining documentation pages**
 4. **Set up GitHub secrets** (DOCKER_HUB_TOKEN)
-5. **Configure DNS** (docs.vantagecraft.dev → GitHub Pages)
+5. **Configure DNS** (code-graph.vantagecraft.dev → GitHub Pages)
 6. **Test CI/CD workflows**
 7. **Create first release** (v0.7.0 with all modes)
 
@@ -342,10 +342,10 @@ Still need to create:
 
 Once deployed:
 
-- **Main Docs**: https://docs.vantagecraft.dev
-- **Quick Start**: https://docs.vantagecraft.dev/getting-started/quickstart/
-- **Deployment**: https://docs.vantagecraft.dev/deployment/overview/
-- **API Reference**: https://docs.vantagecraft.dev/api/mcp-tools/
+- **Main Docs**: https://code-graph.vantagecraft.dev
+- **Quick Start**: https://code-graph.vantagecraft.dev/getting-started/quickstart/
+- **Deployment**: https://code-graph.vantagecraft.dev/deployment/overview/
+- **API Reference**: https://code-graph.vantagecraft.dev/api/mcp-tools/
 
 ## 🐳 Docker Hub URLs
 

@@ -67,7 +67,7 @@ Enable GitHub Pages to automatically deploy documentation.
 
 ---
 
-## 3️⃣ Configure DNS for docs.vantagecraft.dev
+## 3️⃣ Configure DNS for code-graph.vantagecraft.dev
 
 Point your documentation subdomain to GitHub Pages.
 
@@ -79,7 +79,7 @@ Point your documentation subdomain to GitHub Pages.
 2. Add a **CNAME record**:
    ```
    Type: CNAME
-   Name: docs
+   Name: code-graph
    Target: royisme.github.io
    TTL: 3600 (or Auto)
    Proxy: Off (disable Cloudflare proxy initially)
@@ -87,6 +87,11 @@ Point your documentation subdomain to GitHub Pages.
 3. Save the record
 
 **DNS Propagation**: Can take 5 minutes to 48 hours
+
+**Why code-graph instead of docs?**
+- This allows you to use different subdomains for different projects
+- Example: `project-a.vantagecraft.dev`, `project-b.vantagecraft.dev`
+- Keeps your main `docs` subdomain available for a unified documentation portal
 
 ### Option B: Using A Records (Alternative)
 
@@ -120,13 +125,13 @@ After adding DNS records, verify:
 
 ```bash
 # Check CNAME
-nslookup docs.vantagecraft.dev
+nslookup code-graph.vantagecraft.dev
 
 # Or use dig
-dig docs.vantagecraft.dev
+dig code-graph.vantagecraft.dev
 
 # Should return:
-# docs.vantagecraft.dev CNAME royisme.github.io
+# code-graph.vantagecraft.dev CNAME royisme.github.io
 ```
 
 ✅ **Verification**: DNS lookup returns correct target
@@ -134,7 +139,7 @@ dig docs.vantagecraft.dev
 ### Configure Custom Domain in GitHub
 
 1. Go to: https://github.com/royisme/codebase-rag/settings/pages
-2. Under **Custom domain**, enter: `docs.vantagecraft.dev`
+2. Under **Custom domain**, enter: `code-graph.vantagecraft.dev`
 3. Click **Save**
 4. Wait for DNS check (may take a few minutes)
 5. Once verified, check **Enforce HTTPS** (recommended)

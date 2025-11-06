@@ -13,7 +13,7 @@ Before submitting, ensure:
 - [x] **Tools List**: `tools.json` files created for all variants
 - [x] **Server Config**: `server.yaml` files completed
 - [x] **Public Repository**: GitHub repository is public
-- [ ] **Documentation**: docs.vantagecraft.dev is live (pending DNS)
+- [ ] **Documentation**: code-graph.vantagecraft.dev is live (pending DNS)
 - [ ] **CI Passing**: GitHub Actions workflows succeed
 
 ## Step-by-Step Submission
@@ -105,7 +105,7 @@ Three deployment variants:
 
 Repository: https://github.com/royisme/codebase-rag
 Docker Hub: https://hub.docker.com/r/royisme/codebase-rag
-Documentation: https://docs.vantagecraft.dev
+Documentation: https://code-graph.vantagecraft.dev
 License: MIT"
 
 # Push
@@ -134,7 +134,7 @@ git push origin add-codebase-rag
 
    - Repository: https://github.com/royisme/codebase-rag
    - Docker Hub: https://hub.docker.com/r/royisme/codebase-rag
-   - Documentation: https://docs.vantagecraft.dev
+   - Documentation: https://code-graph.vantagecraft.dev
 
    ## Testing
 

@@ -237,7 +237,7 @@ docs-deploy:
 	@echo ""
 	@echo "📝 Next steps for vantagecraft.dev deployment:"
 	@echo "   1. Upload site/ contents to your web server"
-	@echo "   2. Configure DNS: docs.vantagecraft.dev -> your server"
+	@echo "   2. Configure DNS: code-graph.vantagecraft.dev -> your server"
 	@echo "   3. Set up SSL certificate (recommended: Let's Encrypt)"
 	@echo ""
 	@echo "   Or use GitHub Pages:"
