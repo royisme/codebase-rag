@@ -16,10 +16,17 @@ RUN pip install uv
 
 WORKDIR /app
 
-# Copy and install dependencies
+# Copy source files needed for package installation
 COPY pyproject.toml ./
-# Create dummy README for pip install (pyproject.toml references it)
-RUN touch README.md && uv pip install --system -e .
+COPY api ./api
+COPY core ./core
+COPY services ./services
+COPY monitoring ./monitoring
+COPY mcp_tools ./mcp_tools
+COPY start.py start_mcp.py mcp_server.py config.py main.py ./
+
+# Install the package and its dependencies
+RUN uv pip install --system .
 
 # ============================================
 # Final stage
