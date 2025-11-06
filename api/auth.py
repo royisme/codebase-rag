@@ -276,7 +276,7 @@ async def get_audit_logs(
     audits = [
         {
             "id": str(item.id),
-            "actor": item.actor_email or "unknown",
+            "actor": item.actor_email or "system",
             "action": item.action,
             "target": item.target or item.resource,
             "status": item.status,

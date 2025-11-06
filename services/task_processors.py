@@ -28,7 +28,8 @@ class TaskProcessor(ABC):
     def _update_progress(self, progress_callback: Optional[Callable], progress: float, message: str = ""):
         """update task progress"""
         if progress_callback:
-            progress_callback(progress, message)
+            # Convert percentage (0-100) to decimal (0.0-1.0) for task storage
+            progress_callback(progress / 100.0, message)
 
 class DocumentProcessingProcessor(TaskProcessor):
     """document processing task processor"""
@@ -506,27 +507,27 @@ class TaskProcessorRegistry:
         """get task processor"""
         return self._processors.get(task_type)
     
-    def initialize_default_processors(self, neo4j_service=None):
+    def initialize_default_processors(self, knowledge_service=None, graph_service_obj=None):
         """initialize default task processors"""
         self.register_processor(
             TaskType.DOCUMENT_PROCESSING, 
-            DocumentProcessingProcessor(neo4j_service)
+            DocumentProcessingProcessor(knowledge_service)
         )
         self.register_processor(
             TaskType.SCHEMA_PARSING, 
-            SchemaParsingProcessor(neo4j_service)
+            SchemaParsingProcessor(knowledge_service)
         )
         self.register_processor(
             TaskType.KNOWLEDGE_GRAPH_CONSTRUCTION, 
-            KnowledgeGraphConstructionProcessor(neo4j_service)
+            KnowledgeGraphConstructionProcessor(knowledge_service)
         )
         self.register_processor(
             TaskType.BATCH_PROCESSING,
-            BatchProcessingProcessor(neo4j_service)
+            BatchProcessingProcessor(knowledge_service)
         )
         self.register_processor(
             TaskType.KNOWLEDGE_SOURCE_SYNC,
-            KnowledgeSourceSyncProcessor(neo4j_service=neo4j_service)
+            KnowledgeSourceSyncProcessor(neo4j_service=knowledge_service, graph_service=graph_service_obj)
         )
 
         logger.info("Initialized all default task processors")
@@ -534,9 +535,10 @@ class TaskProcessorRegistry:
 class KnowledgeSourceSyncProcessor(TaskProcessor):
     """知识源同步任务处理器"""
 
-    def __init__(self, source_service=None, neo4j_service=None):
+    def __init__(self, source_service=None, neo4j_service=None, graph_service=None):
         self.source_service = source_service
         self.neo4j_service = neo4j_service
+        self.graph_service = graph_service
 
     async def process(self, task: Task, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """处理知识源同步任务"""
@@ -595,9 +597,11 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
 
                 self._update_progress(progress_callback, 90, "完成同步后处理")
 
-                # 更新知识源的同步时间
-                source.last_synced_at = dt.datetime.now(dt.timezone.utc)
+                # Pipeline 已经更新了 source.source_metadata 和 source.last_synced_at
+                # 这里只需要提交会话即可
                 await session.commit()
+                logger.info(f"知识源 {source.id} 同步完成，已提交更改")
+                logger.debug(f"最终元数据: {source.source_metadata}")
 
                 # 更新任务状态为完成
                 if job_id:
@@ -772,7 +776,7 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
         pipeline = CodeIndexingPipeline(
             source_service=source_service,
             session=session,
-            neo4j_service=self.neo4j_service,
+            graph_service=self.graph_service,
         )
 
         result = await pipeline.run(

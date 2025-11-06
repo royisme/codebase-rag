@@ -9,6 +9,7 @@ from loguru import logger
 from database.session import check_database_connection
 from database.init_db import init_database
 from services.neo4j_knowledge_service import neo4j_knowledge_service
+from services.graph_service import graph_service
 from services.task_queue import task_queue
 from services.task_processors import processor_registry
 from security.initialization import ensure_default_policies, ensure_default_superuser
@@ -63,7 +64,10 @@ async def initialize_services():
     
     # initialize task processors
     logger.info("Initializing Task Processors...")
-    processor_registry.initialize_default_processors(neo4j_knowledge_service)
+    processor_registry.initialize_default_processors(
+        knowledge_service=neo4j_knowledge_service,
+        graph_service_obj=graph_service,
+    )
     logger.info("Task Processors initialized successfully")
     
     # initialize task queue

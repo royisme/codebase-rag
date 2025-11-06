@@ -39,7 +39,7 @@ class KnowledgeSourceBase(BaseModel):
     description: Optional[str] = Field(None, description="知识源描述")
     source_type: SourceType = Field(SourceType.OTHER, description="知识源类型")
     connection_config: Optional[Dict[str, Any]] = Field(None, description="连接配置")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="源元数据")
+    source_metadata: Optional[Dict[str, Any]] = Field(None, description="源元数据")
     is_active: bool = Field(True, description="是否激活")
     sync_frequency_minutes: Optional[int] = Field(
         None, ge=1, description="自动同步间隔（分钟）"
@@ -59,7 +59,7 @@ class KnowledgeSourceUpdate(BaseModel):
     description: Optional[str] = None
     source_type: Optional[SourceType] = None
     connection_config: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    source_metadata: Optional[Dict[str, Any]] = None
     is_active: Optional[bool] = None
     sync_frequency_minutes: Optional[int] = Field(None, ge=1)
 
@@ -81,7 +81,7 @@ class KnowledgeSourceResponse(KnowledgeSourceBase):
                     "port": 5432,
                     "database": "cit_knowledge",
                 },
-                "metadata": {"environment": "production", "owner": "data-platform"},
+                "source_metadata": {"environment": "production", "owner": "data-platform"},
                 "is_active": True,
                 "sync_frequency_minutes": 60,
                 "last_synced_at": "2025-10-20T08:30:55Z",
@@ -92,9 +92,8 @@ class KnowledgeSourceResponse(KnowledgeSourceBase):
         },
     )
 
-    metadata: Optional[Dict[str, Any]] = Field(
+    source_metadata: Optional[Dict[str, Any]] = Field(
         default=None,
-        validation_alias="source_metadata",
         description="源元数据",
     )
     id: uuid.UUID

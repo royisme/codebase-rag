@@ -28,7 +28,7 @@ from llama_index.llms.openrouter import OpenRouter
 # Embedding Providers
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.embeddings.gemini import GeminiEmbedding
+from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 # Graph Store
@@ -121,7 +121,7 @@ class Neo4jKnowledgeService:
         elif provider == "gemini":
             if not settings.google_api_key:
                 raise ValueError("Google API key is required for Gemini embedding provider")
-            return GeminiEmbedding(
+            return GoogleGenAIEmbedding(
                 model_name=settings.gemini_embedding_model,
                 api_key=settings.google_api_key
             )
@@ -143,6 +143,11 @@ class Neo4jKnowledgeService:
     
     async def initialize(self) -> bool:
         """initialize service"""
+        # 如果已经初始化，直接返回
+        if self._initialized:
+            logger.debug("Neo4j Knowledge Service already initialized")
+            return True
+            
         try:
             logger.info(f"Initializing with LLM provider: {settings.llm_provider}, Embedding provider: {settings.embedding_provider}")
             
@@ -170,32 +175,15 @@ class Neo4jKnowledgeService:
                 graph_store=self.graph_store
             )
             
-            # try to load existing index, if not exists, create new one
-            try:
-                self.knowledge_index = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        KnowledgeGraphIndex.from_existing,
-                        storage_context=storage_context
-                    ),
-                    timeout=self.connection_timeout
-                )
-                logger.info("Loaded existing knowledge graph index")
-            except asyncio.TimeoutError:
-                logger.warning("Loading existing index timed out, creating new index")
-                self.knowledge_index = KnowledgeGraphIndex(
-                    nodes=[],
-                    storage_context=storage_context,
-                    show_progress=True
-                )
-                logger.info("Created new knowledge graph index")
-            except Exception:
-                # create empty knowledge graph index
-                self.knowledge_index = KnowledgeGraphIndex(
-                    nodes=[],
-                    storage_context=storage_context,
-                    show_progress=True
-                )
-                logger.info("Created new knowledge graph index")
+            # KnowledgeGraphIndex 会自动从 graph_store 加载现有数据
+            # 不需要显式调用 from_existing
+            logger.info("Creating/Loading knowledge graph index from Neo4j...")
+            self.knowledge_index = KnowledgeGraphIndex(
+                nodes=[],
+                storage_context=storage_context,
+                show_progress=True
+            )
+            logger.info("Knowledge graph index initialized (data loaded from Neo4j if exists)")
             
             # 创建查询引擎
             self.query_engine = self.knowledge_index.as_query_engine(
@@ -600,9 +588,15 @@ class Neo4jKnowledgeService:
         if not self._initialized:
             raise Exception("Service not initialized")
         
+        import time as perf_time
+        perf_start = perf_time.perf_counter()
+        
         start_time = time.time()
         accumulated_text = ""
         source_nodes = []
+        evidence_metadata = []  # 初始化证据元数据列表
+        
+        logger.debug(f"[PERF-KG] Starting stream query: {question[:50]}...")
         
         try:
             # Get the LLM instance
@@ -612,46 +606,131 @@ class Neo4jKnowledgeService:
             context_text = ""
             if self.query_engine:
                 try:
-                    # Retrieve relevant nodes first (increased timeout for large datasets)
+                    # Retrieve relevant nodes first
+                    retrieve_start = perf_time.perf_counter()
+                    logger.debug(f"[PERF-KG] Starting retrieval...")
+                    
+                    # Step 1: 创建 retriever
+                    retriever_create_start = perf_time.perf_counter()
                     retriever = self.knowledge_index.as_retriever(
                         similarity_top_k=max_results,
                         include_text=True
                     )
+                    retriever_create_time = perf_time.perf_counter() - retriever_create_start
+                    logger.debug(f"[PERF-KG] Retriever created in {retriever_create_time:.2f}s")
+                    
+                    # Step 2: 执行检索（包含embedding生成 + 向量搜索）
+                    retrieve_exec_start = perf_time.perf_counter()
+                    logger.debug(f"[PERF-KG] Calling retriever.retrieve() with question: {question[:50]}...")
+                    
+                    # 增加超时时间到 60 秒
                     nodes = await asyncio.wait_for(
                         asyncio.to_thread(retriever.retrieve, question),
-                        timeout=30  # 增加到 30 秒
+                        timeout=60
                     )
                     source_nodes = nodes
                     
-                    # Build context from nodes
+                    retrieve_exec_time = perf_time.perf_counter() - retrieve_exec_start
+                    retrieve_time = perf_time.perf_counter() - retrieve_start
+                    logger.info(f"[PERF-KG] Retrieval completed in {retrieve_time:.2f}s (exec: {retrieve_exec_time:.2f}s, {len(nodes)} nodes)")
+                    logger.debug(f"[PERF-KG] Breakdown: retriever_create={retriever_create_time:.2f}s, retrieve_exec={retrieve_exec_time:.2f}s")
+                    
+                    # Build context from nodes with numbered references
                     context_parts = []
-                    for node in nodes[:max_results]:
+                    evidence_metadata = []  # 保留完整元数据
+                    
+                    for idx, node in enumerate(nodes[:max_results], start=1):
+                        metadata = node.metadata or {}
                         text = node.text[:300] if len(node.text) > 300 else node.text
-                        context_parts.append(f"- {text}")
+                        
+                        # 构建文件路径信息
+                        file_path = metadata.get("file_path", "unknown")
+                        start_line = metadata.get("start_line")
+                        end_line = metadata.get("end_line")
+                        
+                        # 添加编号的上下文
+                        location = f"{file_path}"
+                        if start_line:
+                            location += f" (L{start_line}"
+                            if end_line and end_line != start_line:
+                                location += f"-{end_line}"
+                            location += ")"
+                        
+                        context_parts.append(f"[{idx}] {location}:\n{text}")
+                        
+                        # 保存完整元数据用于生成证据
+                        evidence_metadata.append({
+                            "id": node.node_id or f"ev_{idx}",
+                            "snippet": text,
+                            "full_text": node.text,
+                            "repo": metadata.get("repo"),
+                            "branch": metadata.get("branch", "main"),
+                            "file_path": file_path,
+                            "start_line": start_line,
+                            "end_line": end_line,
+                            "source_type": metadata.get("source_type", "code"),
+                            "score": getattr(node, 'score', 0.0),
+                        })
                     
                     if context_parts:
-                        context_text = f"相关上下文:\n" + "\n".join(context_parts)
-                        logger.debug(f"Built context with {len(context_parts)} nodes")
+                        context_text = f"相关上下文:\n\n" + "\n\n".join(context_parts)
+                        logger.debug(f"[PERF-KG] Built context with {len(context_parts)} nodes")
                     else:
-                        logger.debug("No relevant nodes found for context")
+                        logger.debug("[PERF-KG] No relevant nodes found for context")
                 except asyncio.TimeoutError:
-                    logger.warning(f"Context retrieval timed out after 30s for question: {question[:50]}...")
+                    logger.warning(f"[PERF-KG] Context retrieval timed out after 30s for question: {question[:50]}...")
                 except Exception as ctx_exc:
-                    logger.warning(f"Failed to build context: {ctx_exc.__class__.__name__}: {ctx_exc}")
+                    logger.warning(f"[PERF-KG] Failed to build context: {ctx_exc.__class__.__name__}: {ctx_exc}")
             else:
-                logger.debug("Query engine not available, proceeding without context")
+                logger.debug("[PERF-KG] Query engine not available, proceeding without context")
             
             # Construct prompt
+            prompt_start = perf_time.perf_counter()
             if context_text:
-                prompt = f"{context_text}\n\n问题: {question}\n\n请基于以上上下文回答问题。"
+                prompt = f"""基于以下编号的上下文信息，用 Markdown 格式回答问题。引用上下文时请使用编号标记（如 [1] [2]）。
+
+{context_text}
+
+问题: {question}
+
+要求：
+1. 使用 Markdown 格式回答（支持标题、列表、代码块等）
+2. 代码示例请用代码块包裹，并指定语言，例如：```python
+3. **引用上下文时，必须用 [1] [2] 等编号标记来源**
+4. 回答要简洁清晰，重点突出
+5. 如果有多个要点，使用列表或编号
+
+回答："""
             else:
-                prompt = question
+                prompt = f"""请用 Markdown 格式回答以下问题：
+
+{question}
+
+要求：
+1. 使用 Markdown 格式（支持标题、列表、代码块等）
+2. 代码示例请用代码块包裹，并指定语言
+3. 回答要简洁清晰，重点突出
+
+回答："""
+            logger.debug(f"[PERF-KG] Prompt constructed (length={len(prompt)})")
             
             # Stream from LLM
+            llm_start = perf_time.perf_counter()
+            first_chunk_received = False
+            chunk_count = 0
+            
+            logger.info(f"[PERF-KG] Starting LLM streaming...")
+            
             if hasattr(llm, 'astream_complete'):
                 # Use async streaming if available
                 stream_response = await llm.astream_complete(prompt)
                 async for chunk in stream_response:
+                    if not first_chunk_received:
+                        first_chunk_time = perf_time.perf_counter() - llm_start
+                        logger.info(f"[PERF-KG] First LLM chunk received in {first_chunk_time:.2f}s")
+                        first_chunk_received = True
+                    
+                    chunk_count += 1
                     delta_text = str(chunk.delta) if hasattr(chunk, 'delta') else str(chunk)
                     if delta_text:
                         accumulated_text += delta_text
@@ -695,8 +774,20 @@ class Neo4jKnowledgeService:
             # Calculate confidence score
             confidence_score = 0.0
             if source_nodes:
-                scores = [getattr(node, 'score', 0.0) for node in source_nodes]
+                scores = []
+                for node in source_nodes:
+                    raw_score = getattr(node, 'score', 0.0)
+                    if isinstance(raw_score, (int, float)):
+                        scores.append(float(raw_score))
+                    else:
+                        try:
+                            scores.append(float(raw_score))
+                        except (TypeError, ValueError):  # pragma: no cover - defensive
+                            continue
                 confidence_score = max(scores) if scores else 0.0
+
+            # Clamp confidence into [0, 1] to satisfy API schema
+            confidence_score = max(0.0, min(1.0, float(confidence_score)))
             
             resolved_sources = source_ids or [
                 uuid.UUID(str((node.metadata or {}).get("source_id", uuid.uuid4())))
@@ -707,34 +798,64 @@ class Neo4jKnowledgeService:
             
             yield {
                 "type": "metadata",
-                "confidence_score": float(confidence_score),
+                "confidence_score": confidence_score,
                 "execution_time_ms": processing_time_ms,
                 "sources_queried": [str(s) for s in resolved_sources],
                 "retrieval_mode": mode,
             }
             
-            # Extract evidence if requested
-            if include_evidence:
-                for node in source_nodes[:max_results]:
-                    metadata = node.metadata or {}
+            # Extract evidence if requested - 使用保留的完整元数据
+            if include_evidence and evidence_metadata:
+                for idx, ev_data in enumerate(evidence_metadata, start=1):
+                    # 构建 GitHub 链接（如果有 repo 信息）
+                    github_link = None
+                    if ev_data.get("repo") and ev_data.get("file_path"):
+                        repo = ev_data["repo"]
+                        branch = ev_data.get("branch", "main")
+                        file_path = ev_data["file_path"]
+                        start_line = ev_data.get("start_line")
+                        
+                        # 假设 repo 格式为 owner/repo_name
+                        github_link = f"https://github.com/{repo}/blob/{branch}/{file_path}"
+                        if start_line:
+                            end_line = ev_data.get("end_line", start_line)
+                            if end_line and end_line != start_line:
+                                github_link += f"#L{start_line}-L{end_line}"
+                            else:
+                                github_link += f"#L{start_line}"
+                    
                     yield {
                         "type": "evidence",
                         "evidence": {
-                            "id": node.node_id,
-                            "snippet": node.text[:200],
-                            "source_type": metadata.get("source_type", "document"),
-                            "source_ref": metadata.get("source_ref") or metadata.get("file_path"),
-                            "score": getattr(node, 'score', 0.0),
+                            "id": ev_data.get("id"),
+                            "index": idx,  # 对应 [1] [2] [3]
+                            "snippet": ev_data.get("snippet", ""),
+                            "repo": ev_data.get("repo"),
+                            "branch": ev_data.get("branch", "main"),
+                            "file_path": ev_data.get("file_path"),
+                            "start_line": ev_data.get("start_line"),
+                            "end_line": ev_data.get("end_line"),
+                            "source_type": ev_data.get("source_type", "code"),
+                            "score": ev_data.get("score", 0.0),
+                            "link": github_link,
                         }
                     }
             
             # Done
+            total_time = perf_time.perf_counter() - perf_start
+            llm_time = perf_time.perf_counter() - llm_start
+            
+            logger.info(f"[PERF-KG] Stream query completed in {total_time:.2f}s")
+            logger.info(f"[PERF-KG] LLM streaming took {llm_time:.2f}s ({chunk_count} chunks)")
+            if chunk_count > 0 and llm_time > 0:
+                logger.info(f"[PERF-KG] LLM throughput: {chunk_count/llm_time:.1f} chunks/s")
+            
             yield {
                 "type": "done",
                 "query_id": str(uuid.uuid4()),
                 "summary": accumulated_text,
                 "processing_time_ms": processing_time_ms,
-                "confidence_score": float(confidence_score),
+                "confidence_score": confidence_score,
                 "sources_queried": [str(s) for s in resolved_sources],
             }
             

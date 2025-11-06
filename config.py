@@ -21,9 +21,32 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0", description="Host", alias="HOST")
     port: int = Field(default=8123, description="Port", alias="PORT")
 
-    # Database Settings (SQLite for MVP)
+    # Database Settings
     db_path: str = Field(default="data/knowledge.db", description="SQLite database path", alias="DB_PATH")
+    db_driver_async: str = Field(default="sqlite+aiosqlite", description="SQLAlchemy async driver", alias="DB_DRIVER_ASYNC")
+    db_driver_sync: str = Field(default="sqlite", description="SQLAlchemy sync driver", alias="DB_DRIVER_SYNC")
+    db_host: Optional[str] = Field(default=None, description="Database host", alias="DB_HOST")
+    db_port: Optional[int] = Field(default=None, description="Database port", alias="DB_PORT")
+    db_user: Optional[str] = Field(default=None, description="Database user", alias="DB_USER")
+    db_password: Optional[str] = Field(default=None, description="Database password", alias="DB_PASSWORD")
+    db_name: Optional[str] = Field(default=None, description="Database name", alias="DB_NAME")
+    db_schema: Optional[str] = Field(default=None, description="Database schema/search_path", alias="DB_SCHEMA")
     db_echo: bool = Field(default=False, description="Enable SQLAlchemy echo logging", alias="DB_ECHO")
+    sqlite_busy_timeout_seconds: int = Field(
+        default=30,
+        description="SQLite busy timeout (seconds) when the database is locked",
+        alias="SQLITE_BUSY_TIMEOUT_SECONDS",
+    )
+    sqlite_journal_mode: str = Field(
+        default="WAL",
+        description="SQLite journal mode (e.g. DELETE, WAL, MEMORY)",
+        alias="SQLITE_JOURNAL_MODE",
+    )
+    sqlite_synchronous: str = Field(
+        default="NORMAL",
+        description="SQLite synchronous setting (e.g. FULL, NORMAL, OFF)",
+        alias="SQLITE_SYNCHRONOUS",
+    )
 
     # Auth Settings
     auth_jwt_secret: str = Field(default="change-me", description="JWT signing secret", alias="AUTH_JWT_SECRET")
@@ -225,17 +248,45 @@ class Settings(BaseSettings):
 
     @property
     def database_dsn_async(self) -> str:
-        # Ensure database directory exists
-        db_path = Path(self.db_path)
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        return f"sqlite+aiosqlite:///{self.db_path}"
+        driver = (self.db_driver_async or "sqlite+aiosqlite").lower()
+        if driver.startswith("sqlite"):
+            db_path = Path(self.db_path)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            return f"{driver}:///{db_path.as_posix()}"
+
+        return self._build_sql_dsn(driver, async_driver=True)
 
     @property
     def database_dsn_sync(self) -> str:
-        # Ensure database directory exists
-        db_path = Path(self.db_path)
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        return f"sqlite:///{self.db_path}"
+        driver = (self.db_driver_sync or "sqlite").lower()
+        if driver.startswith("sqlite"):
+            db_path = Path(self.db_path)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            return f"{driver}:///{db_path.as_posix()}"
+
+        return self._build_sql_dsn(driver, async_driver=False)
+
+    def _build_sql_dsn(self, driver: str, *, async_driver: bool) -> str:
+        host = self.db_host or "localhost"
+        port = self.db_port or (5432 if "postgres" in driver else None)
+        username = quote_plus(self.db_user) if self.db_user else ""
+        password = quote_plus(self.db_password) if self.db_password else ""
+        auth = ""
+        if username:
+            auth = username
+            if password:
+                auth += f":{password}"
+            auth += "@"
+
+        if port:
+            host_part = f"{host}:{port}"
+        else:
+            host_part = host
+
+        database = self.db_name or ""
+        base = f"{driver}://{auth}{host_part}/{database}"
+
+        return base
 
     @property
     def code_repo_root_path(self) -> Path:

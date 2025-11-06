@@ -5,6 +5,7 @@ from .casbin import CasbinRule
 from .audit import AuditEvent
 from .knowledge import KnowledgeSource, ParseJob, SourceType, ParseStatus
 from .knowledge_user import KnowledgeQuery, KnowledgeNote
+from .task import TaskEntity
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "ParseStatus",
     "KnowledgeQuery",
     "KnowledgeNote",
+    "TaskEntity",
 ]

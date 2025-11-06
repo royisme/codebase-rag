@@ -50,10 +50,11 @@ class CodeIndexingPipeline:
 
     STAGE_PROGRESS = {
         "git_clone": 15,
-        "file_scan": 35,
-        "code_parse": 60,
-        "embedding": 80,
-        "graph_build": 95,
+        "file_scan": 30,
+        "code_parse": 50,
+        "embedding": 70,
+        "graph_build": 85,
+        "knowledge_index": 95,
         "completed": 100,
     }
 
@@ -62,11 +63,11 @@ class CodeIndexingPipeline:
         *,
         source_service: SourceService,
         session,
-        neo4j_service=None,
+        graph_service=None,
     ) -> None:
         self.source_service = source_service
         self.session = session
-        self.neo4j_service = neo4j_service
+        self.graph_service = graph_service
 
         self.git_service = GitSyncService()
         self.scanner = FileScanner(
@@ -76,7 +77,7 @@ class CodeIndexingPipeline:
         )
         self.parser = CodeParser()
         self.embedder = DeterministicEmbeddingGenerator()
-        self.graph_builder = GraphBuilder(neo4j_service=neo4j_service)
+        self.graph_builder = GraphBuilder(graph_service=graph_service)
 
         self.summary: Dict[str, Any] = {
             "stage": "initializing",
@@ -154,6 +155,8 @@ class CodeIndexingPipeline:
             job_uuid = job_id if isinstance(job_id, uuid.UUID) else uuid.UUID(str(job_id))
         repo_root = settings.code_repo_root_path
         repo_path = repo_root / str(source.id)
+        source_id_str = str(getattr(source, "id", None)) if getattr(source, "id", None) is not None else None
+        source_name = getattr(source, "name", None)
 
         git_result = await self._sync_repository(
             repo_url,
@@ -192,6 +195,17 @@ class CodeIndexingPipeline:
             job_uuid,
             progress_callback,
             task_progress_callback,
+            source_id=source_id_str,
+        )
+
+        # Build knowledge index for GraphRAG
+        knowledge_result = await self._build_knowledge_index(
+            parsed_files,
+            job_uuid,
+            progress_callback,
+            task_progress_callback,
+            source_id=source_id_str,
+            source_name=source_name,
         )
 
         duration = time.perf_counter() - start_time
@@ -396,6 +410,8 @@ class CodeIndexingPipeline:
         job_uuid: Optional[uuid.UUID],
         progress_callback: Optional[Callable[[float, str], None]],
         task_progress_callback: Optional[Callable[[float, str], None]],
+        *,
+        source_id: Optional[str],
     ) -> GraphBuildResult:
         job_label = str(job_uuid) if job_uuid else "in-memory job"
         logger.info(
@@ -404,7 +420,7 @@ class CodeIndexingPipeline:
             len(parsed_files),
         )
         start = time.perf_counter()
-        result = await self.graph_builder.build(parsed_files)
+        result = await self.graph_builder.build(parsed_files, source_id=source_id)
         duration = time.perf_counter() - start
 
         self.summary["nodes_created"] = result.nodes_created
@@ -434,6 +450,144 @@ class CodeIndexingPipeline:
             result.nodes_created,
             result.edges_created,
         )
+        return result
+
+    async def _build_knowledge_index(
+        self,
+        parsed_files: List[ParsedFile],
+        job_uuid: Optional[uuid.UUID],
+        progress_callback: Optional[Callable[[float, str], None]],
+        task_progress_callback: Optional[Callable[[float, str], None]],
+        *,
+        source_id: Optional[str],
+        source_name: Optional[str],
+    ) -> Dict[str, Any]:
+        """Build knowledge index for GraphRAG from parsed files."""
+        from llama_index.core import Document
+        from services.neo4j_knowledge_service import neo4j_knowledge_service
+
+        job_label = str(job_uuid) if job_uuid else "in-memory job"
+
+        if not parsed_files:
+            logger.info("Job {} has no parsed files, skipping knowledge index stage.", job_label)
+            return {"documents_created": 0, "skipped": True}
+
+        logger.info(
+            "Job {} entering knowledge_index stage with {} parsed files.",
+            job_label,
+            len(parsed_files),
+        )
+
+        start = time.perf_counter()
+        documents_created = 0
+
+        # 确保服务已初始化（应该在应用启动时已初始化）
+        if not neo4j_knowledge_service._initialized:
+            logger.warning("Knowledge service not initialized, attempting to initialize...")
+            try:
+                await neo4j_knowledge_service.initialize()
+            except Exception as exc:
+                logger.error("Failed to initialize knowledge service: {}", exc)
+                return {"documents_created": 0, "error": str(exc)}
+
+        knowledge_index = getattr(neo4j_knowledge_service, "knowledge_index", None)
+        if not knowledge_index:
+            logger.warning("Knowledge index not initialized, skipping knowledge indexing")
+            return {"documents_created": 0, "skipped": True}
+
+        documents = []
+        for parsed_file in parsed_files:
+            scanned = parsed_file.file
+            file_path = scanned.relative_path.as_posix()
+            language = scanned.language or "unknown"
+
+            content_parts: List[str] = [
+                f"# 文件: {file_path}",
+            ]
+
+            if source_name:
+                content_parts.append(f"所属仓库: {source_name}")
+
+            content_parts.append(
+                f"\n编程语言: {language}",
+            )
+
+            function_names = [function.name for function in (parsed_file.functions or [])]
+            if function_names:
+                content_parts.append("\n## 函数列表")
+                for name in function_names[:15]:
+                    content_parts.append(f"- {name}")
+
+            class_names = list(parsed_file.classes or [])
+            if class_names:
+                content_parts.append("\n## 类列表")
+                for name in class_names[:10]:
+                    content_parts.append(f"- {name}")
+
+            import_modules = [imp.module for imp in (parsed_file.imports or []) if getattr(imp, "module", None)]
+            if import_modules:
+                content_parts.append("\n## 导入模块")
+                for module in import_modules[:10]:
+                    content_parts.append(f"- {module}")
+
+            try:
+                snippet = scanned.absolute_path.read_text(encoding="utf-8", errors="ignore")[:500]
+            except Exception as exc:  # pragma: no cover - filesystem edge case
+                logger.debug("Failed to read snippet for {}: {}", file_path, exc)
+                snippet = ""
+
+            if snippet.strip():
+                content_parts.append("\n## 代码摘要")
+                content_parts.append(snippet)
+
+            doc_text = "\n".join(content_parts)
+            metadata = {
+                "source_type": "code_file",
+                "file_path": file_path,
+                "language": language,
+                "function_count": len(function_names),
+                "class_count": len(class_names),
+            }
+            if source_id:
+                metadata["source_id"] = source_id
+            if source_name:
+                metadata["source_name"] = source_name
+            documents.append(Document(text=doc_text, metadata=metadata))
+
+        for document in documents:
+            try:
+                await asyncio.to_thread(knowledge_index.insert, document)
+                documents_created += 1
+            except Exception as exc:  # pragma: no cover - downstream service failure
+                logger.error("Failed to insert knowledge document for {}: {}", document.metadata.get("file_path"), exc)
+
+        duration = time.perf_counter() - start
+
+        self.summary["knowledge_documents"] = documents_created
+
+        result = {
+            "documents_created": documents_created,
+            "duration_seconds": duration,
+        }
+
+        await self._update_stage(
+            "knowledge_index",
+            progress=self.STAGE_PROGRESS["knowledge_index"],
+            job_uuid=job_uuid,
+            status=ParseStatus.RUNNING,
+            payload=result,
+            message=f"Created {documents_created} knowledge documents",
+            progress_callback=progress_callback,
+            task_progress_callback=task_progress_callback,
+        )
+
+        logger.info(
+            "Job {} knowledge_index stage completed in {:.2f} seconds (documents={}).",
+            job_label,
+            duration,
+            documents_created,
+        )
+
         return result
 
     async def _update_stage(
@@ -469,7 +623,8 @@ class CodeIndexingPipeline:
         if progress_callback:
             progress_callback(progress, message)
         if task_progress_callback:
-            task_progress_callback(progress, message)
+            # Convert percentage (0-100) to decimal (0.0-1.0) for task storage
+            task_progress_callback(progress / 100.0, message)
 
     @staticmethod
     def _ensure_list(value: Any) -> List[str]:

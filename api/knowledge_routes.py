@@ -479,6 +479,19 @@ async def stream_knowledge_graph(
         final_next_actions: List[str] = []
         final_processing_time: Optional[int] = None
 
+        def _clamp_confidence(raw: Optional[Any]) -> float:
+            if raw is None:
+                return 0.0
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):  # pragma: no cover - defensive
+                return 0.0
+            if value < 0.0:
+                return 0.0
+            if value > 1.0:
+                return 1.0
+            return value
+
         try:
             async with asyncio.timeout(timeout_seconds):
                 async for event in graph_rag_service.stream_query(
@@ -509,7 +522,7 @@ async def stream_knowledge_graph(
                     
                     elif event_type == "metadata":
                         # SSE: metadata event
-                        final_confidence = event.get("confidence_score")
+                        final_confidence = _clamp_confidence(event.get("confidence_score"))
                         final_sources = event.get("sources_queried", [])
                         final_processing_time = event.get("execution_time_ms")
                         
@@ -524,7 +537,7 @@ async def stream_knowledge_graph(
                         # SSE: done event
                         result_query_id = uuid.UUID(event.get("query_id")) if event.get("query_id") else query_uuid
                         final_next_actions = event.get("next_actions", [])
-                        final_confidence = event.get("confidence_score", final_confidence)
+                        final_confidence = _clamp_confidence(event.get("confidence_score", final_confidence))
                         final_sources = event.get("sources_queried", final_sources)
                         final_processing_time = event.get("processing_time_ms", final_processing_time)
                         
@@ -539,7 +552,7 @@ async def stream_knowledge_graph(
                             
                             response = GraphRAGQueryResponse(
                                 answer=answer_payload,
-                                confidence_score=final_confidence or 0.0,
+                                confidence_score=_clamp_confidence(final_confidence),
                                 evidence_anchors=[],
                                 raw_messages=None,
                                 sources_queried=final_sources,
@@ -725,6 +738,19 @@ async def stream_knowledge_query(
         query_id_str = str(query_uuid)
         persisted = False
 
+        def _clamp_confidence(raw: Optional[Any]) -> float:
+            if raw is None:
+                return 0.0
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):  # pragma: no cover - defensive
+                return 0.0
+            if value < 0.0:
+                return 0.0
+            if value > 1.0:
+                return 1.0
+            return value
+
         try:
             # 转换前端请求参数到后端格式
             source_uuids = None
@@ -784,7 +810,7 @@ async def stream_knowledge_query(
                     metadata_payload = {
                         "execution_time_ms": execution_time_ms,
                         "sources_queried": request.source_ids,
-                        "confidence_score": payload.get("confidence_score", 0.0),
+                        "confidence_score": _clamp_confidence(payload.get("confidence_score", 0.0)),
                         "retrieval_mode": request.retrieval_mode or "hybrid",
                         "from_cache": False,
                     }
@@ -805,7 +831,7 @@ async def stream_knowledge_query(
                         evidence_anchors = build_evidence_anchors(answer_payload)
                         response_model = GraphRAGQueryResponse(
                             answer=answer_payload,
-                            confidence_score=payload.get("confidence_score", 0.0),
+                            confidence_score=_clamp_confidence(payload.get("confidence_score", 0.0)),
                             evidence_anchors=evidence_anchors,
                             raw_messages=payload.get("raw_messages"),
                             sources_queried=payload.get("sources_queried")

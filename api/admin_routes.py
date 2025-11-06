@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
@@ -18,6 +19,7 @@ from services.source_service import (
 )
 from services.task_queue import submit_knowledge_source_sync_task
 from services.code_indexing import validate_git_connection
+from services.audit_logger import audit_logger
 from security.casbin_enforcer import require_permission
 from schemas import (
     KnowledgeSourceCreate,
@@ -115,6 +117,8 @@ async def create_knowledge_source(
                 actor_info=actor_info,
             )
 
+            await session.flush()
+            await session.refresh(source)
             await session.commit()
             return KnowledgeSourceResponse.model_validate(source)
 
@@ -243,6 +247,8 @@ async def update_knowledge_source(
                 actor_info=actor_info,
             )
 
+            await session.flush()
+            await session.refresh(source)
             await session.commit()
             return KnowledgeSourceResponse.model_validate(source)
 
@@ -367,9 +373,11 @@ async def create_parse_job(
             except SourceValidationError as validation_error:
                 raise HTTPException(status_code=409, detail=str(validation_error)) from validation_error
 
-            await session.commit()
+            await session.flush()
+            await session.refresh(job)
 
             # 提交同步任务到任务队列
+            task_id = None
             try:
                 task_id = await submit_knowledge_source_sync_task(
                     source_id=str(source_id),
@@ -377,8 +385,13 @@ async def create_parse_job(
                     sync_config=job_data.job_config or {},
                 )
                 logger.info(f"已提交知识源同步任务: {task_id}")
+                
+                # 关联 task_id 到 ParseJob
+                job.task_id = task_id
+                await session.commit()
             except Exception as task_error:
                 logger.error(f"提交同步任务失败: {task_error}")
+                await session.commit()
                 # 不影响API响应，只记录日志
 
             return ParseJobResponse.model_validate(job)
@@ -534,7 +547,8 @@ async def sync_knowledge_source(
                 await session.rollback()
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-            await session.commit()
+            await session.flush()
+            await session.refresh(job)
 
             # 提交同步任务
             task_id = await submit_knowledge_source_sync_task(
@@ -542,6 +556,10 @@ async def sync_knowledge_source(
                 job_id=str(job.id),
                 sync_config=sync_config or {},
             )
+            
+            # 关联 task_id 到 ParseJob
+            job.task_id = task_id
+            await session.commit()
 
             return {
                 "message": "知识源同步任务已提交",
@@ -556,4 +574,222 @@ async def sync_knowledge_source(
         raise
     except Exception as e:
         logger.error(f"触发知识源同步失败: {e}")
+        raise HTTPException(status_code=500, detail="内部服务器错误")
+
+
+@router.post(
+    "/jobs/{job_id}/cancel",
+    status_code=status.HTTP_200_OK,
+    summary="取消解析任务",
+    description="取消正在进行或等待中的解析任务。",
+    responses={
+        200: {"description": "任务已取消"},
+        400: {"description": "任务状态不允许取消"},
+        403: {"description": "RBAC：权限不足"},
+        404: {"description": "任务不存在"},
+        500: {"description": "内部服务器错误"},
+    },
+)
+async def cancel_parse_job(
+    job_id: uuid.UUID,
+    user=Depends(require_permission("/admin/sources/*", "POST")),
+):
+    """取消解析任务。"""
+    try:
+        async with async_session_factory() as session:
+            source_service = get_source_service(session)
+            actor_info = get_actor_info(user)
+
+            job = await source_service.get_job_by_id(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="解析任务不存在")
+
+            # 只能取消 PENDING 或 RUNNING 状态的任务
+            if job.status not in [ParseStatus.PENDING, ParseStatus.RUNNING]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"任务状态为 {job.status}，无法取消"
+                )
+
+            # 取消关联的 Task（如果存在）
+            if job.task_id:
+                from services.task_queue import task_queue
+                try:
+                    cancelled = await task_queue.cancel_task(job.task_id)
+                    if cancelled:
+                        logger.info(f"已取消关联任务: {job.task_id}")
+                    else:
+                        logger.warning(f"无法取消关联任务: {job.task_id}（可能已完成或不存在）")
+                except Exception as cancel_error:
+                    logger.error(f"取消关联任务失败: {cancel_error}")
+
+            # 更新任务状态为 CANCELLED
+            job.status = ParseStatus.CANCELLED
+            job.completed_at = datetime.now(timezone.utc)
+            job.error_message = "任务已被用户取消"
+
+            await audit_logger.record_event(
+                actor_id=actor_info.get("user_id"),
+                actor_email=actor_info.get("email"),
+                resource="parse_jobs",
+                action="cancel",
+                status="success",
+                target=str(job.id),
+                details=f"取消解析任务 {job.id}",
+                ip_address=actor_info.get("ip_address"),
+                session=session,
+            )
+
+            await session.commit()
+
+            return {
+                "message": "解析任务已取消",
+                "job_id": str(job.id),
+                "status": job.status.value,
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"取消解析任务失败: {e}")
+        raise HTTPException(status_code=500, detail="内部服务器错误")
+
+
+@router.delete(
+    "/jobs/{job_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除解析任务",
+    description="删除已完成、失败或取消的解析任务记录。",
+    responses={
+        204: {"description": "任务已删除"},
+        400: {"description": "任务状态不允许删除"},
+        403: {"description": "RBAC：权限不足"},
+        404: {"description": "任务不存在"},
+        500: {"description": "内部服务器错误"},
+    },
+)
+async def delete_parse_job(
+    job_id: uuid.UUID,
+    user=Depends(require_permission("/admin/sources/*", "DELETE")),
+):
+    """删除解析任务。"""
+    try:
+        async with async_session_factory() as session:
+            source_service = get_source_service(session)
+            actor_info = get_actor_info(user)
+
+            job = await source_service.get_job_by_id(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="解析任务不存在")
+
+            # 只能删除已完成、失败或取消的任务
+            if job.status in [ParseStatus.PENDING, ParseStatus.RUNNING]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"任务状态为 {job.status}，请先取消任务"
+                )
+
+            await audit_logger.record_event(
+                actor_id=actor_info.get("user_id"),
+                actor_email=actor_info.get("email"),
+                resource="parse_jobs",
+                action="delete",
+                status="success",
+                target=str(job.id),
+                details=f"删除解析任务 {job.id}",
+                metadata={"knowledge_source_id": str(job.knowledge_source_id)},
+                ip_address=actor_info.get("ip_address"),
+                session=session,
+            )
+
+            await session.delete(job)
+            await session.commit()
+
+            return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除解析任务失败: {e}")
+        raise HTTPException(status_code=500, detail="内部服务器错误")
+
+
+@router.post(
+    "/jobs/{job_id}/retry",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="重试失败的解析任务",
+    description="重新提交失败或取消的解析任务。",
+    responses={
+        202: {"description": "任务已重新提交"},
+        400: {"description": "任务状态不允许重试"},
+        403: {"description": "RBAC：权限不足"},
+        404: {"description": "任务不存在"},
+        500: {"description": "内部服务器错误"},
+    },
+)
+async def retry_parse_job(
+    job_id: uuid.UUID,
+    user=Depends(require_permission("/admin/sources/*", "POST")),
+):
+    """重试失败的解析任务。"""
+    try:
+        async with async_session_factory() as session:
+            source_service = get_source_service(session)
+            actor_info = get_actor_info(user)
+
+            job = await source_service.get_job_by_id(job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="解析任务不存在")
+
+            # 只能重试 FAILED 或 CANCELLED 状态的任务
+            if job.status not in [ParseStatus.FAILED, ParseStatus.CANCELLED]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"任务状态为 {job.status}，无法重试"
+                )
+
+            # 重置任务状态
+            job.status = ParseStatus.PENDING
+            job.started_at = None
+            job.completed_at = None
+            job.error_message = None
+            job.progress_percentage = 0
+            job.items_processed = 0
+            job.result_summary = None
+            job.task_id = None  # 清除旧的 task_id
+
+            await audit_logger.record_event(
+                actor_id=actor_info.get("user_id"),
+                actor_email=actor_info.get("email"),
+                resource="parse_jobs",
+                action="retry",
+                status="success",
+                target=str(job.id),
+                details=f"重试解析任务 {job.id}",
+                ip_address=actor_info.get("ip_address"),
+                session=session,
+            )
+
+            # 重新提交任务到队列
+            task_id = await submit_knowledge_source_sync_task(
+                source_id=str(job.knowledge_source_id),
+                job_id=str(job.id),
+                sync_config=job.job_config or {},
+            )
+            
+            # 关联新的 task_id
+            job.task_id = task_id
+            await session.commit()
+
+            return {
+                "message": "解析任务已重新提交",
+                "job_id": str(job.id),
+                "task_id": task_id,
+                "status": "submitted",
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"重试解析任务失败: {e}")
         raise HTTPException(status_code=500, detail="内部服务器错误")

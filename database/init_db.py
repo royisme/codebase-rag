@@ -26,11 +26,15 @@ async def create_database_tables(engine: AsyncEngine | None = None) -> None:
 
 async def init_database() -> None:
     """Initialize the database with all tables and default data."""
-    # Ensure database directory exists
-    db_path = Path(settings.db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    logger.info(f"Initializing database at {settings.db_path}")
+    if settings.db_driver_async.lower().startswith("sqlite"):
+        db_path = Path(settings.db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Initializing database at {settings.db_path}")
+    else:
+        logger.info(
+            "Initializing database via {}",
+            settings.database_dsn_async,
+        )
 
     # Create tables
     await create_database_tables()

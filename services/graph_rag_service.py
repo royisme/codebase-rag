@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -211,10 +212,17 @@ class GraphRAGService:
         Yields events with type: text_delta, status, entity, metadata, done, error
         """
         import datetime as dt
+        import time
+        
+        # 性能监控：记录各阶段耗时
+        perf_start = time.perf_counter()
+        stage_times = {}
         
         start_time = dt.datetime.now(dt.timezone.utc)
         accumulated_summary = ""
         entities_collected = []
+        
+        logger.info(f"[PERF] Stream query started: {question[:50]}...")
         
         # Status: building context
         yield {
@@ -225,7 +233,14 @@ class GraphRAGService:
         
         try:
             # Build context
+            context_start = time.perf_counter()
+            logger.debug(f"[PERF] Starting context building...")
+            
             context = await self.context_builder.build(question)
+            
+            context_time = time.perf_counter() - context_start
+            stage_times['context_build'] = context_time
+            logger.info(f"[PERF] Context built in {context_time:.2f}s (nodes={len(context.graph_data.get('nodes', []))}, edges={len(context.graph_data.get('edges', []))})")
             
             # Status: querying LLM
             yield {
@@ -235,12 +250,23 @@ class GraphRAGService:
             }
             
             # Ensure service is initialized
+            init_start = time.perf_counter()
             if not self.knowledge_service._initialized:  # noqa: SLF001
+                logger.debug(f"[PERF] Knowledge service not initialized, initializing...")
                 async with self._init_lock:
                     if not self.knowledge_service._initialized:  # noqa: SLF001
                         await self.knowledge_service.initialize()
+                init_time = time.perf_counter() - init_start
+                stage_times['service_init'] = init_time
+                logger.info(f"[PERF] Service initialized in {init_time:.2f}s")
             
             # Stream from knowledge service
+            stream_start = time.perf_counter()
+            first_token_received = False
+            token_count = 0
+            
+            logger.debug(f"[PERF] Starting LLM stream...")
+            
             async for event in self.knowledge_service.stream_query(
                 question,
                 mode="hybrid",
@@ -251,6 +277,14 @@ class GraphRAGService:
                 event_type = event.get("type")
                 
                 if event_type == "text_delta":
+                    # 记录首包时间
+                    if not first_token_received:
+                        first_token_time = time.perf_counter() - stream_start
+                        stage_times['first_token'] = first_token_time
+                        logger.info(f"[PERF] First token received in {first_token_time:.2f}s")
+                        first_token_received = True
+                    
+                    token_count += 1
                     # Forward text delta directly
                     accumulated_summary += event.get("content", "")
                     yield {
@@ -278,10 +312,31 @@ class GraphRAGService:
                     return
                 
                 elif event_type == "done":
+                    # 记录总耗时
+                    total_time = time.perf_counter() - perf_start
+                    stage_times['total'] = total_time
+                    stage_times['llm_streaming'] = time.perf_counter() - stream_start
+                    stage_times['token_count'] = token_count
+                    
+                    # 输出性能摘要
+                    logger.info(f"[PERF] Stream query completed in {total_time:.2f}s")
+                    logger.info(f"[PERF] Performance breakdown:")
+                    logger.info(f"  - Context build: {stage_times.get('context_build', 0):.2f}s")
+                    logger.info(f"  - Service init: {stage_times.get('service_init', 0):.2f}s")
+                    logger.info(f"  - First token: {stage_times.get('first_token', 0):.2f}s")
+                    logger.info(f"  - LLM streaming: {stage_times.get('llm_streaming', 0):.2f}s")
+                    logger.info(f"  - Tokens received: {token_count}")
+                    if token_count > 0 and stage_times.get('llm_streaming', 0) > 0:
+                        tokens_per_sec = token_count / stage_times['llm_streaming']
+                        logger.info(f"  - Streaming rate: {tokens_per_sec:.1f} tokens/s")
+                    
                     # Extract entities from context after streaming
+                    entity_start = time.perf_counter()
                     entities_collected = self._build_related_entities(
                         context, max_results=max_results
                     )
+                    entity_time = time.perf_counter() - entity_start
+                    logger.debug(f"[PERF] Entity extraction took {entity_time:.2f}s")
                     
                     # Emit entities
                     for entity_dict in entities_collected:
@@ -375,10 +430,16 @@ class GraphRAGService:
         entities: List[Dict[str, Any]] = []
 
         for file_entry in context.graph_data.get("files", [])[:max_results]:
+            file_path = file_entry.get("path")
+            
+            # 跳过没有路径的文件
+            if not file_path or file_path == "-":
+                continue
+                
             entities.append(
                 {
                     "type": "file",
-                    "name": file_entry.get("path"),
+                    "name": file_path,
                     "importance": "high" if file_entry.get("commits") else "medium",
                     "detail": file_entry.get("description") or "",
                     "link": None,
@@ -386,12 +447,19 @@ class GraphRAGService:
             )
 
         for commit in context.graph_data.get("commits", [])[:max_results]:
+            commit_id = commit.get("id")
+            commit_message = commit.get("message") or ""
+            
+            # 跳过没有 ID 或消息的 commit
+            if not commit_id or not commit_message or commit_message == "-":
+                continue
+                
             entities.append(
                 {
                     "type": "commit",
-                    "name": commit.get("id"),
+                    "name": commit_id,
                     "importance": "high",
-                    "detail": commit.get("message") or "",
+                    "detail": commit_message,
                     "author": commit.get("author"),
                     "link": None,
                 }
@@ -399,10 +467,16 @@ class GraphRAGService:
 
         for module in context.graph_data.get("modules", [])[:max_results]:
             if isinstance(module, dict):
+                module_name = module.get("name") or module.get("entity")
+                
+                # 跳过没有名称的模块
+                if not module_name or module_name == "-":
+                    continue
+                    
                 entities.append(
                     {
                         "type": "module",
-                        "name": module.get("name") or module.get("entity"),
+                        "name": module_name,
                         "importance": "medium",
                         "detail": ", ".join(
                             owner.get("person", "")
@@ -413,6 +487,10 @@ class GraphRAGService:
                     }
                 )
             elif isinstance(module, str):
+                # 跳过空字符串或 "-"
+                if not module or module == "-":
+                    continue
+                    
                 entities.append(
                     {
                         "type": "module",

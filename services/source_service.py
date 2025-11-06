@@ -196,18 +196,29 @@ class SourceService:
         await self.session.flush()
 
         # 记录审计日志
-        await audit_logger.record_event(
-            actor_id=actor_info.get("user_id") if actor_info else None,
-            actor_email=actor_info.get("email") if actor_info else None,
-            resource="knowledge_sources",
-            action="update",
-            status="success",
-            target=str(source.id),
-            details=f"更新知识源: {source.name}",
-            metadata={"updated_fields": updated_fields},
-            ip_address=actor_info.get("ip_address") if actor_info else None,
-            session=self.session,
-        )
+        if actor_info and actor_info.get("email"):
+            await audit_logger.record_event(
+                actor_id=actor_info.get("user_id"),
+                actor_email=actor_info["email"],
+                resource="knowledge_sources",
+                action="update",
+                status="success",
+                target=str(source.id),
+                details=f"更新知识源: {source.name}",
+                metadata={"updated_fields": updated_fields},
+                ip_address=actor_info.get("ip_address"),
+                session=self.session,
+            )
+        else:
+            await audit_logger.record_system_event(
+                resource="knowledge_sources",
+                action="update",
+                status="success",
+                target=str(source.id),
+                details=f"系统更新知识源: {source.name}",
+                metadata={"updated_fields": updated_fields, "trigger": "auto_update"},
+                session=self.session,
+            )
 
         return source
 
@@ -225,17 +236,27 @@ class SourceService:
         await self.session.flush()
 
         # 记录审计日志
-        await audit_logger.record_event(
-            actor_id=actor_info.get("user_id") if actor_info else None,
-            actor_email=actor_info.get("email") if actor_info else None,
-            resource="knowledge_sources",
-            action="delete",
-            status="success",
-            target=str(source.id),
-            details=f"软删除知识源: {source.name}",
-            ip_address=actor_info.get("ip_address") if actor_info else None,
-            session=self.session,
-        )
+        if actor_info and actor_info.get("email"):
+            await audit_logger.record_event(
+                actor_id=actor_info.get("user_id"),
+                actor_email=actor_info["email"],
+                resource="knowledge_sources",
+                action="delete",
+                status="success",
+                target=str(source.id),
+                details=f"软删除知识源: {source.name}",
+                ip_address=actor_info.get("ip_address"),
+                session=self.session,
+            )
+        else:
+            await audit_logger.record_system_event(
+                resource="knowledge_sources",
+                action="delete",
+                status="success",
+                target=str(source.id),
+                details=f"系统删除知识源: {source.name}",
+                session=self.session,
+            )
 
     # ParseJob operations
     async def create_parse_job(
@@ -268,21 +289,36 @@ class SourceService:
         await self.session.flush()
 
         # 记录审计日志
-        await audit_logger.record_event(
-            actor_id=created_by,
-            actor_email=actor_info.get("email") if actor_info else None,
-            resource="parse_jobs",
-            action="create",
-            status="success",
-            target=str(job.id),
-            details=f"为知识源 '{source.name}' 创建解析任务",
-            metadata={
-                "knowledge_source_id": str(job_data.knowledge_source_id),
-                "source_name": source.name,
-            },
-            ip_address=actor_info.get("ip_address") if actor_info else None,
-            session=self.session,
-        )
+        if actor_info and actor_info.get("email"):
+            await audit_logger.record_event(
+                actor_id=created_by,
+                actor_email=actor_info["email"],
+                resource="parse_jobs",
+                action="create",
+                status="success",
+                target=str(job.id),
+                details=f"为知识源 '{source.name}' 创建解析任务",
+                metadata={
+                    "knowledge_source_id": str(job_data.knowledge_source_id),
+                    "source_name": source.name,
+                },
+                ip_address=actor_info.get("ip_address"),
+                session=self.session,
+            )
+        else:
+            await audit_logger.record_system_event(
+                resource="parse_jobs",
+                action="create",
+                status="success",
+                target=str(job.id),
+                details=f"系统为知识源 '{source.name}' 创建解析任务",
+                metadata={
+                    "knowledge_source_id": str(job_data.knowledge_source_id),
+                    "source_name": source.name,
+                    "trigger": "auto_sync",
+                },
+                session=self.session,
+            )
 
         return job
 

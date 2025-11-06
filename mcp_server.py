@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional, List
 from loguru import logger
 
 from services.neo4j_knowledge_service import neo4j_knowledge_service, Neo4jKnowledgeService
+from services.graph_service import graph_service
 from services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
 from services.task_processors import processor_registry
 from config import settings, get_current_model_info
@@ -27,7 +28,10 @@ async def ensure_service_initialized():
             # start task queue
             await task_queue.start()
             # initialize task processors
-            processor_registry.initialize_default_processors(knowledge_service)
+            processor_registry.initialize_default_processors(
+                knowledge_service=knowledge_service,
+                graph_service_obj=graph_service,
+            )
             logger.info("Neo4j Knowledge Service, Task Queue, and Processors initialized for MCP")
         else:
             raise Exception("Failed to initialize Neo4j Knowledge Service")

@@ -37,5 +37,7 @@ class AuditEvent(Base):
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(), default=lambda: dt.datetime.now(dt.timezone.utc), nullable=False
+        DateTime(timezone=True),
+        default=lambda: dt.datetime.now(dt.timezone.utc),
+        nullable=False,
     )

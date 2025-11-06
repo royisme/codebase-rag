@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
@@ -34,7 +35,13 @@ def _configure_sqlalchemy_url() -> None:
     sqlalchemy_url = (
         settings.database_dsn_sync if context.is_offline_mode() else settings.database_dsn_async
     )
-    config.set_main_option("sqlalchemy.url", sqlalchemy_url)
+    # Remove 'options' parameter if it exists in the URL, as asyncpg doesn't support it directly.
+    if "options=" in sqlalchemy_url:
+        sqlalchemy_url = re.sub(r"([?&])options=[^&]*", r"\1", sqlalchemy_url)
+        # Clean up any trailing '?' or '&' if options was the only parameter.
+        sqlalchemy_url = sqlalchemy_url.replace("?&", "?").rstrip("?&")
+
+    config.set_main_option("sqlalchemy.url", sqlalchemy_url.replace('%', '%%'))
 
 
 def run_migrations_offline() -> None:

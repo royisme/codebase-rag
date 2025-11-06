@@ -51,7 +51,7 @@ class KnowledgeSource(Base, TimestampMixin):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_synced_at: Mapped[Optional[dt.datetime]] = mapped_column(
-        DateTime(), nullable=True
+        DateTime(timezone=True), nullable=True
     )
     sync_frequency_minutes: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, comment="自动同步间隔（分钟），为空则手动同步"
@@ -79,10 +79,10 @@ class ParseJob(Base, TimestampMixin):
         String(20), nullable=False, default=ParseStatus.PENDING, index=True
     )
     started_at: Mapped[Optional[dt.datetime]] = mapped_column(
-        DateTime(), nullable=True
+        DateTime(timezone=True), nullable=True
     )
     completed_at: Mapped[Optional[dt.datetime]] = mapped_column(
-        DateTime(), nullable=True
+        DateTime(timezone=True), nullable=True
     )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     progress_percentage: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -96,6 +96,9 @@ class ParseJob(Base, TimestampMixin):
     )
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUIDType(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    task_id: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, index=True, comment="关联的执行任务ID"
     )
 
     # 关系
