@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Background -->
+  <rect width="200" height="200" fill="none"/>
+
+  <!-- Graph nodes (larger circles) -->
+  <circle cx="100" cy="60" r="18" fill="#5c6bc0" opacity="0.9"/>
+  <circle cx="60" cy="120" r="18" fill="#5c6bc0" opacity="0.9"/>
+  <circle cx="140" cy="120" r="18" fill="#5c6bc0" opacity="0.9"/>
+  <circle cx="100" cy="160" r="18" fill="#5c6bc0" opacity="0.9"/>
+
+  <!-- Connecting lines -->
+  <line x1="100" y1="60" x2="60" y2="120" stroke="#7986cb" stroke-width="3" opacity="0.7"/>
+  <line x1="100" y1="60" x2="140" y2="120" stroke="#7986cb" stroke-width="3" opacity="0.7"/>
+  <line x1="60" y1="120" x2="100" y2="160" stroke="#7986cb" stroke-width="3" opacity="0.7"/>
+  <line x1="140" y1="120" x2="100" y2="160" stroke="#7986cb" stroke-width="3" opacity="0.7"/>
+  <line x1="60" y1="120" x2="140" y2="120" stroke="#7986cb" stroke-width="3" opacity="0.7"/>
+
+  <!-- Center highlight -->
+  <circle cx="100" cy="100" r="24" fill="#3f51b5" opacity="0.95"/>
+
+  <!-- Code brackets in center -->
+  <text x="100" y="112" font-family="monospace" font-size="32" font-weight="bold" fill="white" text-anchor="middle">&lt;/&gt;</text>
+</svg>
