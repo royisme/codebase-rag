@@ -57,8 +57,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     rm -rf /wheelhouse
 
 # Copy application code (precise, not everything)
-COPY --chown=appuser:appuser README.md ./
-COPY --chown=appuser:appuser pyproject.toml ./
 COPY --chown=appuser:appuser api ./api
 COPY --chown=appuser:appuser core ./core
 COPY --chown=appuser:appuser services ./services
