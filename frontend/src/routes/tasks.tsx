@@ -71,7 +71,7 @@ function TasksPage() {
       setUploadMessage(`File uploaded successfully! Task ID: ${data.data.task_id}`)
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setUploadMessage(`Upload failed: ${error.message}`)
     },
   })
@@ -84,7 +84,7 @@ function TasksPage() {
       setDirectoryPath('')
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       alert(`Failed to process directory: ${error.message}`)
     },
   })
@@ -107,7 +107,7 @@ function TasksPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
+    const variants: Record<string, 'success' | 'destructive' | 'default' | 'warning' | 'secondary' | 'outline'> = {
       success: 'success',
       failed: 'destructive',
       running: 'default',
