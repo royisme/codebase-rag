@@ -109,12 +109,15 @@ RUN if [ -d frontend/dist ]; then \
 # Switch to non-root user
 USER appuser
 
-# Expose port
+# Expose port (HTTP API only)
+# Note: MCP service (start_mcp.py) uses stdio, NOT HTTP port
+# MCP runs separately on host machine, calls this HTTP API
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Default command
+# Default command - starts HTTP API (not MCP)
+# For MCP service, run on host: python start_mcp.py
 CMD ["python", "start.py"]
