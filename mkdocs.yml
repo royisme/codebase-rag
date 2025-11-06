@@ -144,7 +144,7 @@ nav:
     - Standard Mode: deployment/standard.md
     - Full Mode: deployment/full.md
     - Docker Guide: deployment/docker.md
-    - Production Setup: deployment/production.md
+    
   - User Guide:
     - Code Graph:
       - Overview: guide/code-graph/overview.md
