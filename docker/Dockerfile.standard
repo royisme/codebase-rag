@@ -15,8 +15,9 @@ RUN pip install uv
 
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
-RUN uv pip install --system -e .
+COPY pyproject.toml ./
+# Create dummy README for pip install (pyproject.toml references it)
+RUN touch README.md && uv pip install --system -e .
 
 # ============================================
 # Final stage
