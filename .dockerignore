@@ -31,8 +31,8 @@ env/
 .gitignore
 
 # Documentation
-*.md
 docs/
+*.md
 
 # Data and logs
 data/
@@ -58,7 +58,11 @@ tests/
 pytest.ini
 .pytest_cache/
 
-# Node (if any frontend)
+# Frontend - Exclude development artifacts but allow source
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
 node_modules/
 package-lock.json
 yarn.lock

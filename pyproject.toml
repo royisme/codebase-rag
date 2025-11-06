@@ -29,8 +29,6 @@ dependencies = [
     "llama-index-llms-gemini>=0.5.0",
     "llama-index-embeddings-gemini>=0.3.2",
     "google-generativeai>=0.3.0",
-    "matplotlib>=3.10.3",
-    "nicegui>=2.19.0",
     "llama-index-llms-openrouter>=0.3.2",
     "prometheus-client>=0.21.0",
 ]
@@ -51,7 +49,7 @@ server = "start:main"
 mcp_client = "start_mcp:main"
 
 [tool.setuptools]
-packages = ["api", "core", "services", "monitoring", "mcp_tools"]
+packages = ["api", "core", "services", "mcp_tools"]
 py-modules = ["start", "start_mcp", "mcp_server", "config", "main"]
 
 [tool.pytest.ini_options]

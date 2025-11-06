@@ -124,6 +124,31 @@ export const contextApi = {
   }) => api.get<ContextPack>('/context/pack', { params }),
 }
 
+export interface ProcessDocumentRequest {
+  content: string
+  filename?: string
+  document_type?: string
+}
+
+export interface ProcessDocumentResponse {
+  task_id: string
+  status: string
+  message: string
+}
+
+export interface ProcessDirectoryRequest {
+  directory_path: string
+  file_patterns?: string[]
+  recursive?: boolean
+}
+
+export interface ProcessDirectoryResponse {
+  task_id: string
+  status: string
+  message: string
+  files_found?: number
+}
+
 export const taskApi = {
   getStatus: (taskId: string) =>
     api.get<TaskStatus>(`/tasks/${taskId}`),
@@ -133,6 +158,12 @@ export const taskApi = {
 
   cancelTask: (taskId: string) =>
     api.post(`/tasks/${taskId}/cancel`),
+
+  processDocument: (data: ProcessDocumentRequest) =>
+    api.post<ProcessDocumentResponse>('/documents/process', data),
+
+  processDirectory: (data: ProcessDirectoryRequest) =>
+    api.post<ProcessDirectoryResponse>('/documents/process-directory', data),
 }
 
 export default api

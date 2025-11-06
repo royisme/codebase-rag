@@ -3,12 +3,13 @@ FastAPI application configuration module
 Responsible for creating and configuring FastAPI application instance
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from loguru import logger
+import os
 
 from config import settings
 from .exception_handlers import setup_exception_handlers
@@ -37,47 +38,46 @@ def create_app() -> FastAPI:
     
     # set routes
     setup_routes(app)
-    
-    # static file service
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-    
-    # conditionally enable NiceGUI monitoring interface
-    if settings.enable_monitoring:
-        try:
-            from nicegui import ui
-            from monitoring.task_monitor import setup_monitoring_routes
-            
-            # setup NiceGUI monitoring routes
-            setup_monitoring_routes()
-            
-            # integrate NiceGUI with FastAPI
-            ui.run_with(app, mount_path=settings.monitoring_path)
-            
-            logger.info(f"Monitoring interface enabled at {settings.monitoring_path}/monitor")
-            
-        except ImportError as e:
-            logger.warning(f"NiceGUI not available, monitoring interface disabled: {e}")
-        except Exception as e:
-            logger.error(f"Failed to setup monitoring interface: {e}")
+
+    # Check if static directory exists (contains built React frontend)
+    static_dir = "static"
+    if os.path.exists(static_dir) and os.path.exists(os.path.join(static_dir, "index.html")):
+        # Mount static assets (JS, CSS, images, etc.)
+        app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+
+        # SPA fallback - serve index.html for all non-API routes
+        @app.get("/{full_path:path}")
+        async def serve_spa(request: Request, full_path: str):
+            """Serve React SPA with fallback to index.html for client-side routing"""
+            # API routes are handled by routers, so we only get here for unmatched routes
+            # Check if this looks like an API call that wasn't found
+            if full_path.startswith("api/"):
+                return JSONResponse(
+                    status_code=404,
+                    content={"detail": "Not Found"}
+                )
+
+            # For all other routes, serve the React SPA
+            index_path = os.path.join(static_dir, "index.html")
+            return FileResponse(index_path)
+
+        logger.info("React frontend enabled - serving SPA from /static")
+        logger.info("Task monitoring available at /tasks")
     else:
-        logger.info("Monitoring interface disabled by configuration")
-    
-    # root path
-    @app.get("/")
-    async def root():
-        """root path interface"""
-        response_data = {
-            "message": "Welcome to Code Graph Knowledge Service",
-            "version": settings.app_version,
-            "docs": "/docs" if settings.debug else "Documentation disabled in production",
-            "health": "/api/v1/health"
-        }
-        
-        # conditionally add monitoring URL
-        if settings.enable_monitoring:
-            response_data["task_monitor"] = f"{settings.monitoring_path}/monitor"
-        
-        return response_data
+        logger.warning("Static directory not found - React frontend not available")
+        logger.warning("Run 'cd frontend && npm run build' and copy dist/* to static/")
+
+        # Fallback root endpoint when frontend is not built
+        @app.get("/")
+        async def root():
+            """root path interface"""
+            return {
+                "message": "Welcome to Code Graph Knowledge Service",
+                "version": settings.app_version,
+                "docs": "/docs" if settings.debug else "Documentation disabled in production",
+                "health": "/api/v1/health",
+                "note": "React frontend not built - see logs for instructions"
+            }
     
     # system information interface
     @app.get("/info")
@@ -89,7 +89,6 @@ def create_app() -> FastAPI:
             "version": settings.app_version,
             "python_version": sys.version,
             "debug_mode": settings.debug,
-            "monitoring_enabled": settings.enable_monitoring,
             "services": {
                 "neo4j": {
                     "uri": settings.neo4j_uri,
