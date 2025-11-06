@@ -50,12 +50,15 @@ dev = [
 ]
 
 [project.scripts]
-server = "start:main"
-mcp_client = "start_mcp:main"
+codebase-rag = "codebase_rag.__main__:main"
+codebase-rag-web = "codebase_rag.server.web:main"
+codebase-rag-mcp = "codebase_rag.server.mcp:main"
 
 [tool.setuptools]
-packages = ["api", "core", "services", "mcp_tools"]
-py-modules = ["start", "start_mcp", "mcp_server", "config", "main"]
+packages = {find = {where = ["src"]}}
+
+[tool.setuptools.package-data]
+codebase_rag = ["py.typed"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -73,7 +76,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
-source = ["mcp_tools", "services", "api", "core"]
+source = ["src/codebase_rag"]
 omit = [
     "*/tests/*",
     "*/test_*.py",

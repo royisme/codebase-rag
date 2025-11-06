@@ -20,7 +20,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from llama_index.core import Settings
 from loguru import logger
 
-from services.memory_store import memory_store
+from src.codebase_rag.services.memory_store import memory_store
 
 
 class MemoryExtractor:

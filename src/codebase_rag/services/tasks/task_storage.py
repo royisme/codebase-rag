@@ -13,7 +13,7 @@ from enum import Enum
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from loguru import logger
-from config import settings
+from src.codebase_rag.config import settings
 
 from .task_queue import TaskResult, TaskStatus
 

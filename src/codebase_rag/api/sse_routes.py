@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
-from services.task_queue import task_queue, TaskStatus
+from src.codebase_rag.services.task_queue import task_queue, TaskStatus
 
 router = APIRouter(prefix="/sse", tags=["SSE"])
 

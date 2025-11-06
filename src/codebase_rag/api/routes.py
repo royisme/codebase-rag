@@ -5,17 +5,17 @@ from pydantic import BaseModel
 import uuid
 from datetime import datetime
 
-from services.sql_parser import sql_analyzer
-from services.graph_service import graph_service
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
-from services.universal_sql_schema_parser import parse_sql_schema_smart
-from services.task_queue import task_queue
-from services.code_ingestor import get_code_ingestor
-from services.git_utils import git_utils
-from services.ranker import ranker
-from services.pack_builder import pack_builder
-from services.metrics import metrics_service
-from config import settings
+from src.codebase_rag.services.sql_parser import sql_analyzer
+from src.codebase_rag.services.graph_service import graph_service
+from src.codebase_rag.services.neo4j_knowledge_service import Neo4jKnowledgeService
+from src.codebase_rag.services.universal_sql_schema_parser import parse_sql_schema_smart
+from src.codebase_rag.services.task_queue import task_queue
+from src.codebase_rag.services.code_ingestor import get_code_ingestor
+from src.codebase_rag.services.git_utils import git_utils
+from src.codebase_rag.services.ranker import ranker
+from src.codebase_rag.services.pack_builder import pack_builder
+from src.codebase_rag.services.metrics import metrics_service
+from src.codebase_rag.config import settings
 from loguru import logger
 
 # create router

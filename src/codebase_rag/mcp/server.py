@@ -39,17 +39,17 @@ from mcp.types import (
 from loguru import logger
 
 # Import services
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
-from services.memory_store import memory_store
-from services.memory_extractor import memory_extractor
-from services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
-from services.task_processors import processor_registry
-from services.graph_service import graph_service
-from services.code_ingestor import get_code_ingestor
-from services.ranker import ranker
-from services.pack_builder import pack_builder
-from services.git_utils import git_utils
-from config import settings, get_current_model_info
+from src.codebase_rag.services.neo4j_knowledge_service import Neo4jKnowledgeService
+from src.codebase_rag.services.memory_store import memory_store
+from src.codebase_rag.services.memory_extractor import memory_extractor
+from src.codebase_rag.services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
+from src.codebase_rag.services.task_processors import processor_registry
+from src.codebase_rag.services.graph_service import graph_service
+from src.codebase_rag.services.code_ingestor import get_code_ingestor
+from src.codebase_rag.services.ranker import ranker
+from src.codebase_rag.services.pack_builder import pack_builder
+from src.codebase_rag.services.git_utils import git_utils
+from src.codebase_rag.config import settings, get_current_model_info
 
 # Import MCP tools modules
 from mcp_tools import (

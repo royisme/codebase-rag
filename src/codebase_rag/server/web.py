@@ -12,9 +12,9 @@ from loguru import logger
 from multiprocessing import Process
 
 from src.codebase_rag.config import settings
-from core.app import create_app
-from core.logging import setup_logging
-from core.mcp_sse import create_mcp_sse_app
+from src.codebase_rag.core.app import create_app
+from src.codebase_rag.core.logging import setup_logging
+from src.codebase_rag.core.mcp_sse import create_mcp_sse_app
 
 # setup logging
 setup_logging()

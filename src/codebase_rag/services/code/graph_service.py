@@ -2,7 +2,7 @@ from neo4j import GraphDatabase, basic_auth
 from typing import List, Dict, Optional, Any, Union
 from pydantic import BaseModel
 from loguru import logger
-from config import settings
+from src.codebase_rag.config import settings
 import json
 
 class GraphNode(BaseModel):

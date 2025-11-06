@@ -9,10 +9,10 @@ from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 from datetime import datetime
 
-from services.task_queue import task_queue, TaskStatus
-from services.task_storage import TaskType
+from src.codebase_rag.services.task_queue import task_queue, TaskStatus
+from src.codebase_rag.services.task_storage import TaskType
 from loguru import logger
-from config import settings
+from src.codebase_rag.config import settings
 
 router = APIRouter(prefix="/tasks", tags=["Task Management"])
 

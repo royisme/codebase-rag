@@ -126,6 +126,6 @@ EXPOSE 8000 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
-# Default command - starts HTTP API (not MCP)
-# For MCP service, run on host: python start_mcp.py
-CMD ["python", "start.py"]
+# Default command - starts both MCP and Web services (dual-port mode)
+# Alternative: python -m codebase_rag --mcp (MCP only) or --web (Web only)
+CMD ["python", "-m", "codebase_rag"]
