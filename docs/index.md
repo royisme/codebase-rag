@@ -1,6 +1,5 @@
 # Code Graph Knowledge System
 
-<div align="center">
 
 **AI-Powered Code Intelligence & Knowledge Management**
 
@@ -8,7 +7,6 @@
 [![GitHub](https://img.shields.io/github/stars/royisme/codebase-rag?style=flat-square)](https://github.com/royisme/codebase-rag)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
-</div>
 
 ---
 
