@@ -31,8 +31,10 @@ env/
 .gitignore
 
 # Documentation
-*.md
 docs/
+*.md
+!README.md
+!README_CN.md
 
 # Data and logs
 data/

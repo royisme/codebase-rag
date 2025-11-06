@@ -1,56 +1,69 @@
+# syntax=docker/dockerfile:1.7
 # Full Docker image - All features (LLM + Embedding required)
-FROM python:3.13-slim as builder
+
+########### Builder - Build wheels only ###########
+FROM python:3.13-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PYTHONDONTWRITEBYTECODE=1
 
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
+    ca-certificates \
+    git \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip install uv
 
 WORKDIR /app
 
-# Copy source files needed for package installation
-COPY pyproject.toml ./
-COPY api ./api
-COPY core ./core
-COPY services ./services
-COPY monitoring ./monitoring
-COPY mcp_tools ./mcp_tools
-COPY start.py start_mcp.py mcp_server.py config.py main.py ./
+# Copy requirements file
+COPY requirements.txt ./
 
-# Install the package and its dependencies
-RUN uv pip install --system .
+# Build all dependencies as wheels (using cache mount)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip wheel --no-deps -r requirements.txt -w /wheelhouse && \
+    pip wheel -r requirements.txt -w /wheelhouse
 
-# ============================================
-# Final stage
-# ============================================
-FROM python:3.13-slim
+########### Runtime - Install wheels + code ###########
+FROM python:3.13-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DEPLOYMENT_MODE=full
 
-RUN apt-get update && apt-get install -y \
-    git \
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user
 RUN useradd -m -u 1000 appuser && \
     mkdir -p /app /data /repos && \
     chown -R appuser:appuser /app /data /repos
 
 WORKDIR /app
 
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy wheels from builder and install
+COPY --from=builder /wheelhouse /wheelhouse
+COPY requirements.txt ./
 
-COPY --chown=appuser:appuser . .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --no-index --find-links=/wheelhouse -r requirements.txt && \
+    rm -rf /wheelhouse
+
+# Copy application code (precise, not everything)
+COPY --chown=appuser:appuser README.md ./
+COPY --chown=appuser:appuser pyproject.toml ./
+COPY --chown=appuser:appuser api ./api
+COPY --chown=appuser:appuser core ./core
+COPY --chown=appuser:appuser services ./services
+COPY --chown=appuser:appuser mcp_tools ./mcp_tools
+COPY --chown=appuser:appuser start.py start_mcp.py mcp_server.py config.py main.py ./
 
 USER appuser
 
