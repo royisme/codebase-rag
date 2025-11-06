@@ -7,21 +7,9 @@
 # This Dockerfile expects frontend/dist/ to exist
 
 # ============================================
-# Builder stage
+# Builder stage - Only install dependencies
 # ============================================
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    DEPLOYMENT_MODE=standard
-
-# Install minimal system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -31,18 +19,6 @@ COPY requirements.txt ./
 # Install Python dependencies using uv with BuildKit cache
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --no-cache -r requirements.txt
-
-# Copy application source code
-COPY pyproject.toml README.md ./
-COPY api ./api
-COPY core ./core
-COPY services ./services
-COPY mcp_tools ./mcp_tools
-COPY *.py ./
-
-# Install local package (without dependencies, already installed)
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --no-cache --no-deps -e .
 
 # ============================================
 # Final stage
