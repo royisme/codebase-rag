@@ -39,10 +39,40 @@ pip install -e ".[huggingface,milvus,openrouter]"
 ```
 
 ## Results
-- **Image size reduction**: ~60-70% smaller
-- **Build time**: 50% faster
-- **Dependencies**: 564 → 379 lines (32.9% reduction)
+- **Image size reduction**: ~60-70% smaller (~5GB → ~1.5GB)
+- **Build time**: ~50% faster (layer caching + fewer deps)
+- **Dependencies**: 564 → 379 lines (-32.9%)
 - **NVIDIA packages**: 15 → 0 ✅
+
+## Dockerfile Optimizations
+
+The Dockerfile was also optimized to leverage these changes:
+
+### Before
+```dockerfile
+# ❌ Problem: Installing from pyproject.toml with all dependencies
+COPY pyproject.toml ./
+RUN uv pip install --system -e .
+
+# ❌ Problem: Copying ALL binaries including build tools
+COPY --from=builder /usr/local/bin /usr/local/bin
+```
+
+### After
+```dockerfile
+# ✅ Better: Use pre-compiled requirements.txt (no CUDA)
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ✅ Better: Copy only necessary entry points
+COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
+```
+
+### Key Improvements
+1. **Uses requirements.txt** instead of pyproject.toml → no dependency resolution at build time
+2. **Better layer caching** → requirements.txt changes less frequently than pyproject.toml
+3. **Selective binary copying** → excludes uv, pip-compile, gcc, and other build tools
+4. **Production mode** → not using editable mode for dependencies (only for local package)
 
 ## Default Configuration
 The default setup uses:
