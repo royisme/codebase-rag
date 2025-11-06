@@ -693,7 +693,6 @@ MAX_WORKERS=4  # Parallel document processing threads
 
 - **[Query Guide](query.md)**: Learn to query your knowledge base effectively
 - **[MCP Integration](../mcp/overview.md)**: Connect to AI assistants
-- **[Performance Tuning](../../deployment/production.md)**: Optimize for production
 
 ## Additional Resources
 

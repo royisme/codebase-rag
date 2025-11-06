@@ -576,5 +576,4 @@ See separate Kubernetes deployment guide (coming soon).
 ## Next Steps
 
 - [Minimal Mode Guide](minimal.md) - Deploy minimal mode
-- [Production Setup](production.md) - Production best practices
 - [Troubleshooting](../troubleshooting.md) - Common issues

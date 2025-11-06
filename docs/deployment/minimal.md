@@ -337,4 +337,3 @@ Perfect for individual developers and small teams!
 
 - [Docker Guide](docker.md) - Advanced Docker configuration
 - [Code Graph User Guide](../guide/code-graph/overview.md) - Learn all features
-- [Production Setup](production.md) - Deploy to production

@@ -1,61 +1,63 @@
 # syntax=docker/dockerfile:1.7
 # Full Docker image - All features (LLM + Embedding required)
+#
+# IMPORTANT: Frontend MUST be pre-built before docker build:
+#   ./build-frontend.sh
+#
+# This Dockerfile expects frontend/dist/ to exist
 
-########### Builder - Build wheels only ###########
-FROM python:3.13-slim AS builder
+# ============================================
+# Builder stage
+# ============================================
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    DEPLOYMENT_MODE=full
 
-# Install build dependencies
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    ca-certificates \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy requirements file
+# Copy requirements.txt for optimal layer caching
 COPY requirements.txt ./
 
-# Build all dependencies as wheels (using cache mount)
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
-    pip wheel --no-deps -r requirements.txt -w /wheelhouse && \
-    pip wheel -r requirements.txt -w /wheelhouse
+# Install Python dependencies using uv with BuildKit cache
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --no-cache -r requirements.txt
 
-########### Frontend Builder - Build React app ###########
-FROM node:20-slim AS frontend-builder
+# Copy application source code
+COPY pyproject.toml README.md ./
+COPY api ./api
+COPY core ./core
+COPY services ./services
+COPY mcp_tools ./mcp_tools
+COPY *.py ./
 
-WORKDIR /frontend
+# Install local package (without dependencies, already installed)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --no-cache --no-deps -e .
 
-# Copy package files
-COPY frontend/package*.json ./
-
-# Install dependencies with cache mount
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
-
-# Copy frontend source
-COPY frontend/ ./
-
-# Build production bundle
-RUN npm run build
-
-########### Runtime - Install wheels + code + frontend ###########
-FROM python:3.13-slim AS runtime
+# ============================================
+# Final stage
+# ============================================
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DEPLOYMENT_MODE=full
+    DEPLOYMENT_MODE=full \
+    PATH="/app:${PATH}"
 
-# Install runtime dependencies only
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -65,31 +67,28 @@ RUN useradd -m -u 1000 appuser && \
 
 WORKDIR /app
 
-# Copy wheels from builder and install
-COPY --from=builder /wheelhouse /wheelhouse
-COPY requirements.txt ./
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
-    pip install --no-index --find-links=/wheelhouse -r requirements.txt && \
-    rm -rf /wheelhouse
-
-# Copy application code (precise, not everything)
+# Copy application code
 COPY --chown=appuser:appuser api ./api
 COPY --chown=appuser:appuser core ./core
 COPY --chown=appuser:appuser services ./services
 COPY --chown=appuser:appuser mcp_tools ./mcp_tools
 COPY --chown=appuser:appuser start.py start_mcp.py mcp_server.py config.py main.py ./
 
-# Copy built frontend from frontend-builder stage
-COPY --from=frontend-builder --chown=appuser:appuser /frontend/dist ./static
+# Copy pre-built frontend (MUST exist - run ./build-frontend.sh first)
+COPY --chown=appuser:appuser frontend/dist ./static
 
 USER appuser
 
-EXPOSE 8000
+# Two-Port Architecture
+EXPOSE 8000 8080
 
+# Health check on Web UI port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
-# Start in full mode
-CMD ["python", "start_mcp.py", "--mode=full"]
+# Start application (dual-port mode)
+CMD ["python", "main.py"]
