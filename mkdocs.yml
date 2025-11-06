@@ -177,6 +177,7 @@ nav:
     - Contributing: development/contributing.md
     - Development Setup: development/setup.md
     - Testing: development/testing.md
+    - Migration Guide (v0.8.0): development/migration-guide.md
     - Version Management: development/version-management.md
     - Changelog Automation: development/changelog-automation.md
     - Release Process: development/release.md

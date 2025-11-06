@@ -370,13 +370,13 @@ ENABLE_MEMORY_STORE=true
 
 ```bash
 # Direct execution
-python start_mcp.py
+python -m codebase_rag --mcp
 
 # Using uv
 uv run mcp_server
 
 # With custom config
-MCP_LOG_LEVEL=DEBUG python start_mcp.py
+MCP_LOG_LEVEL=DEBUG python -m codebase_rag --mcp
 ```
 
 ### Client Configuration
@@ -575,7 +575,7 @@ REQUEST_TIMEOUT=30  # seconds
 tail -f mcp_server.log
 
 # Enable debug logging
-MCP_LOG_LEVEL=DEBUG python start_mcp.py
+MCP_LOG_LEVEL=DEBUG python -m codebase_rag --mcp
 ```
 
 ### Tool Call Tracing

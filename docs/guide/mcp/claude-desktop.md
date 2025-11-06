@@ -33,7 +33,7 @@ You need a running instance:
 docker-compose -f docker/docker-compose.full.yml up -d
 
 # Option 2: Local development
-python start_mcp.py
+python -m codebase_rag --mcp
 
 # Verify it's running
 ps aux | grep start_mcp.py
@@ -288,7 +288,7 @@ If tools don't appear:
 tail -f /path/to/codebase-rag/mcp_server.log
 
 # Enable debug mode
-MCP_LOG_LEVEL=DEBUG python start_mcp.py
+MCP_LOG_LEVEL=DEBUG python -m codebase_rag --mcp
 ```
 
 **Claude Desktop Logs**:
@@ -544,7 +544,7 @@ After tool calls:
    ```bash
    # Test the command manually
    cd /path/to/codebase-rag
-   python start_mcp.py
+   python -m codebase_rag --mcp
    ```
 
 4. **Review MCP server logs**:

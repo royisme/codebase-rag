@@ -205,10 +205,10 @@ POST /api/v1/code-graph/context-pack - Build context pack
 For custom integrations, use Python services directly:
 
 ```python
-from services.graph_service import graph_service
-from services.code_ingestor import code_ingestor
-from services.ranker import ranker
-from services.pack_builder import pack_builder
+from src.codebase_rag.services.code import graph_service
+from src.codebase_rag.services.code import code_ingestor
+from src.codebase_rag.services.ranker import ranker
+from src.codebase_rag.services.code import pack_builder
 ```
 
 ## Deployment Modes

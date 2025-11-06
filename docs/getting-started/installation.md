@@ -119,10 +119,10 @@ cp env.example .env
 nano .env
 
 # Start MCP server
-python start_mcp.py
+python -m codebase_rag --mcp
 
 # Or start FastAPI server
-python start.py
+python -m codebase_rag
 ```
 
 ## Verify Installation

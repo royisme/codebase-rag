@@ -50,7 +50,7 @@ Ensure the MCP server is accessible:
 ```bash
 # Running locally
 cd /path/to/codebase-rag
-python start_mcp.py
+python -m codebase_rag --mcp
 
 # Or via Docker
 docker-compose -f docker/docker-compose.full.yml up -d
@@ -186,7 +186,7 @@ uv pip install -e .
       "command": "ssh",
       "args": [
         "user@remote-server",
-        "cd /path/to/codebase-rag && python start_mcp.py"
+        "cd /path/to/codebase-rag && python -m codebase_rag --mcp"
       ]
     }
   }
@@ -666,7 +666,7 @@ For multiple projects, use workspace folders:
 2. **Verify command works**:
    ```bash
    cd /path/to/codebase-rag
-   python start_mcp.py
+   python -m codebase_rag --mcp
    # Should not exit immediately
    ```
 

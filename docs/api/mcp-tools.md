@@ -30,7 +30,7 @@ The MCP server provides AI assistants (like Claude Desktop, VS Code with MCP, et
 
 ```bash
 # Using start script
-python start_mcp.py
+python -m codebase_rag --mcp
 
 # Using uv (recommended)
 uv run mcp_client

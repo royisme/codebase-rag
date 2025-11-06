@@ -106,12 +106,12 @@ OPENROUTER_MODEL=anthropic/claude-3-opus
 ### Import Services
 
 ```python
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
-from services.memory_store import MemoryStore, memory_store
-from services.graph_service import Neo4jGraphService, graph_service
-from services.code_ingestor import CodeIngestor, get_code_ingestor
-from services.task_queue import TaskQueue, task_queue
-from config import settings
+from src.codebase_rag.services.knowledge import Neo4jKnowledgeService
+from src.codebase_rag.services.memory import MemoryStore, memory_store
+from src.codebase_rag.services.code import Neo4jGraphService, graph_service
+from src.codebase_rag.services.code import CodeIngestor, get_code_ingestor
+from src.codebase_rag.services.tasks import TaskQueue, task_queue
+from src.codebase_rag.config import settings
 ```
 
 ### Service Initialization Pattern
@@ -148,7 +148,7 @@ Primary service for knowledge graph operations with LlamaIndex integration.
 ### Initialization
 
 ```python
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
+from src.codebase_rag.services.knowledge import Neo4jKnowledgeService
 
 # Create instance
 knowledge_service = Neo4jKnowledgeService()
@@ -405,7 +405,7 @@ Project memory persistence for AI agents.
 ### Initialization
 
 ```python
-from services.memory_store import memory_store
+from src.codebase_rag.services.memory import memory_store
 
 # Initialize (async)
 await memory_store.initialize()
@@ -627,7 +627,7 @@ Low-level Neo4j graph operations.
 ### Initialization
 
 ```python
-from services.graph_service import graph_service
+from src.codebase_rag.services.code import graph_service
 
 # Connect to Neo4j
 await graph_service.connect()
@@ -791,8 +791,8 @@ Repository code ingestion service.
 ### Initialization
 
 ```python
-from services.code_ingestor import get_code_ingestor
-from services.graph_service import graph_service
+from src.codebase_rag.services.code import get_code_ingestor
+from src.codebase_rag.services.code import graph_service
 
 # Initialize graph service first
 await graph_service.connect()
@@ -882,7 +882,7 @@ Asynchronous task queue management.
 ### Initialization
 
 ```python
-from services.task_queue import task_queue, TaskStatus
+from src.codebase_rag.services.tasks import task_queue, TaskStatus
 
 # Start task queue
 await task_queue.start()
@@ -921,7 +921,7 @@ async def submit_task(
 
 **Example**:
 ```python
-from services.task_processors import process_document_task
+from src.codebase_rag.services.tasks import process_document_task
 
 task_id = await task_queue.submit_task(
     task_func=process_document_task,
@@ -1005,7 +1005,7 @@ def get_queue_stats() -> Dict[str, int]:
 Access configuration settings.
 
 ```python
-from config import settings
+from src.codebase_rag.config import settings
 
 # Neo4j settings
 print(settings.neo4j_uri)
@@ -1034,7 +1034,7 @@ print(settings.top_k)
 ### Get Current Model Info
 
 ```python
-from config import get_current_model_info
+from src.codebase_rag.config import get_current_model_info
 
 model_info = get_current_model_info()
 print(f"LLM: {model_info['llm']}")
@@ -1049,7 +1049,7 @@ print(f"Embedding: {model_info['embedding']}")
 
 ```python
 import asyncio
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
+from src.codebase_rag.services.knowledge import Neo4jKnowledgeService
 
 async def main():
     # Initialize service
@@ -1087,7 +1087,7 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from services.memory_store import memory_store
+from src.codebase_rag.services.memory import memory_store
 
 async def main():
     # Initialize
@@ -1128,9 +1128,9 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from services.graph_service import graph_service
-from services.code_ingestor import get_code_ingestor
-from services.git_utils import git_utils
+from src.codebase_rag.services.code import graph_service
+from src.codebase_rag.services.code import get_code_ingestor
+from src.codebase_rag.services.git_utils import git_utils
 
 async def main():
     # Connect to Neo4j
@@ -1178,8 +1178,8 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from services.task_queue import task_queue, TaskStatus
-from services.task_processors import process_document_task
+from src.codebase_rag.services.tasks import task_queue, TaskStatus
+from src.codebase_rag.services.tasks import process_document_task
 
 async def main():
     # Start task queue
@@ -1318,7 +1318,7 @@ result = await session.run("MATCH (n) RETURN n LIMIT 10")
 ### 4. Set Appropriate Timeouts
 
 ```python
-from config import settings
+from src.codebase_rag.config import settings
 
 # Adjust timeouts for large operations
 settings.operation_timeout = 300  # 5 minutes
@@ -1439,7 +1439,7 @@ for item in items:
 
 ```python
 # 60x faster for updates
-from services.git_utils import git_utils
+from src.codebase_rag.services.git_utils import git_utils
 
 if git_utils.is_git_repo(repo_path):
     changed_files = git_utils.get_changed_files(repo_path)

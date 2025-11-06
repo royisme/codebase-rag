@@ -69,7 +69,7 @@ curl -X POST http://localhost:8000/api/v1/memory/add \
 
 **Python Service**:
 ```python
-from services.memory_store import memory_store
+from src.codebase_rag.services.memory import memory_store
 
 result = await memory_store.add_memory(
     project_id="my-project",

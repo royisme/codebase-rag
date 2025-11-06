@@ -106,7 +106,7 @@ curl -X POST http://localhost:8000/api/v1/memory/extract/conversation \
 
 **Python Service**:
 ```python
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.memory import memory_extractor
 
 result = await memory_extractor.extract_from_conversation(
     project_id="my-project",
@@ -284,7 +284,7 @@ curl -X POST http://localhost:8000/api/v1/memory/extract/commit \
 
 **Python Service**:
 ```python
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.memory import memory_extractor
 
 result = await memory_extractor.extract_from_git_commit(
     project_id="my-project",
@@ -457,7 +457,7 @@ curl -X POST http://localhost:8000/api/v1/memory/extract/comments \
 
 **Python Service**:
 ```python
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.memory import memory_extractor
 
 result = await memory_extractor.extract_from_code_comments(
     project_id="my-project",
@@ -637,7 +637,7 @@ curl -X POST http://localhost:8000/api/v1/memory/suggest \
 
 **Python Service**:
 ```python
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.memory import memory_extractor
 
 result = await memory_extractor.suggest_memory_from_query(
     project_id="my-project",
@@ -689,8 +689,8 @@ if result['should_save']:
 ### Integration with Knowledge Service
 
 ```python
-from services.neo4j_knowledge_service import knowledge_service
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.knowledge import knowledge_service
+from src.codebase_rag.services.memory import memory_extractor
 
 async def query_with_memory_suggestion(
     project_id: str,
@@ -768,7 +768,7 @@ curl -X POST http://localhost:8000/api/v1/memory/extract/batch \
 
 **Python Service**:
 ```python
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.memory import memory_extractor
 
 result = await memory_extractor.batch_extract_from_repository(
     project_id="my-project",
@@ -951,7 +951,7 @@ import subprocess
 import sys
 sys.path.insert(0, '/path/to/project')
 
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.memory import memory_extractor
 
 async def main():
     # Get commit details
@@ -1035,7 +1035,7 @@ OPENAI_API_KEY=your-key
 Adjust auto-save threshold (default: 0.7):
 
 ```python
-from services.memory_extractor import memory_extractor
+from src.codebase_rag.services.memory import memory_extractor
 
 # Lower threshold (more auto-saves)
 memory_extractor.confidence_threshold = 0.6
@@ -1049,7 +1049,7 @@ memory_extractor.confidence_threshold = 0.8
 Adjust processing limits:
 
 ```python
-from services.memory_extractor import MemoryExtractor
+from src.codebase_rag.services.memory import MemoryExtractor
 
 # Custom limits
 MemoryExtractor.MAX_COMMITS_TO_PROCESS = 30
