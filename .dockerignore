@@ -58,7 +58,8 @@ tests/
 pytest.ini
 .pytest_cache/
 
-# Node (if any frontend)
+# Frontend (not needed in backend images)
+frontend/
 node_modules/
 package-lock.json
 yarn.lock
