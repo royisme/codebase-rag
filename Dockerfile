@@ -109,24 +109,25 @@ RUN if [ -d frontend/dist ]; then \
 # Switch to non-root user
 USER appuser
 
-# Expose port 8000 (MCP SSE + HTTP API + Web UI)
+# Expose ports (Two-Port Architecture)
 #
-# SERVICE PRIORITY:
-#   PRIMARY: MCP SSE service at /mcp/* (core功能)
-#     - GET  /mcp/sse       - MCP SSE connection endpoint
-#     - POST /mcp/messages/ - MCP message receiving endpoint
+# PORT 8000: MCP SSE Service (PRIMARY)
+#   - GET  /sse       - MCP SSE connection endpoint
+#   - POST /messages/ - MCP message receiving endpoint
+#   Purpose: Core MCP service for AI clients
 #
-#   SECONDARY: Web UI & REST API (status monitoring)
-#     - GET  /              - Web UI (React SPA)
-#     - *    /api/v1/*      - REST API endpoints
-#     - GET  /metrics       - Prometheus metrics
+# PORT 8080: Web UI + REST API (SECONDARY)
+#   - GET  /          - Web UI (React SPA for monitoring)
+#   - *    /api/v1/*  - REST API endpoints
+#   - GET  /metrics   - Prometheus metrics
+#   Purpose: Status monitoring and programmatic access
 #
-# Note: Legacy start_mcp.py (stdio) still available for local development
-EXPOSE 8000
+# Note: stdio mode (start_mcp.py) still available for local development
+EXPOSE 8000 8080
 
-# Health check
+# Health check (check both services)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
 # Default command - starts HTTP API (not MCP)
 # For MCP service, run on host: python start_mcp.py
