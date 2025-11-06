@@ -129,7 +129,6 @@ function TasksPage() {
       return
     }
 
-    setUploadFile(file)
     uploadMutation.mutate(file)
   }
 
