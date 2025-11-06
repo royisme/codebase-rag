@@ -44,4 +44,7 @@ data/
 .cursor/
 .aider*
 CLAUDE.md
+AGENTS.md
+GEMINI.md
 .backup/
+.claude/
