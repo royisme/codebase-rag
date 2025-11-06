@@ -10,7 +10,7 @@ Follow these steps in order:
 
 - [ ] 1. Configure GitHub Repository Secrets
 - [ ] 2. Enable GitHub Pages
-- [ ] 3. Configure DNS for docs.vantagecraft.dev
+- [ ] 3. Configure DNS for code-graph.vantagecraft.dev
 - [ ] 4. Test Docker builds locally (optional)
 - [ ] 5. Verify CI/CD workflows
 - [ ] 6. Submit to Docker MCP Registry
@@ -253,7 +253,7 @@ Or check on Docker Hub:
 
 1. Go to: https://github.com/royisme/codebase-rag/actions
 2. Check **Deploy Documentation** workflow
-3. Once complete, visit: https://docs.vantagecraft.dev
+3. Once complete, visit: https://code-graph.vantagecraft.dev
 
 ✅ **Verification**: Documentation site loads correctly
 
@@ -323,7 +323,7 @@ docker pull royisme/codebase-rag:standard
 docker pull royisme/codebase-rag:full
 
 # 2. Documentation accessible
-curl -I https://docs.vantagecraft.dev
+curl -I https://code-graph.vantagecraft.dev
 # Should return: HTTP/2 200
 
 # 3. Local deployment works
@@ -361,11 +361,11 @@ curl http://localhost:8000/api/v1/health
 
 ### DNS Not Resolving
 
-**Issue**: `docs.vantagecraft.dev` doesn't resolve
+**Issue**: `code-graph.vantagecraft.dev` doesn't resolve
 **Solution**:
 1. Wait for DNS propagation (up to 48 hours)
 2. Check DNS record is correct
-3. Try `dig docs.vantagecraft.dev +trace` to debug
+3. Try `dig code-graph.vantagecraft.dev +trace` to debug
 
 ### Documentation Build Fails
 
@@ -414,7 +414,7 @@ Once all steps are done:
 - [ ] DNS configured and propagated
 - [ ] CI/CD workflows passing
 - [ ] Docker images on Docker Hub
-- [ ] Documentation live at docs.vantagecraft.dev
+- [ ] Documentation live at code-graph.vantagecraft.dev
 - [ ] MCP Registry PR submitted
 
 **Status**: Ready for production use! 🎉
