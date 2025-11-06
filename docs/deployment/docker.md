@@ -9,6 +9,15 @@ The system provides three Docker images:
 - `royisme/codebase-rag:standard` - Code Graph + Memory
 - `royisme/codebase-rag:full` - All features (largest)
 
+### Two-Port Architecture
+
+The system uses a **two-port architecture** for clear separation of concerns:
+
+- **Port 8000** (PRIMARY): MCP SSE Service - AI-to-application communication
+- **Port 8080** (SECONDARY): Web UI + REST API - Status monitoring and management
+
+This design prioritizes MCP as the core service, with the Web UI serving as a secondary interface for monitoring and administration.
+
 ## Docker Compose Files
 
 ### Location
@@ -35,9 +44,14 @@ services:
 
   mcp:
     image: royisme/codebase-rag:MODE
+    ports:
+      - "${MCP_PORT:-8000}:8000"      # MCP SSE Service (PRIMARY)
+      - "${WEB_UI_PORT:-8080}:8080"   # Web UI + REST API (SECONDARY)
     environment:
       - NEO4J_URI=bolt://neo4j:7687
       - DEPLOYMENT_MODE=MODE
+      - MCP_PORT=8000        # MCP SSE Service
+      - WEB_UI_PORT=8080     # Web UI + REST API
     volumes:
       - ./repos:/repos
       - ./data:/data
@@ -45,7 +59,32 @@ services:
       - neo4j
 ```
 
+**Accessing Services:**
+```bash
+# MCP SSE endpoint (for Claude Desktop, Cline, etc.)
+http://localhost:8000/sse
+
+# Web UI (status monitoring)
+http://localhost:8080/
+
+# REST API
+http://localhost:8080/api/v1/
+```
+
 ## Building Custom Images
+
+### Prerequisites
+
+**Frontend Build** (Required before Docker build):
+```bash
+# Install bun (>= 1.3.1)
+curl -fsSL https://bun.sh/install | bash
+
+# Build frontend
+./build-frontend.sh
+```
+
+This pre-builds the React frontend and generates static files in `frontend/dist/`, which are then copied into the Docker image. The production image does not include Node.js, npm, or any frontend build tools (~405MB savings).
 
 ### Build from Source
 
@@ -53,6 +92,9 @@ services:
 # Clone repository
 git clone https://github.com/royisme/codebase-rag.git
 cd codebase-rag
+
+# Build frontend first (REQUIRED)
+./build-frontend.sh
 
 # Build minimal
 docker build -f docker/Dockerfile.minimal -t my-codebase-rag:minimal .
@@ -63,6 +105,12 @@ docker build -f docker/Dockerfile.standard -t my-codebase-rag:standard .
 # Build full
 docker build -f docker/Dockerfile.full -t my-codebase-rag:full .
 ```
+
+**Dockerfile Optimizations:**
+- Uses `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` base image (uv pre-installed)
+- BuildKit cache mounts for faster rebuilds
+- Pre-compiled frontend (no Node.js in production image)
+- Minimal Python dependencies (373 packages, 0 CUDA packages)
 
 ### Build with Buildx (Multi-Platform)
 
@@ -168,6 +216,27 @@ services:
 
 ## Environment Variables
 
+### Port Configuration
+
+```bash
+# Two-Port Architecture (NEW)
+MCP_PORT=8000          # MCP SSE Service (PRIMARY)
+WEB_UI_PORT=8080       # Web UI + REST API (SECONDARY)
+
+# Legacy (deprecated, but maintained for backward compatibility)
+PORT=8000
+```
+
+**Custom Port Example:**
+```bash
+# Use custom ports
+MCP_PORT=9000 WEB_UI_PORT=9001 docker-compose up -d
+
+# Access:
+# - MCP SSE: http://localhost:9000/sse
+# - Web UI:  http://localhost:9001/
+```
+
 ### Core Variables
 
 ```bash
@@ -242,13 +311,14 @@ docker-compose --profile with-ollama up -d
 
 ## Health Checks
 
-All images include health checks:
+All images include health checks on the **Web UI port (8080)** where the REST API lives:
 
 ```yaml
 services:
   mcp:
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      # Note: Health check uses Web UI port, not MCP port
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
       interval: 30s
       timeout: 10s
       start_period: 40s
@@ -266,6 +336,12 @@ docker inspect --format='{{.State.Health.Status}}' codebase-rag-mcp
 
 # View health logs
 docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' codebase-rag-mcp
+
+# Manual health check
+curl http://localhost:8080/api/v1/health
+
+# Test MCP SSE endpoint
+curl http://localhost:8000/sse
 ```
 
 ## Resource Limits

@@ -16,45 +16,90 @@ Think of MCP as a standardized way for AI assistants to "talk to" your applicati
 ## Architecture
 
 ```
-┌─────────────────┐
-│  AI Assistant   │  (Claude Desktop, VS Code, etc.)
-│  (MCP Client)   │
-└────────┬────────┘
-         │ MCP Protocol
-         │ (stdio, SSE, WebSocket)
-         ↓
-┌─────────────────┐
-│   MCP Server    │  (This Application)
-│  (start_mcp.py) │
-└────────┬────────┘
-         │
-         ↓
-┌─────────────────────────────────────────┐
-│  Backend Services                        │
-│  ┌────────────────────────────────────┐ │
-│  │ Knowledge RAG  │  Code Graph       │ │
-│  │ Memory Store   │  Task Queue       │ │
-│  │ Neo4j Database │  Git Integration  │ │
-│  └────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  AI Assistants (MCP Clients)                        │
+│  - Claude Desktop                                   │
+│  - Cline (VS Code)                                  │
+│  - Custom MCP Clients                               │
+└───────────────────┬─────────────────────────────────┘
+                    │ MCP Protocol over SSE
+                    │ (HTTP/HTTPS)
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│  Two-Port Architecture                              │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐  │
+│  │ Port 8000 (PRIMARY)                           │  │
+│  │ MCP SSE Server                                │  │
+│  │ - GET /sse (connection)                       │  │
+│  │ - POST /messages/* (client messages)          │  │
+│  └──────────────┬───────────────────────────────┘  │
+│                 │                                   │
+│  ┌──────────────┴───────────────────────────────┐  │
+│  │ Port 8080 (SECONDARY)                         │  │
+│  │ Web UI + REST API                             │  │
+│  │ - /api/v1/* (REST endpoints)                  │  │
+│  │ - / (React SPA - monitoring)                  │  │
+│  └──────────────┬───────────────────────────────┘  │
+│                 │                                   │
+└─────────────────┼───────────────────────────────────┘
+                  │
+                  ↓
+┌─────────────────────────────────────────────────────┐
+│  Shared Service Layer                               │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ Knowledge RAG  │  Code Graph                 │   │
+│  │ Memory Store   │  Task Queue                 │   │
+│  │ Neo4j Database │  Git Integration            │   │
+│  └─────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
 ```
+
+**Key Design Principles**:
+- **Port 8000 (PRIMARY)**: MCP service - the core functionality for AI assistants
+- **Port 8080 (SECONDARY)**: Web UI - status monitoring and management only
+- **Shared Services**: Both ports access the same service layer
+- **Multi-Process**: Two independent uvicorn processes for isolation
 
 ## System Components
 
-### 1. MCP Server (`start_mcp.py`)
+### 1. MCP SSE Server (Port 8000)
 
-The main server that:
+**Files**: `main.py`, `core/mcp_sse.py`, `mcp_server.py`
+
+The PRIMARY service that:
 - Implements MCP protocol using official SDK
-- Exposes 30 tools across 6 categories
-- Manages connections from AI clients
+- Exposes 25+ tools across 6 categories
+- Manages SSE connections from AI clients
 - Routes requests to backend services
 
 **Key Features**:
 - ✅ Official MCP SDK (`mcp>=1.1.0`)
-- ✅ Modular architecture (310-line main file)
+- ✅ SSE Transport (`mcp.server.sse.SseServerTransport`)
+- ✅ Transport-agnostic tool layer
 - ✅ Session management
 - ✅ Streaming support
-- ✅ Multi-transport (stdio, SSE, WebSocket)
+- ✅ Network-accessible (Docker-friendly)
+
+**Transport Modes**:
+
+#### SSE Transport (Production/Docker)
+```python
+# Used in Docker deployments
+# Endpoints:
+#   GET  http://localhost:8000/sse
+#   POST http://localhost:8000/messages/*
+```
+
+**Best for**: Docker, remote access, production deployments
+
+#### Stdio Transport (Local Development)
+```python
+# Used for local development
+# Communication via stdin/stdout
+```
+
+**Best for**: Claude Desktop (local mode), development
 
 ### 2. MCP Clients
 

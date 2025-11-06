@@ -16,11 +16,18 @@ The Code Graph Knowledge System consists of multiple specialized components orga
 
 ```mermaid
 graph TB
-    subgraph "API Layer"
-        FastAPI[FastAPI Application]
-        MCP[MCP Server]
-        Routes[API Routes]
-        Middleware[Middleware Stack]
+    subgraph "Two-Port Architecture"
+        subgraph "Port 8000 (PRIMARY)"
+            MCP[MCP SSE Server]
+            MCPRoutes[SSE Routes]
+        end
+
+        subgraph "Port 8080 (SECONDARY)"
+            FastAPI[FastAPI Application]
+            Routes[REST API Routes]
+            Middleware[Middleware Stack]
+            WebUI[Web UI - React SPA]
+        end
     end
 
     subgraph "Service Layer"
@@ -46,16 +53,18 @@ graph TB
         FileSystem[File System]
     end
 
+    MCP --> MCPRoutes
+    MCPRoutes --> KnowServ
+    MCPRoutes --> MemServ
+    MCPRoutes --> GraphServ
+
     FastAPI --> Routes
     FastAPI --> Middleware
+    FastAPI --> WebUI
     Routes --> KnowServ
     Routes --> MemServ
     Routes --> GraphServ
     Routes --> TaskQ
-
-    MCP --> KnowServ
-    MCP --> MemServ
-    MCP --> GraphServ
 
     KnowServ --> Neo4j
     MemServ --> Neo4j
@@ -64,24 +73,65 @@ graph TB
     CodeIng --> GraphServ
     MemExt --> MemServ
 
-    style FastAPI fill:#4CAF50
     style MCP fill:#2196F3
+    style FastAPI fill:#4CAF50
     style Neo4j fill:#f9a825
 ```
 
 ## API Layer Components
 
-### FastAPI Application
+### Architecture Overview
+
+The system uses a **two-port architecture** for clear separation of concerns:
+
+- **Port 8000 (PRIMARY)**: MCP SSE Server - AI-to-application communication via Server-Sent Events
+- **Port 8080 (SECONDARY)**: Web UI + REST API - Status monitoring and management interface
+
+Both servers run in separate processes using Python's `multiprocessing` module and share the same service layer.
+
+### MCP SSE Server (Port 8000)
+
+**File**: `main.py`, `core/mcp_sse.py`
+
+**Purpose**: PRIMARY service providing AI-to-application communication via MCP protocol over SSE transport
+
+**Key Responsibilities**:
+- MCP protocol implementation (Server-Sent Events transport)
+- Tool execution (25+ MCP tools)
+- AI client connection management
+- Long-running streaming responses
+
+**Configuration**:
+```python
+from mcp.server.sse import SseServerTransport
+
+sse_transport = SseServerTransport("/messages/")
+mcp_app = Starlette(routes=[
+    Route("/sse", endpoint=handle_sse, methods=["GET"]),
+    Mount("/messages/", app=sse_transport.handle_post_message),
+])
+```
+
+**Endpoints**:
+- `GET /sse` - Establish SSE connection
+- `POST /messages/*` - Receive client messages
+
+**Supported Clients**:
+- Claude Desktop
+- Cline (VS Code extension)
+- Any MCP-compatible AI client
+
+### FastAPI Application (Port 8080)
 
 **File**: `main.py`, `core/app.py`
 
-**Purpose**: Main web server providing RESTful API endpoints
+**Purpose**: SECONDARY service providing Web UI and REST API for monitoring and management
 
 **Key Responsibilities**:
-- HTTP request handling
+- HTTP request handling (REST API)
 - Route management
 - Middleware processing
-- Static file serving
+- Static file serving (React SPA)
 - API documentation (OpenAPI/Swagger)
 
 **Configuration**:
@@ -101,21 +151,25 @@ app = FastAPI(
 - Middleware stack
 - Exception handlers
 
-**Startup Sequence**:
-1. Load configuration from environment
+**Startup Sequence** (Both Servers):
+1. Load configuration from environment (including MCP_PORT=8000, WEB_UI_PORT=8080)
 2. Initialize logging system
 3. Initialize all services via lifespan manager
-4. Setup middleware
-5. Register routes
-6. Mount static files
-7. Integrate monitoring UI (if enabled)
+4. Fork into two processes:
+   - Process 1: MCP SSE Server on port 8000
+   - Process 2: Web UI + REST API on port 8080
+5. Each process:
+   - Setup middleware/routes
+   - Start uvicorn server
+   - Begin accepting connections
 
 **Shutdown Sequence**:
-1. Stop accepting new requests
+1. Stop accepting new requests (both servers)
 2. Stop task queue
 3. Close Memory Store
 4. Close Knowledge Service
 5. Close database connections
+6. Terminate both processes gracefully
 
 ### API Routes
 
@@ -1201,7 +1255,7 @@ async def get_pending_tasks(self, limit: int = 10) -> List[TaskResult]:
 
 **File**: `mcp_server.py`
 
-**Purpose**: Model Context Protocol server using official SDK
+**Purpose**: Model Context Protocol server using official SDK (transport-agnostic)
 
 **Architecture**:
 ```python
@@ -1224,6 +1278,77 @@ async def call_tool(name: str, arguments: dict) -> Sequence[TextContent]:
     result = await handler(arguments)
     return [TextContent(type="text", text=format_result(result))]
 ```
+
+**Transport Layer** (NEW in v0.8):
+
+The MCP server core is **transport-agnostic** and can work with different transports:
+
+#### 1. SSE Transport (Production/Docker)
+
+**File**: `core/mcp_sse.py`
+
+**Purpose**: Server-Sent Events transport for network-accessible MCP service
+
+```python
+from mcp.server.sse import SseServerTransport
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+
+# Create SSE transport
+sse_transport = SseServerTransport("/messages/")
+
+async def handle_sse(request: Request) -> Response:
+    """Handle SSE connection from MCP clients"""
+    async with sse_transport.connect_sse(
+        request.scope, request.receive, request._send
+    ) as streams:
+        await mcp_server.run(
+            streams[0], streams[1],
+            mcp_server.create_initialization_options()
+        )
+    return Response()
+
+# Starlette app for MCP SSE
+mcp_app = Starlette(routes=[
+    Route("/sse", endpoint=handle_sse, methods=["GET"]),
+    Mount("/messages/", app=sse_transport.handle_post_message),
+])
+```
+
+**Endpoints** (Port 8000):
+- `GET /sse` - Establish SSE connection
+- `POST /messages/*` - Receive client messages
+
+**Use Cases**:
+- Docker deployments
+- Remote MCP access
+- Claude Desktop (remote mode)
+- Cline (VS Code extension)
+
+#### 2. Stdio Transport (Local Development)
+
+**File**: `main.py` (stdio mode)
+
+**Purpose**: Standard input/output transport for local development
+
+```python
+from mcp.server.stdio import stdio_server
+
+async def run_stdio():
+    """Run MCP server with stdio transport"""
+    async with stdio_server() as (read_stream, write_stream):
+        await mcp_server.run(
+            read_stream, write_stream,
+            mcp_server.create_initialization_options()
+        )
+```
+
+**Use Cases**:
+- Local development
+- Claude Desktop (local mode)
+- Direct process communication
+
+**Key Design**: MCP tools (25+) are **transport-independent** and work with both SSE and stdio without modification.
 
 **Tool Categories** (30 tools total):
 
