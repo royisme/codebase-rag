@@ -58,8 +58,11 @@ tests/
 pytest.ini
 .pytest_cache/
 
-# Frontend (not needed in backend images)
-frontend/
+# Frontend - Exclude development artifacts but allow source
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
 node_modules/
 package-lock.json
 yarn.lock

@@ -26,7 +26,25 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip wheel --no-deps -r requirements.txt -w /wheelhouse && \
     pip wheel -r requirements.txt -w /wheelhouse
 
-########### Runtime - Install wheels + code ###########
+########### Frontend Builder - Build React app ###########
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /frontend
+
+# Copy package files
+COPY frontend/package*.json ./
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+# Copy frontend source
+COPY frontend/ ./
+
+# Build production bundle
+RUN npm run build
+
+########### Runtime - Install wheels + code + frontend ###########
 FROM python:3.13-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
@@ -62,6 +80,9 @@ COPY --chown=appuser:appuser core ./core
 COPY --chown=appuser:appuser services ./services
 COPY --chown=appuser:appuser mcp_tools ./mcp_tools
 COPY --chown=appuser:appuser start.py start_mcp.py mcp_server.py config.py main.py ./
+
+# Copy built frontend from frontend-builder stage
+COPY --from=frontend-builder --chown=appuser:appuser /frontend/dist ./static
 
 USER appuser
 
