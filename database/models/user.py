@@ -37,6 +37,9 @@ class User(SQLAlchemyBaseUserTableUUID, TimestampMixin, Base):
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(50), default="viewer", nullable=False)
+    last_login_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     oauth_accounts: Mapped[list[UserOAuthAccount]] = relationship(
         "UserOAuthAccount", back_populates="user", cascade="all, delete-orphan"
@@ -58,5 +61,7 @@ class PasswordResetToken(TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     token: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    expires_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     consumed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

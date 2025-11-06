@@ -7,10 +7,17 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_users.authentication import Strategy
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_async_session
-from security.auth import auth_backend, current_active_user, current_superuser, fastapi_users
+from database.models.user import User
+from security.auth import (
+    auth_backend,
+    current_active_user,
+    current_superuser,
+    fastapi_users,
+)
 from security.casbin_enforcer import get_enforcer, reload_policies, require_permission
 from security.constants import DEFAULT_ROLES
 from security.schemas import (
@@ -75,6 +82,35 @@ async def get_current_user_profile(
 ):
     """返回当前登录用户的基础资料。"""
     return UserRead.model_validate(user)
+
+
+@router.get("/admin/users", tags=["RBAC"])
+async def list_users(
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=200, description="Items per page"),
+    session: AsyncSession = Depends(get_async_session),
+    user=Depends(current_superuser),
+) -> dict[str, Any]:
+    """获取所有用户列表（仅限超级管理员）。"""
+
+    offset = (page - 1) * limit
+
+    # Get total count
+    count_stmt = select(func.count()).select_from(User)
+    total_result = await session.execute(count_stmt)
+    total = total_result.scalar_one()
+
+    # Get users with pagination
+    stmt = select(User).offset(offset).limit(limit).order_by(User.created_at.desc())
+    result = await session.execute(stmt)
+    users = result.scalars().all()
+
+    return {
+        "users": [UserRead.model_validate(u) for u in users],
+        "total": total,
+        "page": page,
+        "limit": limit,
+    }
 
 
 @router.get("/admin/roles", response_model=list[RoleSchema], tags=["RBAC"])
@@ -154,7 +190,9 @@ async def create_policy(
         None,
     )
     if not policy:
-        raise HTTPException(status_code=500, detail="Policy persisted but not retrievable")
+        raise HTTPException(
+            status_code=500, detail="Policy persisted but not retrievable"
+        )
     return PolicySchema(
         id=policy.id,
         subject=policy.v0 or "",
@@ -177,7 +215,9 @@ async def update_policy(
 ):
     policy = await rbac_service.get_policy(session, policy_id)
     if policy is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found"
+        )
 
     await rbac_service.apply_policy_update(
         policy,
@@ -220,7 +260,9 @@ async def delete_policy(
 ):
     policy = await rbac_service.get_policy(session, policy_id)
     if policy is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found"
+        )
 
     await audit_logger.record_event(
         actor_id=user.id,
@@ -260,7 +302,9 @@ async def get_audit_logs(
         try:
             return dt.datetime.fromisoformat(value)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid timestamp format") from exc
+            raise HTTPException(
+                status_code=400, detail="Invalid timestamp format"
+            ) from exc
 
     items, total = await list_audit_events(
         session,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Optional
 
@@ -14,6 +15,9 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     company: Optional[str] = None
     department: Optional[str] = None
     role: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    last_login_at: Optional[dt.datetime] = None
 
 
 class UserCreate(schemas.BaseUserCreate):

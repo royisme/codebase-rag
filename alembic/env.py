@@ -12,6 +12,7 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
+from sqlalchemy.schema import SchemaItem
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -31,9 +32,45 @@ _schema = getattr(settings, "db_schema", None)
 _include_schemas = bool(_schema)
 
 
+def include_object(
+    object: SchemaItem, name: str, type_: str, reflected: bool, compare_to: Any
+) -> bool:
+    """
+    过滤 Alembic autogenerate 时要包含的对象。
+    排除不应该由 Alembic 管理的表和 schema。
+    """
+    # 排除特定的 schema
+    if type_ == "schema":
+        # 排除 Apache AGE 图数据库的 schema
+        if name in ("ag_catalog",):
+            return False
+
+    # 排除特定的表
+    if type_ == "table":
+        # 排除 Alembic 自己的版本管理表
+        if name == "alembic_version":
+            return False
+        # 排除 Apache AGE 的系统表
+        if hasattr(object, "schema") and object.schema == "ag_catalog":
+            return False
+
+    # 排除特定的索引
+    if type_ == "index":
+        # 排除 Apache AGE 相关的索引
+        if name and name.startswith("ag_"):
+            return False
+        # 排除旧的 idx_tasks_ 索引（已被 SQLAlchemy 的 ix_tasks_ 替代）
+        if name and name.startswith("idx_tasks_"):
+            return False
+
+    return True
+
+
 def _configure_sqlalchemy_url() -> None:
     sqlalchemy_url = (
-        settings.database_dsn_sync if context.is_offline_mode() else settings.database_dsn_async
+        settings.database_dsn_sync
+        if context.is_offline_mode()
+        else settings.database_dsn_async
     )
     # Remove 'options' parameter if it exists in the URL, as asyncpg doesn't support it directly.
     if "options=" in sqlalchemy_url:
@@ -41,7 +78,7 @@ def _configure_sqlalchemy_url() -> None:
         # Clean up any trailing '?' or '&' if options was the only parameter.
         sqlalchemy_url = sqlalchemy_url.replace("?&", "?").rstrip("?&")
 
-    config.set_main_option("sqlalchemy.url", sqlalchemy_url.replace('%', '%%'))
+    config.set_main_option("sqlalchemy.url", sqlalchemy_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
@@ -55,6 +92,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         version_table_schema=_schema,
         include_schemas=_include_schemas,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -67,6 +105,7 @@ def do_run_migrations(connection: Connection) -> None:
         target_metadata=target_metadata,
         version_table_schema=_schema,
         include_schemas=_include_schemas,
+        include_object=include_object,
     )
 
     with context.begin_transaction():

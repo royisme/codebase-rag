@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import CheckConstraint, Index, String, Text, Float, Integer
+from sqlalchemy import CheckConstraint, Index, String, Text, Float, Integer, desc
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database.base import Base, TimestampMixin
@@ -27,7 +27,9 @@ class TaskEntity(Base, TimestampMixin):
     priority: Mapped[int] = mapped_column(Integer, default=0)
 
     __table_args__ = (
-        CheckConstraint("progress >= 0.0 AND progress <= 1.0", name="ck_tasks_progress_range"),
+        CheckConstraint(
+            "progress >= 0.0 AND progress <= 1.0", name="ck_tasks_progress_range"
+        ),
         Index("idx_tasks_priority", priority.desc(), "created_at"),
     )
 
