@@ -7,9 +7,14 @@ class Settings(BaseSettings):
     app_name: str = "Code Graph Knowledge Service"
     app_version: str = "1.0.0"
     debug: bool = False
-    # server settings
-    host: str = Field(default="0.0.0.0", description="Host", alias="HOST")
-    port: int = Field(default=8123, description="Port", alias="PORT")
+
+    # Server Settings (Two-Port Architecture)
+    host: str = Field(default="0.0.0.0", description="Host for all services", alias="HOST")
+
+    # Port configuration
+    port: int = Field(default=8123, description="Legacy port (deprecated)", alias="PORT")
+    mcp_port: int = Field(default=8000, description="MCP SSE service port (PRIMARY)", alias="MCP_PORT")
+    web_ui_port: int = Field(default=8080, description="Web UI + REST API port (SECONDARY)", alias="WEB_UI_PORT")
 
     # Vector Search Settings (using Neo4j built-in vector index)
     vector_index_name: str = Field(default="knowledge_vectors", description="Neo4j vector index name")

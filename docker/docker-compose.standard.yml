@@ -42,13 +42,18 @@ services:
     image: royisme/codebase-rag:standard
     container_name: codebase-rag-mcp-standard
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "${MCP_PORT:-8000}:8000"      # MCP SSE Service (PRIMARY)
+      - "${WEB_UI_PORT:-8080}:8080"   # Web UI + REST API (SECONDARY)
     environment:
       # Application
       - APP_NAME=${APP_NAME:-Code Graph Knowledge System}
       - DEBUG=${DEBUG:-false}
       - HOST=0.0.0.0
-      - PORT=8000
+
+      # Two-Port Architecture
+      - MCP_PORT=8000        # MCP SSE Service (PRIMARY)
+      - WEB_UI_PORT=8080     # Web UI + REST API (SECONDARY)
+      - PORT=8000            # Legacy (deprecated)
 
       # Deployment mode
       - DEPLOYMENT_MODE=standard
@@ -87,7 +92,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"  # Access host services (e.g., Ollama on host)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      # Health check on Web UI port (where REST API lives)
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3

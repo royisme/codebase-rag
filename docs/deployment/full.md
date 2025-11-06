@@ -407,7 +407,6 @@ input: {
 
 ## Production Deployment
 
-See [Production Setup Guide](production.md) for:
 - High availability configuration
 - Backup strategies
 - Monitoring setup
@@ -463,4 +462,3 @@ LLM_PROVIDER=openai
 
 - [Knowledge RAG Guide](../guide/knowledge/overview.md) - Document processing
 - [Auto-Extraction Guide](../guide/memory/extraction.md) - Automated memory capture
-- [Production Setup](production.md) - Deploy at scale

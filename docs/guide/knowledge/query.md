@@ -819,7 +819,6 @@ def iterative_query(initial_question, max_iterations=3):
 - **[MCP Integration](../mcp/overview.md)**: Connect to AI assistants
 - **[Claude Desktop Setup](../mcp/claude-desktop.md)**: Use queries in Claude
 - **[VS Code Integration](../mcp/vscode.md)**: Query from your editor
-- **[Production Optimization](../../deployment/production.md)**: Scale query performance
 
 ## Additional Resources
 

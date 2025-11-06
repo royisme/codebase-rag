@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { ingestApi } from '@/lib/api'
+import { ingestApi, IngestRepoResponse } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,7 @@ function RepositoriesPage() {
     branch: 'main',
     mode: 'full' as 'full' | 'incremental',
   })
-  const [lastResult, setLastResult] = useState<any>(null)
+  const [lastResult, setLastResult] = useState<IngestRepoResponse | null>(null)
 
   const ingestMutation = useMutation({
     mutationFn: ingestApi.ingestRepo,
@@ -171,7 +171,7 @@ function RepositoriesPage() {
           {ingestMutation.isError && (
             <div className="mt-4 p-4 border rounded-lg bg-red-50 dark:bg-red-950">
               <p className="text-red-800 dark:text-red-200 text-sm">
-                Error: {(ingestMutation.error as any)?.response?.data?.detail || ingestMutation.error.message}
+                Error: {(ingestMutation.error as Error & { response?: { data?: { detail?: string } } })?.response?.data?.detail || (ingestMutation.error as Error).message}
               </p>
             </div>
           )}

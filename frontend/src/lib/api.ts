@@ -12,6 +12,22 @@ export interface HealthStatus {
   version: string
 }
 
+export interface TaskResult {
+  files_processed?: number
+  nodes_created?: number
+  relationships_created?: number
+  duration_ms?: number
+  [key: string]: unknown
+}
+
+export interface TaskMetadata {
+  repo_url?: string
+  local_path?: string
+  mode?: string
+  file_count?: number
+  [key: string]: unknown
+}
+
 export interface TaskStatus {
   task_id: string
   status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
@@ -20,9 +36,9 @@ export interface TaskStatus {
   created_at: string
   started_at?: string
   completed_at?: string
-  result?: any
+  result?: TaskResult
   error?: string
-  metadata?: Record<string, any>
+  metadata?: TaskMetadata
 }
 
 export interface IngestRepoRequest {
@@ -78,12 +94,19 @@ export interface ImpactResponse {
   depth: number
 }
 
+export interface ContextItemExtra {
+  path?: string
+  lang?: string
+  score?: number
+  [key: string]: unknown
+}
+
 export interface ContextItem {
   kind: string
   title: string
   summary: string
   ref: string
-  extra?: Record<string, any>
+  extra?: ContextItemExtra
 }
 
 export interface ContextPack {

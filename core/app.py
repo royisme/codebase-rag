@@ -1,6 +1,10 @@
 """
 FastAPI application configuration module
 Responsible for creating and configuring FastAPI application instance
+
+ARCHITECTURE (Two-Port Setup):
+  - Port 8000: MCP SSE Service (PRIMARY) - Separate server in main.py
+  - Port 8080: Web UI + REST API (SECONDARY) - This app
 """
 
 from fastapi import FastAPI, Request
@@ -39,6 +43,15 @@ def create_app() -> FastAPI:
     # set routes
     setup_routes(app)
 
+    # ========================================================================
+    # Web UI (Status Monitoring) + REST API
+    # ========================================================================
+    # Note: MCP SSE service runs separately on port 8000
+    # This app (port 8080) provides:
+    # - Web UI for monitoring
+    # - REST API for programmatic access
+    # - Prometheus metrics
+    #
     # Check if static directory exists (contains built React frontend)
     static_dir = "static"
     if os.path.exists(static_dir) and os.path.exists(os.path.join(static_dir, "index.html")):

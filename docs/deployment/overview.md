@@ -351,5 +351,4 @@ make docker-full
 - [Minimal Deployment Guide](minimal.md)
 - [Standard Deployment Guide](standard.md)
 - [Full Deployment Guide](full.md)
-- [Production Setup](production.md)
 - [Docker Guide](docker.md)

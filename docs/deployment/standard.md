@@ -386,4 +386,3 @@ docker exec -it codebase-rag-neo4j cypher-shell -u neo4j -p password
 
 - [Memory Store User Guide](../guide/memory/overview.md) - Detailed features
 - [Full Mode](full.md) - Upgrade for all features
-- [Production Setup](production.md) - Deploy to production
