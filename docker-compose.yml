@@ -46,12 +46,21 @@ services:
     image: royisme/codebase-rag:minimal
     container_name: codebase-rag-mcp
     ports:
-      - "${APP_PORT:-8000}:8000"
+      # Two-Port Architecture
+      - "${MCP_PORT:-8000}:8000"      # MCP SSE Service (PRIMARY)
+      - "${WEB_UI_PORT:-8080}:8080"   # Web UI + REST API (SECONDARY)
     environment:
       - APP_NAME=${APP_NAME:-Code Graph Knowledge System}
       - DEBUG=${DEBUG:-false}
       - HOST=0.0.0.0
+
+      # Two-Port Configuration
+      - MCP_PORT=8000       # MCP SSE service port (PRIMARY)
+      - WEB_UI_PORT=8080    # Web UI + REST API port (SECONDARY)
+
+      # Legacy (deprecated)
       - PORT=8000
+
       - DEPLOYMENT_MODE=minimal
       - ENABLE_KNOWLEDGE_RAG=false
       - ENABLE_AUTO_EXTRACTION=false
@@ -70,7 +79,8 @@ services:
       neo4j:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      # Health check on Web UI port (where REST API lives)
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
