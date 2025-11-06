@@ -1,6 +1,6 @@
 #!/bin/bash
 # Automated version bumping script using bump-my-version
-# Usage: ./scripts/bump-version.sh [major|minor|patch] [--dry-run]
+# Usage: ./scripts/bump-version.sh [major|minor|patch] [--dry-run] [--no-changelog]
 
 set -e
 
@@ -8,6 +8,7 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Check if bump-my-version is installed
@@ -20,18 +21,23 @@ fi
 # Parse arguments
 BUMP_TYPE=${1:-patch}  # Default to patch
 DRY_RUN=""
+GENERATE_CHANGELOG=true
 
-if [[ "$2" == "--dry-run" ]] || [[ "$1" == "--dry-run" ]]; then
-    DRY_RUN="--dry-run"
-    if [[ "$1" == "--dry-run" ]]; then
-        BUMP_TYPE="patch"
-    fi
-fi
+for arg in "$@"; do
+    case $arg in
+        --dry-run)
+            DRY_RUN="--dry-run"
+            ;;
+        --no-changelog)
+            GENERATE_CHANGELOG=false
+            ;;
+    esac
+done
 
 # Validate bump type
 if [[ ! "$BUMP_TYPE" =~ ^(major|minor|patch)$ ]]; then
     echo -e "${RED}Error: Invalid bump type '$BUMP_TYPE'${NC}"
-    echo "Usage: $0 [major|minor|patch] [--dry-run]"
+    echo "Usage: $0 [major|minor|patch] [--dry-run] [--no-changelog]"
     exit 1
 fi
 
@@ -73,15 +79,40 @@ fi
 # Confirm with user (unless dry run)
 if [[ -z "$DRY_RUN" ]]; then
     echo -e "${YELLOW}This will:${NC}"
-    echo "  1. Update version in pyproject.toml, src/__version__.py, docs/changelog.md"
-    echo "  2. Create a git commit"
-    echo "  3. Create a git tag v$NEW_VERSION"
+    if [[ "$GENERATE_CHANGELOG" == true ]]; then
+        echo "  1. Generate changelog from git commits"
+        echo "  2. Update version in pyproject.toml, src/__version__.py"
+        echo "  3. Create a git commit"
+        echo "  4. Create a git tag v$NEW_VERSION"
+    else
+        echo "  1. Update version in pyproject.toml, src/__version__.py"
+        echo "  2. Create a git commit"
+        echo "  3. Create a git tag v$NEW_VERSION"
+    fi
     echo ""
     read -p "Continue? (y/N) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "Aborted"
         exit 0
+    fi
+fi
+
+# Generate changelog if enabled
+if [[ "$GENERATE_CHANGELOG" == true ]] && [[ -z "$DRY_RUN" ]]; then
+    echo ""
+    echo -e "${BLUE}Generating changelog from commits...${NC}"
+
+    # Check if generate-changelog.py exists
+    if [[ -f "scripts/generate-changelog.py" ]]; then
+        if python3 scripts/generate-changelog.py --update --version "$NEW_VERSION"; then
+            echo -e "${GREEN}✓ Changelog generated and updated${NC}"
+            git add docs/changelog.md
+        else
+            echo -e "${YELLOW}⚠ Changelog generation failed, continuing anyway${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ scripts/generate-changelog.py not found, skipping changelog generation${NC}"
     fi
 fi
 

@@ -178,6 +178,7 @@ nav:
     - Development Setup: development/setup.md
     - Testing: development/testing.md
     - Version Management: development/version-management.md
+    - Changelog Automation: development/changelog-automation.md
     - Release Process: development/release.md
   - Technical Notes:
     - Implementation Summary: IMPLEMENTATION_SUMMARY.md
