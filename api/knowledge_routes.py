@@ -82,7 +82,9 @@ async def cache_query_response(response: GraphRAGQueryResponse) -> None:
         logger.warning("缓存知识查询结果失败: {}", exc)
 
 
-def build_evidence_anchors(answer_payload: GraphRAGAnswerPayload) -> List[EvidenceAnchor]:
+def build_evidence_anchors(
+    answer_payload: GraphRAGAnswerPayload,
+) -> List[EvidenceAnchor]:
     """根据回答证据生成 EvidenceAnchor 列表。"""
 
     anchors: List[EvidenceAnchor] = []
@@ -469,6 +471,10 @@ async def stream_knowledge_graph(
     max_results = stream_request.top_k or 8
     session_id = stream_request.session_id
 
+    logger.info(
+        f"[TIMEOUT-DEBUG] 流式查询配置: timeout={timeout_seconds}s (请求值={stream_request.timeout}), top_k={max_results}, mode={retrieval_mode}"
+    )
+
     async def event_generator():
         query_uuid = uuid.uuid4()
         start_time = dt.datetime.now(dt.timezone.utc)
@@ -496,60 +502,82 @@ async def stream_knowledge_graph(
             async with asyncio.timeout(timeout_seconds):
                 async for event in graph_rag_service.stream_query(
                     question,
-                    source_ids=[str(sid) for sid in validated_source_ids] if validated_source_ids else None,
+                    source_ids=[str(sid) for sid in validated_source_ids]
+                    if validated_source_ids
+                    else None,
                     timeout_seconds=timeout_seconds,
                     include_evidence=True,
                     max_results=max_results,
                     session_id=session_id,
                 ):
                     event_type = event.get("type")
-                    
+
                     if event_type == "text_delta":
                         # SSE: text_delta event
                         accumulated_summary += event.get("content", "")
-                        yield _encode_sse("text_delta", {"content": event.get("content", "")})
-                    
+                        yield _encode_sse(
+                            "text_delta", {"content": event.get("content", "")}
+                        )
+
                     elif event_type == "status":
                         # SSE: status event
-                        yield _encode_sse("status", {
-                            "stage": event.get("stage"),
-                            "message": event.get("message"),
-                        })
-                    
+                        yield _encode_sse(
+                            "status",
+                            {
+                                "stage": event.get("stage"),
+                                "message": event.get("message"),
+                            },
+                        )
+
                     elif event_type == "entity":
                         # SSE: entity event
                         yield _encode_sse("entity", {"entity": event.get("entity")})
-                    
+
                     elif event_type == "metadata":
                         # SSE: metadata event
-                        final_confidence = _clamp_confidence(event.get("confidence_score"))
+                        final_confidence = _clamp_confidence(
+                            event.get("confidence_score")
+                        )
                         final_sources = event.get("sources_queried", [])
                         final_processing_time = event.get("execution_time_ms")
-                        
-                        yield _encode_sse("metadata", {
-                            "confidence_score": final_confidence,
-                            "execution_time_ms": final_processing_time,
-                            "sources_queried": final_sources,
-                            "retrieval_mode": retrieval_mode,
-                        })
-                    
+
+                        yield _encode_sse(
+                            "metadata",
+                            {
+                                "confidence_score": final_confidence,
+                                "execution_time_ms": final_processing_time,
+                                "sources_queried": final_sources,
+                                "retrieval_mode": retrieval_mode,
+                            },
+                        )
+
                     elif event_type == "done":
                         # SSE: done event
-                        result_query_id = uuid.UUID(event.get("query_id")) if event.get("query_id") else query_uuid
+                        result_query_id = (
+                            uuid.UUID(event.get("query_id"))
+                            if event.get("query_id")
+                            else query_uuid
+                        )
                         final_next_actions = event.get("next_actions", [])
-                        final_confidence = _clamp_confidence(event.get("confidence_score", final_confidence))
+                        final_confidence = _clamp_confidence(
+                            event.get("confidence_score", final_confidence)
+                        )
                         final_sources = event.get("sources_queried", final_sources)
-                        final_processing_time = event.get("processing_time_ms", final_processing_time)
-                        
+                        final_processing_time = event.get(
+                            "processing_time_ms", final_processing_time
+                        )
+
                         # Cache and persist the response
                         try:
-                            answer_payload = GraphRAGAnswerPayload.model_validate({
-                                "summary": accumulated_summary,
-                                "related_entities": [],  # Already sent as entity events
-                                "evidence": [],
-                                "next_actions": final_next_actions,
-                            })
-                            
+                            answer_payload = GraphRAGAnswerPayload.model_validate(
+                                {
+                                    "summary": accumulated_summary,
+                                    "related_entities": [],  # Already sent as entity events
+                                    "evidence": [],
+                                    "next_actions": final_next_actions,
+                                }
+                            )
+
                             response = GraphRAGQueryResponse(
                                 answer=answer_payload,
                                 confidence_score=_clamp_confidence(final_confidence),
@@ -560,30 +588,38 @@ async def stream_knowledge_graph(
                                 query_id=result_query_id,
                                 issues=[],
                             )
-                            
+
                             await cache_query_response(response)
                             await persist_successful_query(
                                 user=user,
                                 question=question,
-                                source_ids=validated_source_ids if validated_source_ids else None,
+                                source_ids=validated_source_ids
+                                if validated_source_ids
+                                else None,
                                 response=response,
                                 processing_time_ms=final_processing_time or 0,
                                 mode=retrieval_mode,
                             )
                         except Exception as cache_exc:
-                            logger.warning(f"Failed to cache/persist query: {cache_exc}")
-                        
-                        yield _encode_sse("done", {
-                            "query_id": str(result_query_id),
-                            "timestamp": event.get("timestamp") or dt.datetime.now(dt.timezone.utc).isoformat(),
-                            "summary": accumulated_summary,
-                            "next_actions": final_next_actions,
-                            "confidence_score": final_confidence,
-                            "sources_queried": final_sources,
-                            "processing_time_ms": final_processing_time,
-                        })
+                            logger.warning(
+                                f"Failed to cache/persist query: {cache_exc}"
+                            )
+
+                        yield _encode_sse(
+                            "done",
+                            {
+                                "query_id": str(result_query_id),
+                                "timestamp": event.get("timestamp")
+                                or dt.datetime.now(dt.timezone.utc).isoformat(),
+                                "summary": accumulated_summary,
+                                "next_actions": final_next_actions,
+                                "confidence_score": final_confidence,
+                                "sources_queried": final_sources,
+                                "processing_time_ms": final_processing_time,
+                            },
+                        )
                         return
-                    
+
                     elif event_type == "error":
                         # SSE: error event
                         logger.warning(
@@ -591,23 +627,35 @@ async def stream_knowledge_graph(
                             query_uuid,
                             event.get("message"),
                         )
-                        yield _encode_sse("error", {
-                            "message": event.get("message"),
-                            "code": event.get("code"),
-                            "processing_time_ms": event.get("processing_time_ms"),
-                        })
+                        yield _encode_sse(
+                            "error",
+                            {
+                                "message": event.get("message"),
+                                "code": event.get("code"),
+                                "processing_time_ms": event.get("processing_time_ms"),
+                            },
+                        )
                         return
 
         except asyncio.TimeoutError:
             processing_time_ms = int(
                 (dt.datetime.now(dt.timezone.utc) - start_time).total_seconds() * 1000
             )
-            logger.warning("GraphRAG 流式查询 {} 超时", query_uuid)
-            yield _encode_sse("error", {
-                "message": "查询超时，请尝试简化问题或增加超时时间。",
-                "code": GraphRAGErrorCodes.TIMEOUT,
-                "processing_time_ms": processing_time_ms,
-            })
+            logger.warning(
+                "GraphRAG 流式查询 {} 超时 - 配置超时={}s, 实际运行={}ms, 问题='{}'",
+                query_uuid,
+                timeout_seconds,
+                processing_time_ms,
+                question[:100],
+            )
+            yield _encode_sse(
+                "error",
+                {
+                    "message": "查询超时，请尝试简化问题或增加超时时间。",
+                    "code": GraphRAGErrorCodes.TIMEOUT,
+                    "processing_time_ms": processing_time_ms,
+                },
+            )
         except asyncio.CancelledError:
             logger.info("GraphRAG 流式查询 {} 被客户端中断", query_uuid)
             raise
@@ -616,18 +664,23 @@ async def stream_knowledge_graph(
                 (dt.datetime.now(dt.timezone.utc) - start_time).total_seconds() * 1000
             )
             logger.exception("GraphRAG 流式查询 {} 发生未知错误: {}", query_uuid, exc)
-            yield _encode_sse("error", {
-                "message": "内部服务器错误，请稍后重试。",
-                "code": GraphRAGErrorCodes.INTERNAL_ERROR,
-                "processing_time_ms": processing_time_ms,
-            })
+            yield _encode_sse(
+                "error",
+                {
+                    "message": "内部服务器错误，请稍后重试。",
+                    "code": GraphRAGErrorCodes.INTERNAL_ERROR,
+                    "processing_time_ms": processing_time_ms,
+                },
+            )
 
     headers = {
         "Cache-Control": "no-cache",
         "X-Accel-Buffering": "no",
     }
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers=headers)
+    return StreamingResponse(
+        event_generator(), media_type="text/event-stream", headers=headers
+    )
 
 
 @router.get(
@@ -680,6 +733,20 @@ async def list_available_sources(
 
             for source in sources:
                 meta = getattr(source, "source_metadata", None) or {}
+                config = getattr(source, "connection_config", None) or {}
+
+                # Extract language from languages dict (e.g., {"python": 8} -> "Python")
+                languages = meta.get("languages", {})
+                if languages:
+                    primary_language = (
+                        max(languages.items(), key=lambda x: x[1])[0]
+                        if languages
+                        else "Unknown"
+                    )
+                    primary_language = primary_language.capitalize()
+                else:
+                    primary_language = "Unknown"
+
                 available_sources.append(
                     {
                         "id": str(source.id),
@@ -688,18 +755,27 @@ async def list_available_sources(
                         "description": meta.get("description")
                         or source.description
                         or "",
-                        "branch": meta.get("branch") or "main",
-                        "language": meta.get("language") or "Unknown",
+                        "branch": config.get("branch") or meta.get("branch") or "main",
+                        "language": primary_language,
                         "tags": meta.get("tags") or [],
                         "status": meta.get("status") or "healthy",
                         "lastFullIndex": meta.get("last_full_index"),
                         "lastIncremental": meta.get("last_incremental"),
+                        "lastSyncedAt": source.last_synced_at.isoformat()
+                        if source.last_synced_at
+                        else None,
+                        "createdAt": source.created_at.isoformat()
+                        if hasattr(source, "created_at") and source.created_at
+                        else None,
+                        "updatedAt": source.updated_at.isoformat()
+                        if hasattr(source, "updated_at") and source.updated_at
+                        else None,
                         "maintainers": meta.get("maintainers") or [],
                         "recommendedQuestions": meta.get("recommended_questions") or [],
                         "isActive": source.is_active,
                         "queryCount7d": counts.get(str(source.id), 0),
-                        "nodeCount": meta.get("node_count"),
-                        "relationCount": meta.get("relation_count"),
+                        "nodeCount": meta.get("graph_nodes"),
+                        "relationCount": meta.get("graph_edges"),
                     }
                 )
 
@@ -810,7 +886,9 @@ async def stream_knowledge_query(
                     metadata_payload = {
                         "execution_time_ms": execution_time_ms,
                         "sources_queried": request.source_ids,
-                        "confidence_score": _clamp_confidence(payload.get("confidence_score", 0.0)),
+                        "confidence_score": _clamp_confidence(
+                            payload.get("confidence_score", 0.0)
+                        ),
                         "retrieval_mode": request.retrieval_mode or "hybrid",
                         "from_cache": False,
                     }
@@ -831,7 +909,9 @@ async def stream_knowledge_query(
                         evidence_anchors = build_evidence_anchors(answer_payload)
                         response_model = GraphRAGQueryResponse(
                             answer=answer_payload,
-                            confidence_score=_clamp_confidence(payload.get("confidence_score", 0.0)),
+                            confidence_score=_clamp_confidence(
+                                payload.get("confidence_score", 0.0)
+                            ),
                             evidence_anchors=evidence_anchors,
                             raw_messages=payload.get("raw_messages"),
                             sources_queried=payload.get("sources_queried")

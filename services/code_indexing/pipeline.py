@@ -21,7 +21,7 @@ from services.source_service import SourceService
 from .code_parser import CodeParser, ParseSummary, ParsedFile
 from .embedding import DeterministicEmbeddingGenerator, EmbeddingSummary
 from .file_scanner import FileScanner, FileScanResult
-from .git_sync import GitSyncService, GitSyncResult
+from .git_sync import GitSyncService, GitSyncResult, GitDiffResult
 from .graph_builder import GraphBuilder, GraphBuildResult
 
 
@@ -104,6 +104,14 @@ class CodeIndexingPipeline:
         start_time = time.perf_counter()
         sync_config = sync_config or {}
 
+        # Extract force_full flag to determine if we should clear existing data
+        force_full = sync_config.get("force_full", False)
+
+        # Extract sync_mode (full or incremental)
+        sync_mode = sync_config.get(
+            "sync_mode", "full" if force_full else "incremental"
+        )
+
         connection_config = dict(source.connection_config or {})
         overrides: Dict[str, Any] = {}
 
@@ -115,14 +123,21 @@ class CodeIndexingPipeline:
             for key, value in sync_config.items():
                 if key == "connection_config":
                     continue
+                # Skip force_full as it's not a connection config
+                if key == "force_full":
+                    continue
                 overrides[key] = value
 
         if overrides:
-            connection_config.update({k: v for k, v in overrides.items() if v is not None})
+            connection_config.update(
+                {k: v for k, v in overrides.items() if v is not None}
+            )
 
         depth_override = overrides.get("git_depth") or overrides.get("clone_depth")
         if depth_override is None:
-            depth_override = connection_config.get("git_depth") or connection_config.get("clone_depth")
+            depth_override = connection_config.get(
+                "git_depth"
+            ) or connection_config.get("clone_depth")
         if depth_override is not None:
             try:
                 self.git_service.depth = int(depth_override)
@@ -136,9 +151,15 @@ class CodeIndexingPipeline:
         branch = connection_config.get("branch") or "main"
         auth_type = connection_config.get("auth_type", "none")
         access_token = connection_config.get("access_token")
-        include_patterns = connection_config.get("include_patterns") or settings.code_include_patterns
-        exclude_patterns = connection_config.get("exclude_patterns") or settings.code_exclude_patterns
-        max_file_size_kb = connection_config.get("max_file_size_kb") or settings.code_max_file_size_kb
+        include_patterns = (
+            connection_config.get("include_patterns") or settings.code_include_patterns
+        )
+        exclude_patterns = (
+            connection_config.get("exclude_patterns") or settings.code_exclude_patterns
+        )
+        max_file_size_kb = (
+            connection_config.get("max_file_size_kb") or settings.code_max_file_size_kb
+        )
 
         # Normalize pattern configuration
         include_patterns = self._ensure_list(include_patterns)
@@ -152,11 +173,34 @@ class CodeIndexingPipeline:
 
         job_uuid = None
         if job_id:
-            job_uuid = job_id if isinstance(job_id, uuid.UUID) else uuid.UUID(str(job_id))
+            job_uuid = (
+                job_id if isinstance(job_id, uuid.UUID) else uuid.UUID(str(job_id))
+            )
         repo_root = settings.code_repo_root_path
         repo_path = repo_root / str(source.id)
-        source_id_str = str(getattr(source, "id", None)) if getattr(source, "id", None) is not None else None
+        source_id_str = (
+            str(getattr(source, "id", None))
+            if getattr(source, "id", None) is not None
+            else None
+        )
         source_name = getattr(source, "name", None)
+
+        # If force_full is True, clear existing graph data for this source
+        if force_full and source_id_str:
+            logger.info(
+                f"Force full reindex requested - clearing existing graph data for source {source_id_str}"
+            )
+            await self._clear_source_graph_data(
+                source_id_str,
+                job_uuid,
+                progress_callback,
+                task_progress_callback,
+            )
+
+        # Get previous commit SHA for incremental indexing
+        previous_sha = None
+        if source.source_metadata:
+            previous_sha = source.source_metadata.get("last_commit_sha")
 
         git_result = await self._sync_repository(
             repo_url,
@@ -169,19 +213,62 @@ class CodeIndexingPipeline:
             task_progress_callback,
         )
 
-        scan_result = await self._scan_repository(
-            repo_path,
-            job_uuid,
-            progress_callback,
-            task_progress_callback,
+        # Determine if we should use incremental indexing
+        use_incremental = (
+            sync_mode == "incremental"
+            and not force_full
+            and previous_sha
+            and previous_sha != git_result.commit_sha
+            and git_result.fetched
         )
 
-        parsed_files, parse_summary = await self._parse_repository(
-            scan_result,
-            job_uuid,
-            progress_callback,
-            task_progress_callback,
-        )
+        if use_incremental:
+            # At this point, previous_sha is guaranteed to be not None due to use_incremental conditions
+            assert previous_sha is not None
+            logger.info(
+                f"Using incremental indexing: {previous_sha[:8]} -> {git_result.commit_sha[:8]}"
+            )
+
+            # Get changed files using git diff
+            diff_result = await self.git_service.get_changed_files(
+                repo_path,
+                previous_sha,
+                git_result.commit_sha,
+            )
+
+            # Process only changed files
+            scan_result, parsed_files, parse_summary = await self._process_incremental(
+                repo_path,
+                diff_result,
+                source_id_str,
+                job_uuid,
+                progress_callback,
+                task_progress_callback,
+            )
+        else:
+            if previous_sha and previous_sha == git_result.commit_sha:
+                logger.info(
+                    f"No changes detected (commit {git_result.commit_sha[:8]}), skipping full scan"
+                )
+            elif force_full or sync_mode == "full":
+                logger.info("Using full indexing mode")
+            else:
+                logger.info("Using full indexing (no previous commit or first sync)")
+
+            # Full indexing: scan and parse all files
+            scan_result = await self._scan_repository(
+                repo_path,
+                job_uuid,
+                progress_callback,
+                task_progress_callback,
+            )
+
+            parsed_files, parse_summary = await self._parse_repository(
+                scan_result,
+                job_uuid,
+                progress_callback,
+                task_progress_callback,
+            )
 
         embedding_summary = await self._embed_functions(
             parsed_files,
@@ -211,16 +298,43 @@ class CodeIndexingPipeline:
         duration = time.perf_counter() - start_time
 
         # Update knowledge source metadata
-        source.source_metadata = {
+        metadata_update = {
             "last_commit_sha": git_result.commit_sha,
-            "total_files": len(scan_result.files),
-            "total_functions": parse_summary.functions_extracted,
-            "languages": graph_result.languages,
-            "graph_nodes": graph_result.nodes_created,
-            "graph_edges": graph_result.edges_created,
+            "last_sync_mode": sync_mode,
             "index_version": "mvp-1",
             "embedding_dimension": embedding_summary.embedding_dimension,
         }
+
+        if sync_mode == "full" or force_full or not source.source_metadata:
+            # Full sync: overwrite all metadata
+            metadata_update.update(
+                {
+                    "total_files": len(scan_result.files),
+                    "total_functions": parse_summary.functions_extracted,
+                    "languages": graph_result.languages,
+                    "graph_nodes": graph_result.nodes_created,
+                    "graph_edges": graph_result.edges_created,
+                }
+            )
+            source.source_metadata = metadata_update
+        else:
+            # Incremental sync: update metadata
+            if not source.source_metadata:
+                source.source_metadata = {}
+
+            # Increment counters for incremental updates
+            source.source_metadata.update(metadata_update)
+            source.source_metadata["total_files"] = source.source_metadata.get(
+                "total_files", 0
+            ) + len(scan_result.files)
+            source.source_metadata["graph_nodes"] = (
+                source.source_metadata.get("graph_nodes", 0)
+                + graph_result.nodes_created
+            )
+            source.source_metadata["graph_edges"] = (
+                source.source_metadata.get("graph_edges", 0)
+                + graph_result.edges_created
+            )
 
         self.summary["duration_seconds"] = duration
         await self._update_stage(
@@ -262,6 +376,177 @@ class CodeIndexingPipeline:
         )
 
         return result
+
+    async def _process_incremental(
+        self,
+        repo_path: Path,
+        diff_result: GitDiffResult,
+        source_id: Optional[str],
+        job_uuid: Optional[uuid.UUID],
+        progress_callback: Optional[Callable[[float, str], None]],
+        task_progress_callback: Optional[Callable[[float, str], None]],
+    ):
+        """Process only changed files for incremental indexing."""
+
+        # Combine added and modified files for processing
+        files_to_process = diff_result.added_files + diff_result.modified_files
+
+        # Handle renamed files (treat as delete old + add new)
+        for old_path, new_path in diff_result.renamed_files:
+            diff_result.deleted_files.append(old_path)
+            files_to_process.append(new_path)
+
+        logger.info(
+            f"Incremental sync: processing {len(files_to_process)} files, "
+            f"deleting {len(diff_result.deleted_files)} files"
+        )
+
+        await self._update_stage(
+            "incremental_delete",
+            progress=12,
+            job_uuid=job_uuid,
+            status=ParseStatus.RUNNING,
+            payload={
+                "deleted_files": len(diff_result.deleted_files),
+            },
+            message=f"Deleting {len(diff_result.deleted_files)} removed files from graph",
+            progress_callback=progress_callback,
+            task_progress_callback=task_progress_callback,
+        )
+
+        # Delete nodes for removed/renamed files
+        if diff_result.deleted_files and source_id:
+            if self.graph_service:
+                for file_path in diff_result.deleted_files:
+                    try:
+                        await self.graph_service.delete_file_nodes(source_id, file_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete nodes for {file_path}: {e}")
+
+        # Create a filtered scan result with only changed files
+        from .file_scanner import ScannedFile, FileScanResult
+
+        scanned_files = []
+        skipped_count = 0
+        errors = []
+
+        for file_path in files_to_process:
+            absolute_path = repo_path / file_path
+
+            if not absolute_path.exists():
+                logger.warning(f"File not found: {file_path}")
+                continue
+
+            # Check if file matches include/exclude patterns
+            relative_path_obj = Path(file_path)
+            if self.scanner._should_skip(relative_path_obj):
+                skipped_count += 1
+                continue
+
+            try:
+                size_bytes = absolute_path.stat().st_size
+                if size_bytes > self.scanner.max_file_size_bytes:
+                    skipped_count += 1
+                    continue
+
+                language = self.scanner._detect_language(absolute_path)
+                if not language:
+                    skipped_count += 1
+                    continue
+
+                scanned_files.append(
+                    ScannedFile(
+                        relative_path=relative_path_obj,
+                        absolute_path=absolute_path,
+                        language=language,
+                        size_bytes=size_bytes,
+                    )
+                )
+            except Exception as e:
+                errors.append({"file": file_path, "error": str(e)})
+
+        # Build language breakdown
+        language_breakdown = {}
+        for scanned in scanned_files:
+            ext = scanned.absolute_path.suffix.lower()
+            language_breakdown[ext] = language_breakdown.get(ext, 0) + 1
+
+        scan_result = FileScanResult(
+            files=scanned_files,
+            skipped=skipped_count,
+            errors=errors,
+            language_breakdown=language_breakdown,
+        )
+
+        await self._update_stage(
+            "incremental_scan",
+            progress=20,
+            job_uuid=job_uuid,
+            status=ParseStatus.RUNNING,
+            payload={
+                "files_to_parse": len(scanned_files),
+                "files_skipped": skipped_count,
+            },
+            message=f"Scanning {len(scanned_files)} changed files",
+            progress_callback=progress_callback,
+            task_progress_callback=task_progress_callback,
+        )
+
+        # Parse the changed files
+        parsed_files, parse_summary = await self._parse_repository(
+            scan_result,
+            job_uuid,
+            progress_callback,
+            task_progress_callback,
+        )
+
+        return scan_result, parsed_files, parse_summary
+
+    async def _clear_source_graph_data(
+        self,
+        source_id: str,
+        job_uuid: Optional[uuid.UUID],
+        progress_callback: Optional[Callable[[float, str], None]],
+        task_progress_callback: Optional[Callable[[float, str], None]],
+    ) -> None:
+        """Clear all existing graph data for this source before full reindex."""
+        try:
+            await self._update_stage(
+                "clear_data",
+                progress=5,
+                job_uuid=job_uuid,
+                status=ParseStatus.RUNNING,
+                payload={"action": "clearing_existing_data"},
+                message="Clearing existing graph data",
+                progress_callback=progress_callback,
+                task_progress_callback=task_progress_callback,
+            )
+
+            # Delete all nodes and relationships for this source
+            deleted = await self.graph_service.delete_source_data(source_id)
+
+            logger.info(
+                f"Cleared {deleted.get('nodes_deleted', 0)} nodes and {deleted.get('relationships_deleted', 0)} relationships for source {source_id}"
+            )
+
+            await self._update_stage(
+                "clear_data",
+                progress=8,
+                job_uuid=job_uuid,
+                status=ParseStatus.RUNNING,
+                payload={
+                    "action": "data_cleared",
+                    "nodes_deleted": deleted.get("nodes_deleted", 0),
+                    "relationships_deleted": deleted.get("relationships_deleted", 0),
+                },
+                message=f"Cleared {deleted.get('nodes_deleted', 0)} nodes",
+                progress_callback=progress_callback,
+                task_progress_callback=task_progress_callback,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to clear existing graph data: {e}")
+            # Don't fail the entire pipeline if clearing fails
+            # The new data will overwrite/merge with existing data
 
     async def _sync_repository(
         self,
@@ -309,7 +594,9 @@ class CodeIndexingPipeline:
         task_progress_callback: Optional[Callable[[float, str], None]],
     ) -> FileScanResult:
         start = time.perf_counter()
-        scan_result: FileScanResult = await asyncio.to_thread(self.scanner.scan, repo_path)
+        scan_result: FileScanResult = await asyncio.to_thread(
+            self.scanner.scan, repo_path
+        )
         duration = time.perf_counter() - start
 
         self.summary["files_scanned"] = len(scan_result.files)
@@ -381,7 +668,9 @@ class CodeIndexingPipeline:
         task_progress_callback: Optional[Callable[[float, str], None]],
     ) -> EmbeddingSummary:
         start = time.perf_counter()
-        functions = [function for parsed in parsed_files for function in parsed.functions]
+        functions = [
+            function for parsed in parsed_files for function in parsed.functions
+        ]
         summary = await asyncio.to_thread(self.embedder.generate, functions)
         duration = time.perf_counter() - start
 
@@ -469,7 +758,9 @@ class CodeIndexingPipeline:
         job_label = str(job_uuid) if job_uuid else "in-memory job"
 
         if not parsed_files:
-            logger.info("Job {} has no parsed files, skipping knowledge index stage.", job_label)
+            logger.info(
+                "Job {} has no parsed files, skipping knowledge index stage.", job_label
+            )
             return {"documents_created": 0, "skipped": True}
 
         logger.info(
@@ -483,7 +774,9 @@ class CodeIndexingPipeline:
 
         # 确保服务已初始化（应该在应用启动时已初始化）
         if not neo4j_knowledge_service._initialized:
-            logger.warning("Knowledge service not initialized, attempting to initialize...")
+            logger.warning(
+                "Knowledge service not initialized, attempting to initialize..."
+            )
             try:
                 await neo4j_knowledge_service.initialize()
             except Exception as exc:
@@ -492,7 +785,9 @@ class CodeIndexingPipeline:
 
         knowledge_index = getattr(neo4j_knowledge_service, "knowledge_index", None)
         if not knowledge_index:
-            logger.warning("Knowledge index not initialized, skipping knowledge indexing")
+            logger.warning(
+                "Knowledge index not initialized, skipping knowledge indexing"
+            )
             return {"documents_created": 0, "skipped": True}
 
         documents = []
@@ -512,7 +807,9 @@ class CodeIndexingPipeline:
                 f"\n编程语言: {language}",
             )
 
-            function_names = [function.name for function in (parsed_file.functions or [])]
+            function_names = [
+                function.name for function in (parsed_file.functions or [])
+            ]
             if function_names:
                 content_parts.append("\n## 函数列表")
                 for name in function_names[:15]:
@@ -524,14 +821,20 @@ class CodeIndexingPipeline:
                 for name in class_names[:10]:
                     content_parts.append(f"- {name}")
 
-            import_modules = [imp.module for imp in (parsed_file.imports or []) if getattr(imp, "module", None)]
+            import_modules = [
+                imp.module
+                for imp in (parsed_file.imports or [])
+                if getattr(imp, "module", None)
+            ]
             if import_modules:
                 content_parts.append("\n## 导入模块")
                 for module in import_modules[:10]:
                     content_parts.append(f"- {module}")
 
             try:
-                snippet = scanned.absolute_path.read_text(encoding="utf-8", errors="ignore")[:500]
+                snippet = scanned.absolute_path.read_text(
+                    encoding="utf-8", errors="ignore"
+                )[:500]
             except Exception as exc:  # pragma: no cover - filesystem edge case
                 logger.debug("Failed to read snippet for {}: {}", file_path, exc)
                 snippet = ""
@@ -559,7 +862,11 @@ class CodeIndexingPipeline:
                 await asyncio.to_thread(knowledge_index.insert, document)
                 documents_created += 1
             except Exception as exc:  # pragma: no cover - downstream service failure
-                logger.error("Failed to insert knowledge document for {}: {}", document.metadata.get("file_path"), exc)
+                logger.error(
+                    "Failed to insert knowledge document for {}: {}",
+                    document.metadata.get("file_path"),
+                    exc,
+                )
 
         duration = time.perf_counter() - start
 

@@ -623,10 +623,10 @@ class Neo4jKnowledgeService:
                     retrieve_exec_start = perf_time.perf_counter()
                     logger.debug(f"[PERF-KG] Calling retriever.retrieve() with question: {question[:50]}...")
                     
-                    # 增加超时时间到 60 秒
+                    # 增加超时时间到 180 秒 (3分钟)
                     nodes = await asyncio.wait_for(
                         asyncio.to_thread(retriever.retrieve, question),
-                        timeout=60
+                        timeout=180
                     )
                     source_nodes = nodes
                     

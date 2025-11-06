@@ -31,6 +31,18 @@ class GitSyncResult:
     fetched: bool
 
 
+@dataclass
+class GitDiffResult:
+    """Result of git diff operation showing file changes."""
+
+    added_files: List[str]
+    modified_files: List[str]
+    deleted_files: List[str]
+    renamed_files: List[Tuple[str, str]]  # (old_path, new_path)
+    previous_sha: str
+    current_sha: str
+
+
 class RepositoryClientError(RuntimeError):
     """Base error for repository client failures."""
 
@@ -87,7 +99,9 @@ class GithubRepositoryClient(RepositoryClient):
         if path.endswith(".git"):
             path = path[:-4]
         if "/" not in path:
-            sanitized_url = f"{scheme}://{host}/{path}" if path else f"{scheme}://{host}"
+            sanitized_url = (
+                f"{scheme}://{host}/{path}" if path else f"{scheme}://{host}"
+            )
             raise RepositoryClientError("Invalid GitHub repository URL", sanitized_url)
 
         owner, repo = path.split("/", 1)
@@ -95,7 +109,9 @@ class GithubRepositoryClient(RepositoryClient):
 
         try:
             from ghapi.all import GhApi  # type: ignore
-        except ImportError as exc:  # pragma: no cover - exercised in environments missing ghapi
+        except (
+            ImportError
+        ) as exc:  # pragma: no cover - exercised in environments missing ghapi
             raise MissingDependencyError("ghapi", sanitized_url) from exc
 
         super().__init__(sanitized_url)
@@ -209,7 +225,9 @@ class GitlabRepositoryClient(RepositoryClient):
 
         try:
             import gitlab  # type: ignore
-        except ImportError as exc:  # pragma: no cover - exercised when dependency missing
+        except (
+            ImportError
+        ) as exc:  # pragma: no cover - exercised when dependency missing
             raise MissingDependencyError("python-gitlab", sanitized_url) from exc
 
         super().__init__(sanitized_url)
@@ -327,7 +345,9 @@ class GitCliRepositoryClient(RepositoryClient):
                 target_folder,
                 branch,
             )
-            _run_git_command(["git", "fetch", "origin", branch], cwd=target_folder, env=env)
+            _run_git_command(
+                ["git", "fetch", "origin", branch], cwd=target_folder, env=env
+            )
             _run_git_command(
                 ["git", "reset", "--hard", f"origin/{branch}"],
                 cwd=target_folder,
@@ -335,12 +355,16 @@ class GitCliRepositoryClient(RepositoryClient):
             )
 
         commit_result = _run_git_command(
-            ["git", "rev-parse", "HEAD"], cwd=target_folder, env=env, capture_output=True
+            ["git", "rev-parse", "HEAD"],
+            cwd=target_folder,
+            env=env,
+            capture_output=True,
         )
         commit_sha = (commit_result.stdout or "").strip()
         if not commit_sha:
             raise RepositoryClientError(
-                f"Failed to resolve commit SHA for {self.sanitized_url}", self.sanitized_url
+                f"Failed to resolve commit SHA for {self.sanitized_url}",
+                self.sanitized_url,
             )
         return commit_sha
 
@@ -360,7 +384,9 @@ class GitCliRepositoryClient(RepositoryClient):
         stderr = getattr(result, "stderr", "") or ""
         if exit_code != 0:
             raise RepositoryAuthenticationError(
-                _sanitize_message(stderr or stdout or "git ls-remote failed", self.sanitized_url),
+                _sanitize_message(
+                    stderr or stdout or "git ls-remote failed", self.sanitized_url
+                ),
                 self.sanitized_url,
             )
 
@@ -372,7 +398,9 @@ class GitSyncService:
     """Service responsible for cloning and updating repositories."""
 
     def __init__(self, repo_root: Optional[Path] = None, depth: Optional[int] = None):
-        base_root = Path(repo_root) if repo_root is not None else settings.code_repo_root_path
+        base_root = (
+            Path(repo_root) if repo_root is not None else settings.code_repo_root_path
+        )
         base_root.mkdir(parents=True, exist_ok=True)
         self.repo_root = base_root
         self.depth = depth if depth is not None else settings.code_git_depth
@@ -421,6 +449,109 @@ class GitSyncService:
             fetched=fetched,
         )
 
+    async def get_changed_files(
+        self,
+        repo_path: Path,
+        previous_sha: str,
+        current_sha: Optional[str] = None,
+    ) -> GitDiffResult:
+        """
+        Get the list of changed files between two commits using git diff.
+
+        Args:
+            repo_path: Path to the git repository
+            previous_sha: Previous commit SHA to compare from
+            current_sha: Current commit SHA to compare to (defaults to HEAD)
+
+        Returns:
+            GitDiffResult containing lists of added, modified, deleted, and renamed files
+        """
+        repo_path = Path(repo_path)
+
+        if not repo_path.exists():
+            raise ValueError(f"Repository path does not exist: {repo_path}")
+
+        # If current_sha is not provided, use HEAD
+        if not current_sha:
+            result = await asyncio.to_thread(
+                _run_git_command,
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+            )
+            current_sha = (result.stdout or "").strip()
+
+        logger.info(
+            "Getting changed files between {} and {} in {}",
+            previous_sha[:8],
+            current_sha[:8],
+            repo_path,
+        )
+
+        # Get diff with file status
+        # --name-status shows: A (added), M (modified), D (deleted), R (renamed)
+        result = await asyncio.to_thread(
+            _run_git_command,
+            ["git", "diff", "--name-status", previous_sha, current_sha],
+            cwd=repo_path,
+            capture_output=True,
+        )
+
+        diff_output = (result.stdout or "").strip()
+
+        added_files = []
+        modified_files = []
+        deleted_files = []
+        renamed_files = []
+
+        if diff_output:
+            for line in diff_output.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+
+                parts = line.split("\t")
+                if len(parts) < 2:
+                    continue
+
+                status = parts[0]
+
+                if status.startswith("A"):
+                    # Added file
+                    added_files.append(parts[1])
+                elif status.startswith("M"):
+                    # Modified file
+                    modified_files.append(parts[1])
+                elif status.startswith("D"):
+                    # Deleted file
+                    deleted_files.append(parts[1])
+                elif status.startswith("R"):
+                    # Renamed file (format: R100\told_path\tnew_path)
+                    if len(parts) >= 3:
+                        renamed_files.append((parts[1], parts[2]))
+                    elif len(parts) == 2:
+                        # Sometimes git shows rename as "R\told_path -> new_path"
+                        if " -> " in parts[1]:
+                            old_path, new_path = parts[1].split(" -> ", 1)
+                            renamed_files.append((old_path.strip(), new_path.strip()))
+
+        logger.info(
+            "Changed files: {} added, {} modified, {} deleted, {} renamed",
+            len(added_files),
+            len(modified_files),
+            len(deleted_files),
+            len(renamed_files),
+        )
+
+        return GitDiffResult(
+            added_files=added_files,
+            modified_files=modified_files,
+            deleted_files=deleted_files,
+            renamed_files=renamed_files,
+            previous_sha=previous_sha,
+            current_sha=current_sha,
+        )
+
 
 async def validate_git_connection(
     repo_url: str,
@@ -451,7 +582,11 @@ async def validate_git_connection(
             return False, str(exc), []
 
         if branch and branch not in branches:
-            return False, f"Branch '{branch}' not found for {client.sanitized_url}", branches
+            return (
+                False,
+                f"Branch '{branch}' not found for {client.sanitized_url}",
+                branches,
+            )
 
         return True, f"Successfully validated {client.sanitized_url}", branches
 
@@ -473,7 +608,9 @@ def _resolve_repository_client(
     if "gitlab" in host:
         return GitlabRepositoryClient(repo_url, token=token)
 
-    return GitCliRepositoryClient(repo_url, auth_type=auth_type, access_token=access_token)
+    return GitCliRepositoryClient(
+        repo_url, auth_type=auth_type, access_token=access_token
+    )
 
 
 def _read_commit_marker(target_folder: Path) -> Optional[str]:
@@ -535,18 +672,22 @@ def _coerce_archive_bytes(value, sanitized_url: str) -> bytes:
         if isinstance(content, (bytes, bytearray, memoryview)):
             return bytes(content)
     raise RepositoryClientError(
-        f"Unsupported archive payload type from repository {sanitized_url}", sanitized_url
+        f"Unsupported archive payload type from repository {sanitized_url}",
+        sanitized_url,
     )
 
 
-def _extract_archive_bytes(archive_bytes: bytes, target_folder: Path, sanitized_url: str) -> None:
+def _extract_archive_bytes(
+    archive_bytes: bytes, target_folder: Path, sanitized_url: str
+) -> None:
     try:
         with tempfile.TemporaryDirectory(prefix="repo-archive-") as tmp_dir:
             tmp_path = Path(tmp_dir)
             if not _try_extract_tar(archive_bytes, tmp_path, sanitized_url):
                 if not _try_extract_zip(archive_bytes, tmp_path, sanitized_url):
                     raise RepositoryClientError(
-                        f"Unsupported archive format returned for {sanitized_url}", sanitized_url
+                        f"Unsupported archive format returned for {sanitized_url}",
+                        sanitized_url,
                     )
 
             extracted_root = _determine_archive_root(tmp_path)
@@ -561,7 +702,9 @@ def _extract_archive_bytes(archive_bytes: bytes, target_folder: Path, sanitized_
         ) from exc
 
 
-def _try_extract_tar(archive_bytes: bytes, destination: Path, sanitized_url: str) -> bool:
+def _try_extract_tar(
+    archive_bytes: bytes, destination: Path, sanitized_url: str
+) -> bool:
     buffer = io.BytesIO(archive_bytes)
     try:
         with tarfile.open(fileobj=buffer, mode="r:*") as archive:
@@ -573,7 +716,9 @@ def _try_extract_tar(archive_bytes: bytes, destination: Path, sanitized_url: str
         return False
 
 
-def _try_extract_zip(archive_bytes: bytes, destination: Path, sanitized_url: str) -> bool:
+def _try_extract_zip(
+    archive_bytes: bytes, destination: Path, sanitized_url: str
+) -> bool:
     buffer = io.BytesIO(archive_bytes)
     try:
         with zipfile.ZipFile(buffer) as archive:
@@ -736,6 +881,7 @@ def _build_authenticated_url(
 
     repo_with_auth = urlunparse(parsed._replace(netloc=netloc))
     return repo_with_auth, sanitized
+
 
 def _sanitize_message(message: str, sanitized_url: str) -> str:
     """Remove repository credentials from log messages."""
