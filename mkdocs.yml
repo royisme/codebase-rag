@@ -136,14 +136,51 @@ nav:
   - Home: index.md
   - Getting Started:
     - Quick Start: getting-started/quickstart.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
   - Deployment:
     - Overview: deployment/overview.md
+    - Minimal Mode: deployment/minimal.md
+    - Standard Mode: deployment/standard.md
+    - Full Mode: deployment/full.md
+    - Docker Guide: deployment/docker.md
     - Production Setup: deployment/production.md
-  - Technical Docs:
-    - MCP V2 Modularization: MCP_V2_MODULARIZATION.md
-    - MCP Migration Guide: MCP_MIGRATION_GUIDE.md
-    - Implementation Summary: IMPLEMENTATION_SUMMARY.md
-    - v0.6 Summary: v0.6-SUMMARY.md
+  - User Guide:
+    - Code Graph:
+      - Overview: guide/code-graph/overview.md
+      - Repository Ingestion: guide/code-graph/ingestion.md
+      - Search & Discovery: guide/code-graph/search.md
+      - Impact Analysis: guide/code-graph/impact.md
+      - Context Packing: guide/code-graph/context.md
+    - Memory Store:
+      - Overview: guide/memory/overview.md
+      - Manual Management: guide/memory/manual.md
+      - Vector Search: guide/memory/search.md
+      - Auto Extraction: guide/memory/extraction.md
+    - Knowledge RAG:
+      - Overview: guide/knowledge/overview.md
+      - Document Processing: guide/knowledge/documents.md
+      - Intelligent Q&A: guide/knowledge/query.md
+    - MCP Integration:
+      - Overview: guide/mcp/overview.md
+      - Claude Desktop: guide/mcp/claude-desktop.md
+      - VS Code: guide/mcp/vscode.md
+  - API Reference:
+    - REST API: api/rest.md
+    - MCP Tools: api/mcp-tools.md
+    - Python SDK: api/python-sdk.md
+  - Architecture:
+    - System Design: architecture/design.md
+    - Components: architecture/components.md
+    - Data Flow: architecture/dataflow.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Development Setup: development/setup.md
+    - Testing: development/testing.md
+    - Release Process: development/release.md
+  - Troubleshooting: troubleshooting.md
+  - FAQ: faq.md
+  - Changelog: changelog.md
 
 copyright: |
   &copy; 2024 <a href="https://vantagecraft.dev" target="_blank" rel="noopener">VantageCraft</a>
