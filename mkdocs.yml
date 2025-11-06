@@ -1,0 +1,187 @@
+site_name: Code Graph Knowledge System
+site_url: https://docs.vantagecraft.dev
+site_description: AI-powered code intelligence and knowledge management system
+site_author: VantageCraft
+repo_url: https://github.com/royisme/codebase-rag
+repo_name: codebase-rag
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  custom_dir: docs/overrides
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  favicon: assets/favicon.png
+  logo: assets/logo.png
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  homepage: https://vantagecraft.dev
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/royisme/codebase-rag
+      name: GitHub Repository
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/royisme/codebase-rag
+      name: Docker Hub
+  version:
+    provider: mike
+    default: latest
+  analytics:
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: >-
+            Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: >-
+            Thanks for your feedback! Help us improve by
+            <a href="https://github.com/royisme/codebase-rag/issues/new" target="_blank" rel="noopener">opening an issue</a>.
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: royisme
+      repo: codebase-rag
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started/quickstart.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+  - Deployment:
+    - Overview: deployment/overview.md
+    - Minimal Mode: deployment/minimal.md
+    - Standard Mode: deployment/standard.md
+    - Full Mode: deployment/full.md
+    - Docker Guide: deployment/docker.md
+    - Production Setup: deployment/production.md
+  - User Guide:
+    - Code Graph:
+      - Overview: guide/code-graph/overview.md
+      - Repository Ingestion: guide/code-graph/ingestion.md
+      - Search & Discovery: guide/code-graph/search.md
+      - Impact Analysis: guide/code-graph/impact.md
+      - Context Packing: guide/code-graph/context.md
+    - Memory Store:
+      - Overview: guide/memory/overview.md
+      - Manual Management: guide/memory/manual.md
+      - Vector Search: guide/memory/search.md
+      - Auto Extraction: guide/memory/extraction.md
+    - Knowledge RAG:
+      - Overview: guide/knowledge/overview.md
+      - Document Processing: guide/knowledge/documents.md
+      - Intelligent Q&A: guide/knowledge/query.md
+    - MCP Integration:
+      - Overview: guide/mcp/overview.md
+      - Claude Desktop: guide/mcp/claude-desktop.md
+      - VS Code: guide/mcp/vscode.md
+  - API Reference:
+    - REST API: api/rest.md
+    - MCP Tools: api/mcp-tools.md
+    - Python SDK: api/python-sdk.md
+  - Architecture:
+    - System Design: architecture/design.md
+    - Components: architecture/components.md
+    - Data Flow: architecture/dataflow.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Development Setup: development/setup.md
+    - Testing: development/testing.md
+    - Release Process: development/release.md
+  - Troubleshooting: troubleshooting.md
+  - FAQ: faq.md
+  - Changelog: changelog.md
+
+copyright: |
+  &copy; 2024 <a href="https://vantagecraft.dev" target="_blank" rel="noopener">VantageCraft</a>

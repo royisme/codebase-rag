@@ -1,0 +1,201 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKER_USER: royisme
+  DOCKER_REGISTRY: docker.io
+
+jobs:
+  build-minimal:
+    name: Build Minimal Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_USER }}/codebase-rag
+          tags: |
+            type=ref,event=branch,suffix=-minimal
+            type=ref,event=pr,suffix=-minimal
+            type=semver,pattern={{version}},suffix=-minimal
+            type=semver,pattern={{major}}.{{minor}},suffix=-minimal
+            type=raw,value=minimal,enable={{is_default_branch}}
+            type=raw,value=minimal-latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.minimal
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  build-standard:
+    name: Build Standard Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_USER }}/codebase-rag
+          tags: |
+            type=ref,event=branch,suffix=-standard
+            type=ref,event=pr,suffix=-standard
+            type=semver,pattern={{version}},suffix=-standard
+            type=semver,pattern={{major}}.{{minor}},suffix=-standard
+            type=raw,value=standard,enable={{is_default_branch}}
+            type=raw,value=standard-latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.standard
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  build-full:
+    name: Build Full Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_USER }}/codebase-rag
+          tags: |
+            type=ref,event=branch,suffix=-full
+            type=ref,event=pr,suffix=-full
+            type=semver,pattern={{version}},suffix=-full
+            type=semver,pattern={{major}}.{{minor}},suffix=-full
+            type=raw,value=full,enable={{is_default_branch}}
+            type=raw,value=full-latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.full
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  create-release:
+    name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-minimal, build-standard, build-full]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          body: |
+            ## Docker Images
+
+            ### Minimal (Code Graph only)
+            ```bash
+            docker pull royisme/codebase-rag:minimal
+            docker pull royisme/codebase-rag:${{ github.ref_name }}-minimal
+            ```
+
+            ### Standard (Code Graph + Memory)
+            ```bash
+            docker pull royisme/codebase-rag:standard
+            docker pull royisme/codebase-rag:${{ github.ref_name }}-standard
+            ```
+
+            ### Full (All Features)
+            ```bash
+            docker pull royisme/codebase-rag:full
+            docker pull royisme/codebase-rag:${{ github.ref_name }}-full
+            docker pull royisme/codebase-rag:latest
+            ```
+
+            ## Quick Start
+
+            See [documentation](https://docs.vantagecraft.dev) for detailed setup instructions.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify Build Status
+    needs: [build-minimal, build-standard, build-full]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Minimal**: ✅ Built" >> $GITHUB_STEP_SUMMARY
+          echo "- **Standard**: ✅ Built" >> $GITHUB_STEP_SUMMARY
+          echo "- **Full**: ✅ Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Images available at: https://hub.docker.com/r/royisme/codebase-rag" >> $GITHUB_STEP_SUMMARY
