@@ -5,9 +5,13 @@
 #   ./scripts/build-frontend.sh
 #
 # This Dockerfile expects frontend/dist/ to exist
+#
+# ARCHITECTURE:
+# - Builder stage: Install Python dependencies only
+# - Final stage: Runtime with git (for repo cloning) + curl (for health checks)
 
 # ============================================
-# Builder stage - Only install dependencies
+# Builder stage - Install dependencies only
 # ============================================
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
@@ -21,7 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --no-cache -r requirements.txt
 
 # ============================================
-# Final stage
+# Final stage - Runtime environment
 # ============================================
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
@@ -30,7 +34,7 @@ ENV PYTHONUNBUFFERED=1 \
     DEPLOYMENT_MODE=minimal \
     PATH="/app:${PATH}"
 
-# Install runtime dependencies
+# Install ONLY runtime dependencies (git for repo cloning, curl for health checks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -47,10 +51,10 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 
-# Copy application code
+# Copy application code (only src/)
 COPY --chown=appuser:appuser src ./src
 
-# Copy pre-built frontend (MUST exist - run ./scripts/build-frontend.sh first)
+# Copy pre-built frontend static files
 COPY --chown=appuser:appuser frontend/dist ./static
 
 USER appuser

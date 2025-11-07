@@ -1,73 +1,52 @@
 # =============================================================================
-# Multi-stage Dockerfile for Code Graph Knowledge System
+# Dockerfile for Code Graph Knowledge System (Development/Local Use)
 # =============================================================================
 #
+# NOTE: For production deployments, use the optimized variants:
+#   - docker/Dockerfile.minimal  - Code Graph only (No LLM required)
+#   - docker/Dockerfile.standard - Code Graph + Memory Store (Embedding required)
+#   - docker/Dockerfile.full     - All features (LLM + Embedding required)
+#
+# This Dockerfile is for local development and testing.
+#
 # OPTIMIZATION STRATEGY:
-# 1. Uses uv official image - uv pre-installed, optimized base
-# 2. Uses requirements.txt - pre-compiled, no CUDA/GPU dependencies
+# 1. Uses uv official image - uv pre-installed, optimized base (~150MB)
+# 2. Uses requirements.txt - 118 dependencies (no CUDA/PyTorch)
 # 3. BuildKit cache mounts - faster rebuilds with persistent cache
-# 4. Multi-stage build - minimal final image
+# 4. Multi-stage build - minimal final image (~500-700MB total)
 # 5. Layer caching - dependencies rebuild only when requirements.txt changes
 # 6. Pre-built frontend - no Node.js/npm/bun in image, only static files
 #
-# IMAGE SIZE REDUCTION:
-# - Base image: python:3.13-slim → uv:python3.13-bookworm-slim (smaller)
-# - No build-essential needed (uv handles compilation efficiently)
-# - No Node.js/npm/bun needed (frontend pre-built outside Docker)
-# - requirements.txt: 373 dependencies, 0 NVIDIA CUDA packages
-# - Estimated size: ~1.2GB (from >5GB, -76%)
-# - Build time: ~80% faster (BuildKit cache + pre-built frontend)
+# ARCHITECTURE:
+# - Builder stage: Install Python dependencies only
+# - Final stage: Runtime with git (for repo cloning) + curl (for health checks)
 #
 # =============================================================================
 
 # ============================================
-# Builder stage
+# Builder stage - Install dependencies only
 # ============================================
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
-
-# Install minimal system dependencies (git for repo cloning, curl for health checks)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set work directory
 WORKDIR /app
 
-# Copy ONLY requirements.txt first for optimal layer caching
+# Copy requirements.txt for optimal layer caching
 COPY requirements.txt ./
 
-# Install Python dependencies using uv with BuildKit cache mount
-# This leverages uv's efficient dependency resolution and caching
+# Install Python dependencies using uv with BuildKit cache
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --no-cache -r requirements.txt
 
-# Copy application source code for local package installation
-COPY pyproject.toml README.md ./
-COPY src ./src
-COPY *.py ./
-
-# Install local package (without dependencies, already installed)
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --no-cache --no-deps -e .
-
 # ============================================
-# Final stage
+# Final stage - Runtime environment
 # ============================================
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
-# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app:${PATH}"
 
-# Install runtime dependencies (minimal)
+# Install ONLY runtime dependencies (git for repo cloning, curl for health checks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -75,38 +54,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app /data /tmp/repos && \
-    chown -R appuser:appuser /app /data /tmp/repos
+    mkdir -p /app /data /repos && \
+    chown -R appuser:appuser /app /data /repos
 
-# Set work directory
 WORKDIR /app
 
-# Copy Python packages from builder (site-packages only)
+# Copy Python packages from builder
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-
-# Copy only package entry point scripts (not build tools like uv, pip-compile, etc.)
-# Note: python binaries already exist in base image, no need to copy
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 
-# Copy application code
-COPY --chown=appuser:appuser . .
+# Copy application code (only src/)
+COPY --chown=appuser:appuser src ./src
 
 # Copy pre-built frontend (if exists)
 # Run ./scripts/build-frontend.sh before docker build to generate frontend/dist
-# If frontend/dist doesn't exist, the app will run as API-only (no web UI)
 RUN if [ -d frontend/dist ]; then \
-        mkdir -p static && \
-        cp -r frontend/dist/* static/ && \
+        cp -r frontend/dist ./static && \
         echo "✅ Frontend copied to static/"; \
     else \
         echo "⚠️  No frontend/dist found - running as API-only"; \
         echo "   Run ./scripts/build-frontend.sh to build frontend"; \
     fi
 
-# Switch to non-root user
 USER appuser
 
-# Expose ports (Two-Port Architecture)
+# Two-Port Architecture
 #
 # PORT 8000: MCP SSE Service (PRIMARY)
 #   - GET  /sse       - MCP SSE connection endpoint
@@ -118,14 +90,11 @@ USER appuser
 #   - *    /api/v1/*  - REST API endpoints
 #   - GET  /metrics   - Prometheus metrics
 #   Purpose: Status monitoring and programmatic access
-#
-# Note: stdio mode (start_mcp.py) still available for local development
 EXPOSE 8000 8080
 
-# Health check (check both services)
+# Health check on Web UI port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
-# Default command - starts both MCP and Web services (dual-port mode)
-# Alternative: python -m codebase_rag --mcp (MCP only) or --web (Web only)
+# Start application (dual-port mode)
 CMD ["python", "-m", "codebase_rag"]

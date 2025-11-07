@@ -154,7 +154,7 @@ task_processing_duration_seconds = Histogram(
 
 
 class MetricsService:
-    """Service for managing Prometheus metrics"""
+    """Service for managing Prometheus metrics."""
 
     def __init__(self):
         self.registry = registry
@@ -289,8 +289,12 @@ class MetricsService:
             self.update_neo4j_status(False)
 
 
+class MetricsCollector(MetricsService):
+    """Backward compatible alias for the previous metrics collector API."""
+
+
 # Create singleton instance
-metrics_service = MetricsService()
+metrics_service = MetricsCollector()
 
 
 def track_duration(operation: str, metric_type: str = "graph"):

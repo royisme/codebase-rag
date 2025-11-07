@@ -1,3 +1,4 @@
+
 """
 modern knowledge graph service based on Neo4j's native vector index
 uses LlamaIndex's KnowledgeGraphIndex and Neo4j's native vector search functionality
@@ -13,10 +14,8 @@ import time
 
 from llama_index.core import (
     KnowledgeGraphIndex,
-    Document,
     Settings,
     StorageContext,
-    SimpleDirectoryReader,
     VectorStoreIndex,
 )
 from llama_index.core.indices.knowledge_graph import KnowledgeGraphRAGRetriever
@@ -34,20 +33,28 @@ from llama_index.llms.openrouter import OpenRouter
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.embeddings.gemini import GeminiEmbedding
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 # Graph Store
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 
+# Tools / workflow
 from llama_index.core.tools import FunctionTool
-
 try:  # Optional dependency for advanced workflow integration
     from llama_index.core.workflow.tool_node import ToolNode
 except Exception:  # pragma: no cover - optional runtime dependency
     ToolNode = None  # type: ignore
 
 from codebase_rag.config import settings
+from codebase_rag.services.knowledge.pipeline_components import (
+    PipelineBundle,
+    build_pipeline_bundle,
+    merge_pipeline_configs,
+)
 
+
+# =========================
+# Retrieval Pipeline Config
+# =========================
 
 @dataclass
 class PipelineConfig:
@@ -95,28 +102,30 @@ class Neo4jRAGPipeline:
         nodes: List[NodeWithScore],
     ) -> None:
         """Merge retrieved nodes by keeping the highest scoring entry per node id."""
-
         for node in nodes:
-            node_id = node.node.node_id if node.node else node.node_id
+            node_id = node.node.node_id if getattr(node, "node", None) else node.node_id
             if node_id not in aggregated or (
-                aggregated[node_id].score or 0
-            ) < (node.score or 0):
+                (aggregated[node_id].score or 0) < (node.score or 0)
+            ):
                 aggregated[node_id] = node
 
     @staticmethod
     def _summarize_nodes(nodes: List[NodeWithScore]) -> List[Dict[str, Any]]:
         """Return a lightweight representation of retrieved nodes for tracing."""
-
         summaries: List[Dict[str, Any]] = []
         for node in nodes:
-            text = node.get_text() or ""
+            text = ""
+            try:
+                text = node.get_text() or ""
+            except Exception:
+                text = getattr(node, "text", "") or ""
             if len(text) > 200:
                 text = text[:200] + "..."
             summaries.append(
                 {
-                    "node_id": node.node.node_id if node.node else node.node_id,
+                    "node_id": node.node.node_id if getattr(node, "node", None) else node.node_id,
                     "score": node.score,
-                    "metadata": dict(getattr(node.node, "metadata", {})),
+                    "metadata": dict(getattr(getattr(node, "node", None), "metadata", {}) or {}),
                     "text": text,
                 }
             )
@@ -124,7 +133,6 @@ class Neo4jRAGPipeline:
 
     def run(self, question: str, config: PipelineConfig) -> Dict[str, Any]:
         """Execute the pipeline synchronously."""
-
         query_bundle = QueryBundle(query_str=question)
         aggregated_nodes: Dict[str, NodeWithScore] = {}
         pipeline_steps: List[Dict[str, Any]] = []
@@ -194,11 +202,7 @@ class Neo4jRAGPipeline:
                 except Exception as exc:  # pragma: no cover - defensive logging
                     logger.warning(f"Tool node execution failed: {exc}")
                     tool_outputs.append(
-                        {
-                            "tool": "tool_node",
-                            "error": str(exc),
-                            "is_error": True,
-                        }
+                        {"tool": "tool_node", "error": str(exc), "is_error": True}
                     )
             elif self.function_tools:
                 for tool in self.function_tools:
@@ -214,11 +218,7 @@ class Neo4jRAGPipeline:
                     except Exception as exc:  # pragma: no cover - defensive logging
                         logger.warning(f"Function tool execution failed: {exc}")
                         tool_outputs.append(
-                            {
-                                "tool": tool.metadata.name,
-                                "error": str(exc),
-                                "is_error": True,
-                            }
+                            {"tool": tool.metadata.name, "error": str(exc), "is_error": True}
                         )
 
         return {
@@ -230,6 +230,10 @@ class Neo4jRAGPipeline:
         }
 
 
+# ======================
+# Knowledge Service Main
+# ======================
+
 class Neo4jKnowledgeService:
     """knowledge graph service based on Neo4j's native vector index"""
 
@@ -240,8 +244,14 @@ class Neo4jKnowledgeService:
         self.vector_index: Optional[VectorStoreIndex] = None
         self.response_synthesizer = None
         self.query_pipeline: Optional[Neo4jRAGPipeline] = None
+
+        # tools / workflow
         self.function_tools: List[FunctionTool] = []
         self.tool_node: Optional["ToolNode"] = None
+
+        # ingestion pipelines
+        self._pipeline_bundles: Dict[str, PipelineBundle] = {}
+
         self._initialized = False
 
         # get timeout settings from config
@@ -250,6 +260,10 @@ class Neo4jKnowledgeService:
         self.large_document_timeout = settings.large_document_timeout
 
         logger.info("Neo4j Knowledge Service created")
+
+    # --------------------------
+    # LLM / Embedding factories
+    # --------------------------
 
     def _create_llm(self):
         """create LLM instance based on config"""
@@ -325,10 +339,6 @@ class Neo4jKnowledgeService:
                 model_name=settings.gemini_embedding_model,
                 api_key=settings.google_api_key,
             )
-        elif provider == "huggingface":
-            return HuggingFaceEmbedding(
-                model_name=settings.huggingface_embedding_model
-            )
         elif provider == "openrouter":
             if not settings.openrouter_api_key:
                 raise ValueError(
@@ -343,9 +353,12 @@ class Neo4jKnowledgeService:
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
 
+    # --------------
+    # Tool registry
+    # --------------
+
     def _register_tools(self) -> None:
         """Create FunctionTool/ToolNode hooks for workflow integration."""
-
         self.function_tools = []
         try:
             tool = FunctionTool.from_defaults(
@@ -354,13 +367,13 @@ class Neo4jKnowledgeService:
                 description="Run a Neo4j knowledge service query via the retrieval pipeline.",
             )
             self.function_tools.append(tool)
-        except Exception as exc:  # pragma: no cover - tool registration is best-effort
+        except Exception as exc:  # pragma: no cover - best-effort registration
             logger.warning(f"Failed to register FunctionTool: {exc}")
 
         if ToolNode is not None and self.function_tools:
             try:
                 self.tool_node = ToolNode(self.function_tools)
-            except Exception as exc:  # pragma: no cover - optional dependency
+            except Exception as exc:  # pragma: no cover - optional dep
                 logger.warning(f"Failed to initialize ToolNode: {exc}")
                 self.tool_node = None
 
@@ -368,9 +381,12 @@ class Neo4jKnowledgeService:
             self.query_pipeline.function_tools = self.function_tools
             self.query_pipeline.tool_node = self.tool_node
 
+    # -----------------------
+    # Retrieval pipeline (RAG)
+    # -----------------------
+
     def _build_pipeline(self) -> None:
         """(Re)build the retrieval pipeline and refresh tool bindings."""
-
         if self.storage_context is None:
             raise RuntimeError("Storage context is not available")
         if self.response_synthesizer is None:
@@ -387,6 +403,106 @@ class Neo4jKnowledgeService:
             vector_index=self.vector_index,
         )
         self._register_tools()
+
+    # -----------------------
+    # Ingestion pipeline (ETL)
+    # -----------------------
+
+    def _default_pipeline_configs(self) -> Dict[str, Dict[str, Any]]:
+        """Return the built-in ingestion pipeline configuration."""
+        node_parser_config = {
+            "class_path": "llama_index.core.node_parser.SimpleNodeParser",
+            "kwargs": {
+                "chunk_size": settings.chunk_size,
+                "chunk_overlap": settings.chunk_overlap,
+            },
+        }
+        metadata_transform = (
+            "codebase_rag.services.knowledge.pipeline_components.MetadataEnrichmentTransformation"
+        )
+        writer_path = (
+            "codebase_rag.services.knowledge.pipeline_components.Neo4jKnowledgeGraphWriter"
+        )
+
+        return {
+            "manual_input": {
+                "connector": {
+                    "class_path": "codebase_rag.services.knowledge.pipeline_components.ManualDocumentConnector",
+                },
+                "transformations": [
+                    dict(node_parser_config),
+                    {
+                        "class_path": metadata_transform,
+                        "kwargs": {"metadata": {"pipeline": "manual_input"}},
+                    },
+                ],
+                "writer": {"class_path": writer_path},
+            },
+            "file": {
+                "connector": {
+                    "class_path": "codebase_rag.services.knowledge.pipeline_components.SimpleFileConnector",
+                },
+                "transformations": [
+                    dict(node_parser_config),
+                    {
+                        "class_path": metadata_transform,
+                        "kwargs": {"metadata": {"pipeline": "file"}},
+                    },
+                ],
+                "writer": {"class_path": writer_path},
+            },
+            "directory": {
+                "connector": {
+                    "class_path": "codebase_rag.services.knowledge.pipeline_components.SimpleDirectoryConnector",
+                    "kwargs": {
+                        "recursive": True,
+                        "file_extensions": [
+                            ".txt",
+                            ".md",
+                            ".py",
+                            ".js",
+                            ".ts",
+                            ".sql",
+                            ".json",
+                            ".yaml",
+                            ".yml",
+                        ],
+                    },
+                },
+                "transformations": [
+                    dict(node_parser_config),
+                    {
+                        "class_path": metadata_transform,
+                        "kwargs": {"metadata": {"pipeline": "directory"}},
+                    },
+                ],
+                "writer": {"class_path": writer_path},
+            },
+        }
+
+    def _setup_ingestion_pipelines(self) -> None:
+        """Build ingestion pipelines from defaults and user configuration."""
+        default_config = self._default_pipeline_configs()
+        merged_config = merge_pipeline_configs(default_config, settings.ingestion_pipelines)
+
+        bundles: Dict[str, PipelineBundle] = {}
+        for name, config in merged_config.items():
+            try:
+                bundles[name] = build_pipeline_bundle(
+                    name,
+                    knowledge_index=self.knowledge_index,
+                    graph_store=self.graph_store,
+                    configuration=config,
+                )
+                logger.debug(f"Built ingestion pipeline '{name}'")
+            except Exception as exc:
+                logger.error(f"Failed to build ingestion pipeline '{name}': {exc}")
+
+        self._pipeline_bundles = bundles
+
+    # -----------
+    # Initialize
+    # -----------
 
     async def initialize(self) -> bool:
         """initialize service"""
@@ -434,9 +550,7 @@ class Neo4jKnowledgeService:
                 )
                 logger.info("Loaded existing knowledge graph index")
             except asyncio.TimeoutError:
-                logger.warning(
-                    "Loading existing index timed out, creating new index"
-                )
+                logger.warning("Loading existing index timed out, creating new index")
                 self.knowledge_index = KnowledgeGraphIndex(
                     nodes=[],
                     storage_context=self.storage_context,
@@ -462,16 +576,22 @@ class Neo4jKnowledgeService:
                 llm=Settings.llm,
             )
 
-            # Construct the retrieval pipeline
+            # Build both query pipeline (RAG) and ingestion pipelines (ETL)
             self._build_pipeline()
+            self._setup_ingestion_pipelines()
 
             self._initialized = True
             logger.success("Neo4j Knowledge Service initialized successfully")
             return True
 
+            # End try
         except Exception as e:
             logger.error(f"Failed to initialize Neo4j Knowledge Service: {e}")
             return False
+
+    # -----------------
+    # Querying (RAG)
+    # -----------------
 
     def _resolve_pipeline_config(
         self,
@@ -485,23 +605,12 @@ class Neo4jKnowledgeService:
         tool_kwargs: Optional[Dict[str, Any]] = None,
     ) -> PipelineConfig:
         """Translate user configuration into a pipeline configuration."""
-
         mode = (mode or "hybrid").lower()
-        run_graph = use_graph if use_graph is not None else mode in (
-            "hybrid",
-            "graph_only",
-            "graph_first",
-        )
-        run_vector = use_vector if use_vector is not None else mode in (
-            "hybrid",
-            "vector_only",
-            "vector_first",
-        )
+        run_graph = use_graph if use_graph is not None else mode in ("hybrid", "graph_only", "graph_first")
+        run_vector = use_vector if use_vector is not None else mode in ("hybrid", "vector_only", "vector_first")
 
         if not run_graph and not run_vector:
-            raise ValueError(
-                "At least one of graph or vector retrieval must be enabled"
-            )
+            raise ValueError("At least one of graph or vector retrieval must be enabled")
 
         config = PipelineConfig()
         config.run_graph = run_graph
@@ -512,19 +621,20 @@ class Neo4jKnowledgeService:
         config.tool_kwargs = tool_kwargs or {}
         return config
 
-    def _format_source_nodes(
-        self, nodes: List[NodeWithScore]
-    ) -> List[Dict[str, Any]]:
+    def _format_source_nodes(self, nodes: List[NodeWithScore]) -> List[Dict[str, Any]]:
         formatted: List[Dict[str, Any]] = []
         for node in nodes:
-            text = node.get_text() or ""
+            try:
+                text = node.get_text() or ""
+            except Exception:
+                text = getattr(node, "text", "") or ""
             if len(text) > 200:
                 text = text[:200] + "..."
             formatted.append(
                 {
-                    "node_id": node.node.node_id if node.node else node.node_id,
+                    "node_id": node.node.node_id if getattr(node, "node", None) else node.node_id,
                     "text": text,
-                    "metadata": dict(getattr(node.node, "metadata", {})),
+                    "metadata": dict(getattr(getattr(node, "node", None), "metadata", {}) or {}),
                     "score": node.score,
                 }
             )
@@ -538,7 +648,6 @@ class Neo4jKnowledgeService:
         graph_depth: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Synchronous query helper exposed to FunctionTool."""
-
         if self.query_pipeline is None:
             raise RuntimeError("Query pipeline is not initialized")
 
@@ -607,10 +716,7 @@ class Neo4jKnowledgeService:
             }
         except Exception as e:
             logger.error(f"Failed to query: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+            return {"success": False, "error": str(e)}
 
         response = pipeline_result["response"]
         source_nodes = self._format_source_nodes(pipeline_result["source_nodes"])
@@ -621,9 +727,7 @@ class Neo4jKnowledgeService:
             "success": True,
             "answer": str(response),
             "source_nodes": source_nodes,
-            "retrieved_nodes": self._format_source_nodes(
-                pipeline_result["retrieved_nodes"]
-            ),
+            "retrieved_nodes": self._format_source_nodes(pipeline_result["retrieved_nodes"]),
             "pipeline_steps": pipeline_result["steps"],
             "tool_outputs": pipeline_result["tool_outputs"],
             "query_mode": mode,
@@ -636,6 +740,70 @@ class Neo4jKnowledgeService:
             },
         }
 
+    # -----------------
+    # Ingestion helpers
+    # -----------------
+
+    async def _run_ingestion_pipeline(
+        self,
+        pipeline_name: str,
+        *,
+        connector_overrides: Dict[str, Any],
+        timeout: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        if pipeline_name not in self._pipeline_bundles:
+            available_pipelines = ", ".join(self._pipeline_bundles.keys())
+            raise ValueError(
+                f"Pipeline '{pipeline_name}' is not configured. Available pipelines: {available_pipelines}"
+            )
+        bundle = self._pipeline_bundles[pipeline_name]
+        connector = bundle.instantiate_connector(**connector_overrides)
+
+        documents = await connector.aload_data()
+        documents = list(documents)
+        if not documents:
+            return {
+                "success": False,
+                "error": f"Pipeline '{pipeline_name}' produced no documents",
+            }
+
+        timeout = timeout or self.operation_timeout
+        total_chars = sum(len(doc.text) for doc in documents)
+        logger.info(
+            f"Running pipeline '{pipeline_name}' with {len(documents)} documents (total chars: {total_chars})"
+        )
+
+        def _process_pipeline() -> Dict[str, Any]:
+            nodes = bundle.pipeline.run(show_progress=False, documents=documents)
+            bundle.writer.write(nodes)
+            return {
+                "nodes_count": len(nodes),
+                "documents_count": len(documents),
+            }
+
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(_process_pipeline),
+                timeout=timeout,
+            )
+            logger.info(
+                f"Pipeline '{pipeline_name}' completed with {result['nodes_count']} nodes"
+            )
+            return {
+                "success": True,
+                "pipeline": pipeline_name,
+                "documents_count": result["documents_count"],
+                "nodes_count": result["nodes_count"],
+                "total_chars": total_chars,
+            }
+        except asyncio.TimeoutError:
+            error_msg = f"Pipeline '{pipeline_name}' execution timed out after {timeout}s"
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg, "timeout": timeout}
+        except Exception as exc:
+            logger.error(f"Pipeline '{pipeline_name}' failed: {exc}")
+            return {"success": False, "error": str(exc)}
+
     async def add_document(
         self,
         content: str,
@@ -646,126 +814,52 @@ class Neo4jKnowledgeService:
         if not self._initialized:
             raise Exception("Service not initialized")
 
-        try:
-            # create document
-            doc = Document(
-                text=content,
-                metadata={
-                    "title": title or "Untitled",
-                    "source": "manual_input",
-                    "timestamp": time.time(),
-                    **(metadata or {}),
-                },
-            )
+        metadata = metadata or {}
+        metadata.setdefault("title", title or metadata.get("title", "Untitled"))
+        metadata.setdefault("source", metadata.get("source", "manual_input"))
+        metadata.setdefault("timestamp", metadata.get("timestamp", time.time()))
 
-            # select timeout based on document size
-            content_size = len(content)
-            timeout = (
-                self.operation_timeout
-                if content_size < 10000
-                else self.large_document_timeout
-            )
+        content_size = len(content)
+        timeout = (
+            self.operation_timeout if content_size < 10000 else self.large_document_timeout
+        )
 
-            logger.info(
-                f"Adding document '{title}' (size: {content_size} chars, timeout: {timeout}s)"
-            )
+        result = await self._run_ingestion_pipeline(
+            "manual_input",
+            connector_overrides={
+                "content": content,
+                "title": title,
+                "metadata": metadata,
+            },
+            timeout=timeout,
+        )
 
-            # use async timeout control for insert operation
-            await asyncio.wait_for(
-                asyncio.to_thread(self.knowledge_index.insert, doc),
-                timeout=timeout,
-            )
-
-            logger.info(f"Successfully added document: {title}")
-
-            return {
-                "success": True,
-                "message": f"Document '{title}' added to knowledge graph",
-                "document_id": doc.doc_id,
+        if result.get("success"):
+            result.update({
+                "message": f"Document '{metadata['title']}' added to knowledge graph",
                 "content_size": content_size,
-            }
-
-        except asyncio.TimeoutError:
-            error_msg = f"Document insertion timed out after {timeout}s"
-            logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "timeout": timeout,
-            }
-        except Exception as e:
-            logger.error(f"Failed to add document: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+            })
+        return result
 
     async def add_file(self, file_path: str) -> Dict[str, Any]:
         """add file to knowledge graph"""
         if not self._initialized:
             raise Exception("Service not initialized")
 
-        try:
-            # read file
-            documents = await asyncio.to_thread(
-                lambda: SimpleDirectoryReader(input_files=[file_path]).load_data()
+        absolute_path = str(Path(file_path).expanduser())
+        result = await self._run_ingestion_pipeline(
+            "file",
+            connector_overrides={"file_path": absolute_path},
+        )
+
+        if result.get("success"):
+            result.setdefault(
+                "message",
+                f"File '{absolute_path}' processed with {result.get('nodes_count', 0)} nodes",
             )
-
-            if not documents:
-                return {
-                    "success": False,
-                    "error": "No documents loaded from file",
-                }
-
-            # batch insert, handle timeout for each document
-            success_count = 0
-            errors = []
-
-            for i, doc in enumerate(documents):
-                try:
-                    content_size = len(doc.text)
-                    timeout = (
-                        self.operation_timeout
-                        if content_size < 10000
-                        else self.large_document_timeout
-                    )
-
-                    await asyncio.wait_for(
-                        asyncio.to_thread(self.knowledge_index.insert, doc),
-                        timeout=timeout,
-                    )
-                    success_count += 1
-                    logger.debug(
-                        f"Added document {i+1}/{len(documents)} from {file_path}"
-                    )
-
-                except asyncio.TimeoutError:
-                    error_msg = f"Document {i+1} timed out"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-                except Exception as e:
-                    error_msg = f"Document {i+1} failed: {str(e)}"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-
-            logger.info(
-                f"Added {success_count}/{len(documents)} documents from {file_path}"
-            )
-
-            return {
-                "success": success_count > 0,
-                "message": f"Added {success_count}/{len(documents)} documents from {file_path}",
-                "documents_count": len(documents),
-                "success_count": success_count,
-                "errors": errors,
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to add file {file_path}: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+        else:
+            result.setdefault("error", f"Failed to process file '{absolute_path}'")
+        return result
 
     async def add_directory(
         self,
@@ -777,95 +871,31 @@ class Neo4jKnowledgeService:
         if not self._initialized:
             raise Exception("Service not initialized")
 
-        try:
-            # set file extension filter
-            if file_extensions is None:
-                file_extensions = [
-                    ".txt",
-                    ".md",
-                    ".py",
-                    ".js",
-                    ".ts",
-                    ".sql",
-                    ".json",
-                    ".yaml",
-                    ".yml",
-                ]
+        absolute_path = str(Path(directory_path).expanduser())
+        overrides: Dict[str, Any] = {
+            "directory_path": absolute_path,
+            "recursive": recursive,
+        }
+        if file_extensions is not None:
+            overrides["file_extensions"] = file_extensions
 
-            # read directory
-            reader = SimpleDirectoryReader(
-                input_dir=directory_path,
-                recursive=recursive,
-                file_extractor={ext: None for ext in file_extensions},
+        result = await self._run_ingestion_pipeline(
+            "directory",
+            connector_overrides=overrides,
+        )
+
+        if result.get("success"):
+            result.setdefault(
+                "message",
+                f"Directory '{absolute_path}' processed with {result.get('documents_count', 0)} documents",
             )
+        else:
+            result.setdefault("error", f"Failed to process directory '{absolute_path}'")
+        return result
 
-            documents = await asyncio.to_thread(reader.load_data)
-
-            if not documents:
-                return {
-                    "success": False,
-                    "error": "No documents found in directory",
-                }
-
-            # batch insert, handle timeout for each document
-            success_count = 0
-            errors = []
-
-            logger.info(
-                f"Processing {len(documents)} documents from {directory_path}"
-            )
-
-            for i, doc in enumerate(documents):
-                try:
-                    content_size = len(doc.text)
-                    timeout = (
-                        self.operation_timeout
-                        if content_size < 10000
-                        else self.large_document_timeout
-                    )
-
-                    await asyncio.wait_for(
-                        asyncio.to_thread(self.knowledge_index.insert, doc),
-                        timeout=timeout,
-                    )
-                    success_count += 1
-
-                    if i % 10 == 0:  # record progress every 10 documents
-                        logger.info(
-                            f"Progress: {i+1}/{len(documents)} documents processed"
-                        )
-
-                except asyncio.TimeoutError:
-                    error_msg = (
-                        f"Document {i+1} ({doc.metadata.get('file_name', 'unknown')}) timed out"
-                    )
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-                except Exception as e:
-                    error_msg = (
-                        f"Document {i+1} ({doc.metadata.get('file_name', 'unknown')}) failed: {str(e)}"
-                    )
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-
-            logger.info(
-                f"Successfully added {success_count}/{len(documents)} documents from {directory_path}"
-            )
-
-            return {
-                "success": success_count > 0,
-                "message": f"Added {success_count}/{len(documents)} documents from {directory_path}",
-                "documents_count": len(documents),
-                "success_count": success_count,
-                "errors": errors,
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to add directory {directory_path}: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+    # -----------------
+    # Introspection / Ops
+    # -----------------
 
     async def get_graph_schema(self) -> Dict[str, Any]:
         """get graph schema information"""
@@ -879,26 +909,15 @@ class Neo4jKnowledgeService:
                 timeout=self.connection_timeout,
             )
 
-            return {
-                "success": True,
-                "schema": schema_info,
-            }
+            return {"success": True, "schema": schema_info}
 
         except asyncio.TimeoutError:
-            error_msg = (
-                f"Schema retrieval timed out after {self.connection_timeout}s"
-            )
+            error_msg = f"Schema retrieval timed out after {self.connection_timeout}s"
             logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-            }
+            return {"success": False, "error": error_msg}
         except Exception as e:
             logger.error(f"Failed to get graph schema: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+            return {"success": False, "error": str(e)}
 
     async def search_similar_nodes(
         self,
@@ -923,59 +942,44 @@ class Neo4jKnowledgeService:
 
             results = []
             for node in nodes:
-                text = node.get_text() if hasattr(node, "get_text") else node.text
+                try:
+                    text = node.get_text() if hasattr(node, "get_text") else node.text
+                except Exception:
+                    text = getattr(node, "text", "")
                 if text and len(text) > 200:
                     text = text[:200] + "..."
                 results.append(
                     {
-                        "node_id": node.node.node_id if node.node else node.node_id,
+                        "node_id": node.node.node_id if getattr(node, "node", None) else node.node_id,
                         "text": text,
-                        "metadata": dict(getattr(node.node, "metadata", {})),
+                        "metadata": dict(getattr(getattr(node, "node", None), "metadata", {}) or {}),
                         "score": node.score,
                     }
                 )
 
-            return {
-                "success": True,
-                "results": results,
-                "query": query,
-            }
+            return {"success": True, "results": results, "query": query}
 
         except asyncio.TimeoutError:
             error_msg = f"Search timed out after {self.operation_timeout}s"
             logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "timeout": self.operation_timeout,
-            }
+            return {"success": False, "error": error_msg, "timeout": self.operation_timeout}
         except Exception as e:
             logger.error(f"Failed to search similar nodes: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+            return {"success": False, "error": str(e)}
 
     async def get_statistics(self) -> Dict[str, Any]:
         """Return lightweight service statistics for legacy API compatibility."""
-
         if not self._initialized:
             raise Exception("Service not initialized")
 
         def _collect_statistics() -> Dict[str, Any]:
             base_stats: Dict[str, Any] = {
                 "initialized": self._initialized,
-                "graph_store_type": type(self.graph_store).__name__
-                if self.graph_store
-                else None,
-                "vector_index_type": type(self.vector_index).__name__
-                if self.vector_index
-                else None,
+                "graph_store_type": type(self.graph_store).__name__ if self.graph_store else None,
+                "vector_index_type": type(self.vector_index).__name__ if self.vector_index else None,
                 "pipeline": {
                     "default_top_k": getattr(self.query_pipeline, "default_top_k", None),
-                    "default_graph_depth": getattr(
-                        self.query_pipeline, "default_graph_depth", None
-                    ),
+                    "default_graph_depth": getattr(self.query_pipeline, "default_graph_depth", None),
                     "supports_tools": bool(self.function_tools),
                 },
             }
@@ -984,24 +988,14 @@ class Neo4jKnowledgeService:
                 return base_stats
 
             try:
-                node_result = self.graph_store.query(
-                    "MATCH (n) RETURN count(n) AS node_count"
-                )
-                base_stats["node_count"] = (
-                    node_result[0].get("node_count", 0) if node_result else 0
-                )
+                node_result = self.graph_store.query("MATCH (n) RETURN count(n) AS node_count")
+                base_stats["node_count"] = node_result[0].get("node_count", 0) if node_result else 0
             except Exception as exc:
                 base_stats["node_count_error"] = str(exc)
 
             try:
-                rel_result = self.graph_store.query(
-                    "MATCH ()-[r]->() RETURN count(r) AS relationship_count"
-                )
-                base_stats["relationship_count"] = (
-                    rel_result[0].get("relationship_count", 0)
-                    if rel_result
-                    else 0
-                )
+                rel_result = self.graph_store.query("MATCH ()-[r]->() RETURN count(r) AS relationship_count")
+                base_stats["relationship_count"] = rel_result[0].get("relationship_count", 0) if rel_result else 0
             except Exception as exc:
                 base_stats["relationship_count_error"] = str(exc)
 
@@ -1016,18 +1010,13 @@ class Neo4jKnowledgeService:
         except asyncio.TimeoutError:
             error_msg = f"Statistics retrieval timed out after {self.operation_timeout}s"
             logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "timeout": self.operation_timeout,
-            }
+            return {"success": False, "error": error_msg, "timeout": self.operation_timeout}
         except Exception as exc:
             logger.error(f"Failed to collect statistics: {exc}")
             return {"success": False, "error": str(exc)}
 
     async def clear_knowledge_base(self) -> Dict[str, Any]:
         """Clear Neo4j data and rebuild service indices for legacy API compatibility."""
-
         if not self._initialized:
             raise Exception("Service not initialized")
 
@@ -1049,22 +1038,15 @@ class Neo4jKnowledgeService:
                         except TypeError:
                             delete_method()
                         except Exception as exc:  # pragma: no cover - defensive logging
-                            logger.warning(
-                                f"Vector store clear failed: {exc}"
-                            )
+                            logger.warning(f"Vector store clear failed: {exc}")
 
             await asyncio.to_thread(_clear_sync)
 
         try:
-            await asyncio.wait_for(
-                _clear_graph(),
-                timeout=self.operation_timeout,
-            )
+            await asyncio.wait_for(_clear_graph(), timeout=self.operation_timeout)
 
             # Recreate storage context and indexes to reflect cleared state
-            self.storage_context = StorageContext.from_defaults(
-                graph_store=self.graph_store
-            )
+            self.storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
             self.knowledge_index = KnowledgeGraphIndex(
                 nodes=[],
                 storage_context=self.storage_context,
@@ -1074,21 +1056,17 @@ class Neo4jKnowledgeService:
                 self.storage_context.vector_store,
                 embed_model=Settings.embed_model,
             )
+
+            # Rebuild both pipelines
             self._build_pipeline()
+            self._setup_ingestion_pipelines()
 
             logger.info("Knowledge base cleared successfully")
-            return {
-                "success": True,
-                "message": "Knowledge base cleared successfully",
-            }
+            return {"success": True, "message": "Knowledge base cleared successfully"}
         except asyncio.TimeoutError:
             error_msg = f"Clear operation timed out after {self.operation_timeout}s"
             logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "timeout": self.operation_timeout,
-            }
+            return {"success": False, "error": error_msg, "timeout": self.operation_timeout}
         except Exception as exc:
             logger.error(f"Failed to clear knowledge base: {exc}")
             return {"success": False, "error": str(exc)}
@@ -1112,26 +1090,15 @@ class Neo4jKnowledgeService:
                 timeout=self.operation_timeout,
             )
 
-            return {
-                "success": True,
-                "result": result,
-                "query": query,
-            }
+            return {"success": True, "result": result, "query": query}
 
         except asyncio.TimeoutError:
             error_msg = f"Cypher execution timed out after {self.operation_timeout}s"
             logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "timeout": self.operation_timeout,
-            }
+            return {"success": False, "error": error_msg, "timeout": self.operation_timeout}
         except Exception as e:
             logger.error(f"Failed to execute cypher query: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+            return {"success": False, "error": str(e)}
 
     async def export_graph(self, output_path: Union[str, Path]) -> Dict[str, Any]:
         """export knowledge graph to file"""
@@ -1145,26 +1112,15 @@ class Neo4jKnowledgeService:
                 timeout=self.operation_timeout,
             )
 
-            return {
-                "success": True,
-                "output_path": str(output_path),
-                "result": export_result,
-            }
+            return {"success": True, "output_path": str(output_path), "result": export_result}
 
         except asyncio.TimeoutError:
             error_msg = f"Graph export timed out after {self.operation_timeout}s"
             logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "timeout": self.operation_timeout,
-            }
+            return {"success": False, "error": error_msg, "timeout": self.operation_timeout}
         except Exception as e:
             logger.error(f"Failed to export graph: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+            return {"success": False, "error": str(e)}
 
     async def close(self) -> None:
         """close service"""
@@ -1172,3 +1128,4 @@ class Neo4jKnowledgeService:
             await asyncio.to_thread(self.graph_store.close)
         self._initialized = False
         logger.info("Neo4j Knowledge Service closed")
+

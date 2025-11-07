@@ -48,7 +48,7 @@ ENABLE_KNOWLEDGE_RAG=false
 ENABLE_AUTO_EXTRACTION=false
 
 # Embedding Provider (choose one)
-EMBEDDING_PROVIDER=ollama  # or openai, gemini, huggingface
+EMBEDDING_PROVIDER=ollama  # or openai, gemini, openrouter
 
 # Ollama Configuration (if using Ollama)
 OLLAMA_BASE_URL=http://host.docker.internal:11434
@@ -166,14 +166,6 @@ OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 OPENAI_API_BASE=https://openrouter.ai/api/v1
 ```
 
-### HuggingFace (Local Embeddings)
-
-Free local embeddings without API:
-
-```bash
-EMBEDDING_PROVIDER=huggingface
-HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-```
 
 ## Advanced Configuration
 
@@ -191,6 +183,44 @@ OPERATION_TIMEOUT=300
 # Large document processing timeout (seconds)
 LARGE_DOCUMENT_TIMEOUT=600
 ```
+
+### Ingestion Pipelines
+
+Document ingestion now uses [LlamaIndex ingestion pipelines](https://docs.llamaindex.ai/) with pluggable connectors, transformations, and writers. The service ships with three pipelines (`manual_input`, `file`, `directory`), and you can override or extend them from configuration by providing a JSON-style mapping in your `.env` file:
+
+```bash
+INGESTION_PIPELINES='{
+  "file": {
+    "transformations": [
+      {
+        "class_path": "llama_index.core.node_parser.SimpleNodeParser",
+        "kwargs": {"chunk_size": 256, "chunk_overlap": 20}
+      },
+      {
+        "class_path": "codebase_rag.services.knowledge.pipeline_components.MetadataEnrichmentTransformation",
+        "kwargs": {"metadata": {"language": "python"}}
+      }
+    ]
+  },
+  "git": {
+    "connector": {
+      "class_path": "my_project.pipeline.GitRepositoryConnector",
+      "kwargs": {"branch": "main"}
+    },
+    "transformations": [
+      {
+        "class_path": "my_project.pipeline.CodeBlockParser",
+        "kwargs": {"max_tokens": 400}
+      }
+    ],
+    "writer": {
+      "class_path": "codebase_rag.services.knowledge.pipeline_components.Neo4jKnowledgeGraphWriter"
+    }
+  }
+}'
+```
+
+Each entry is merged with the defaults. This means you can change chunking behaviour, add metadata enrichment steps, or register new data sources by publishing your own connector class. At runtime the knowledge service builds and reuses the configured pipeline instances so changes only require a service restart.
 
 ### Neo4j Performance Tuning
 

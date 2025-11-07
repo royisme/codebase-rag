@@ -1,7 +1,7 @@
 [project]
 name = "code-graph"
 version = "0.8.0"
-description = "AI-powered code intelligence and knowledge management system with graph database"
+description = "Enterprise knowledge management platform with Neo4j graph database, multi-interface architecture (MCP/Web/REST), and intelligent code analysis"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -29,15 +29,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-milvus = [
-    "pymilvus",
-    "llama-index-vector-stores-milvus",
-]
 openrouter = [
     "llama-index-llms-openrouter",
-]
-huggingface = [
-    "llama-index-embeddings-huggingface",
 ]
 dev = [
     "bump-my-version>=0.26.0",

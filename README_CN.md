@@ -29,6 +29,12 @@
 - **灵活的嵌入模型**：支持 HuggingFace 和 Ollama 嵌入模型
 - **模块化设计**：清晰的关注点分离和可插拔组件
 
+## 📚 文档
+
+详细的文档、指南和 API 参考，请访问我们的官方文档站点：
+
+**[📖 完整文档](https://vantagecraft.dev/docs/code-graph)**
+
 ## 项目路线图
 
 ### 第二阶段：结构化数据与图谱增强（SQL 与图感知）
@@ -66,7 +72,7 @@
 
 1. **克隆仓库**
    ```bash
-   git clone https://github.com/yourusername/code-graph.git
+   git clone https://github.com/royisme/codebase-rag.git
    cd code-graph
    ```
 
@@ -305,10 +311,10 @@ ruff check .
 
 ## 支持
 
-- 文档：[GitHub Wiki](https://github.com/yourusername/code-graph/wiki)
-- Neo4j 技术指南：[README_Neo4j.md](README_Neo4j.md)
-- 问题：[GitHub Issues](https://github.com/yourusername/code-graph/issues)
-- 讨论：[GitHub Discussions](https://github.com/yourusername/code-graph/discussions)
+- 📚 **文档**: [完整文档](https://vantagecraft.dev/docs/code-graph)
+- 📖 **Neo4j 指南**: [README_Neo4j.md](README_Neo4j.md)
+- 🐛 **问题**: [GitHub Issues](https://github.com/royisme/codebase-rag/issues)
+- 💬 **讨论**: [GitHub Discussions](https://github.com/royisme/codebase-rag/discussions)
 
 ## 致谢
 

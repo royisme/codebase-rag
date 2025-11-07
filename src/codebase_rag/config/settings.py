@@ -7,7 +7,7 @@ Settings can be configured via environment variables or .env file.
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any
 
 
 class Settings(BaseSettings):
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     openrouter_max_tokens: int = Field(default=2048, description="OpenRouter max tokens for completion", alias="OPENROUTER_MAX_TOKENS")
 
     # Embedding Provider Configuration
-    embedding_provider: Literal["ollama", "openai", "gemini", "huggingface", "openrouter"] = Field(
+    embedding_provider: Literal["ollama", "openai", "gemini", "openrouter"] = Field(
         default="ollama",
         description="Embedding provider to use",
         alias="EMBEDDING_PROVIDER"
@@ -75,9 +75,6 @@ class Settings(BaseSettings):
 
     # Gemini Embedding
     gemini_embedding_model: str = Field(default="models/embedding-001", description="Gemini embedding model", alias="GEMINI_EMBEDDING_MODEL")
-
-    # HuggingFace Embedding
-    huggingface_embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", description="HuggingFace embedding model", alias="HF_EMBEDDING_MODEL")
 
     # OpenRouter Embedding
     openrouter_embedding_model: str = Field(default="text-embedding-ada-002", description="OpenRouter embedding model", alias="OPENROUTER_EMBEDDING_MODEL")
@@ -99,6 +96,10 @@ class Settings(BaseSettings):
     # Document Processing Settings
     max_document_size: int = Field(default=10 * 1024 * 1024, description="Maximum document size in bytes (10MB)")
     max_payload_size: int = Field(default=50 * 1024 * 1024, description="Maximum task payload size for storage (50MB)")
+    ingestion_pipelines: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Optional ingestion pipeline overrides",
+    )
 
     # API Settings
     cors_origins: list = Field(default=["*"], description="CORS allowed origins")

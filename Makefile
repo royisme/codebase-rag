@@ -4,7 +4,8 @@
 .PHONY: help docker-minimal docker-standard docker-full docker-full-with-ollama \
         docker-build-minimal docker-build-standard docker-build-full docker-build-all \
         docker-push docker-pull docker-clean docker-logs docker-stop \
-        dev-minimal dev-standard dev-full docs-serve docs-build docs-deploy
+        dev-minimal dev-standard dev-full docs-serve docs-build docs-deploy \
+        freeze-deps
 
 # Docker Hub username
 DOCKER_USER ?= royisme
@@ -37,6 +38,7 @@ help:
 	@echo "  make dev-minimal             - Start minimal in dev mode (mounted code)"
 	@echo "  make dev-standard            - Start standard in dev mode"
 	@echo "  make dev-full                - Start full in dev mode"
+	@echo "  make freeze-deps             - Freeze dependencies (update requirements.txt)"
 	@echo ""
 	@echo "Documentation:"
 	@echo "  make docs-serve              - Serve documentation locally"
@@ -242,6 +244,22 @@ docs-deploy:
 	@echo ""
 	@echo "   Or use GitHub Pages:"
 	@echo "   - mkdocs gh-deploy"
+
+# ============================================
+# Dependency Management
+# ============================================
+
+freeze-deps:
+	@echo "🔒 Freezing dependencies from pyproject.toml..."
+	@if command -v uv &> /dev/null; then \
+		uv pip compile pyproject.toml -o requirements.txt; \
+		echo "✅ requirements.txt updated with uv"; \
+	else \
+		echo "❌ uv not found. Installing uv..."; \
+		pip install uv; \
+		uv pip compile pyproject.toml -o requirements.txt; \
+		echo "✅ requirements.txt updated with uv"; \
+	fi
 
 # ============================================
 # Utility Commands
