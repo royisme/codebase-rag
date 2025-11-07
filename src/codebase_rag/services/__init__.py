@@ -10,20 +10,15 @@ This module provides all business logic services organized into logical subpacka
 - utils: Utility functions (git, ranking, metrics)
 - pipeline: Data processing pipeline
 - graph: Graph schema and utilities
+
+Note: Subpackages are not eagerly imported to avoid triggering heavy dependencies.
+Import specific services from their subpackages as needed:
+    from src.codebase_rag.services.code import Neo4jGraphService
+    from src.codebase_rag.services.knowledge import Neo4jKnowledgeService
+    from src.codebase_rag.services.memory import MemoryStore
 """
 
-# Import subpackages
-from src.codebase_rag.services import (
-    knowledge,
-    memory,
-    code,
-    sql,
-    tasks,
-    utils,
-    pipeline,
-    graph,
-)
-
+# Declare subpackages without eager importing to avoid dependency issues
 __all__ = [
     "knowledge",
     "memory",

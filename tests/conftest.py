@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, Mock
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi.testclient import TestClient
-from src.codebase_rag.services.graph import Neo4jGraphService
+from src.codebase_rag.services.code import Neo4jGraphService
 
 
 @pytest.fixture(scope="session")
