@@ -11,8 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 
-from codebase_rag.services.memory_store import memory_store
-from codebase_rag.services.memory_extractor import memory_extractor
+from codebase_rag.services.memory import memory_store, memory_extractor
 from loguru import logger
 
 

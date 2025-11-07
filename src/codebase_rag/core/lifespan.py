@@ -6,10 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from loguru import logger
 
-from codebase_rag.services.neo4j_knowledge_service import neo4j_knowledge_service
-from codebase_rag.services.task_queue import task_queue
-from codebase_rag.services.task_processors import processor_registry
-from codebase_rag.services.memory_store import memory_store
+from codebase_rag.services.knowledge import neo4j_knowledge_service
+from codebase_rag.services.tasks import task_queue, processor_registry
+from codebase_rag.services.memory import memory_store
 
 
 @asynccontextmanager

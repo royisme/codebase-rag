@@ -5,16 +5,11 @@ from pydantic import BaseModel
 import uuid
 from datetime import datetime
 
-from codebase_rag.services.sql_parser import sql_analyzer
-from codebase_rag.services.graph_service import graph_service
-from codebase_rag.services.neo4j_knowledge_service import Neo4jKnowledgeService
-from codebase_rag.services.universal_sql_schema_parser import parse_sql_schema_smart
-from codebase_rag.services.task_queue import task_queue
-from codebase_rag.services.code_ingestor import get_code_ingestor
-from codebase_rag.services.git_utils import git_utils
-from codebase_rag.services.ranker import ranker
-from codebase_rag.services.pack_builder import pack_builder
-from codebase_rag.services.metrics import metrics_service
+from codebase_rag.services.sql import sql_analyzer, parse_sql_schema_smart
+from codebase_rag.services.code import graph_service, get_code_ingestor, pack_builder
+from codebase_rag.services.knowledge import Neo4jKnowledgeService
+from codebase_rag.services.tasks import task_queue
+from codebase_rag.services.utils import git_utils, ranker, metrics_service
 from codebase_rag.config import settings
 from loguru import logger
 
