@@ -157,7 +157,9 @@ response = httpx.post("http://localhost:8000/api/v1/documents/directory", json={
 # Query the knowledge base
 response = httpx.post("http://localhost:8000/api/v1/knowledge/query", json={
     "question": "How does the authentication system work?",
-    "mode": "hybrid"  # or "graph_only", "vector_only"
+    "mode": "hybrid",  # or "graph_only", "vector_only"
+    "use_tools": False,
+    "top_k": 5
 })
 
 # Search similar documents

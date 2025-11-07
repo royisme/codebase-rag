@@ -135,16 +135,26 @@ Query the knowledge base using GraphRAG.
 ```json
 {
   "question": "How does authentication work in this system?",
-  "mode": "hybrid"
+  "mode": "hybrid",
+  "use_graph": true,
+  "use_vector": true,
+  "use_tools": false,
+  "top_k": 5,
+  "graph_depth": 2
 }
 ```
 
 **Parameters**:
 - `question` (string, required): Question to ask
 - `mode` (string, optional): Query mode
-  - `hybrid` (default): Graph traversal + vector search
-  - `graph_only`: Only graph relationships
-  - `vector_only`: Only vector similarity
+  - `hybrid` (default): Run graph + vector retrieval sequentially
+  - `graph_only`: Only run graph retrieval
+  - `vector_only`: Only run vector retrieval
+- `use_graph` / `use_vector` (boolean, optional): Override mode defaults
+- `use_tools` (boolean, optional): Execute registered workflow tools (default: `false`)
+- `top_k` (integer, optional): Override vector retrieval `top_k` (default: global setting)
+- `graph_depth` (integer, optional): Override graph traversal depth (default: `2`)
+- `tool_kwargs` (object, optional): Extra parameters passed to workflow tools
 
 **Response**:
 ```json
@@ -153,6 +163,7 @@ Query the knowledge base using GraphRAG.
   "answer": "The system uses JWT-based authentication...",
   "source_nodes": [
     {
+      "node_id": "node-123",
       "text": "JWT implementation details...",
       "score": 0.92,
       "metadata": {
@@ -161,7 +172,33 @@ Query the knowledge base using GraphRAG.
       }
     }
   ],
-  "mode": "hybrid"
+  "retrieved_nodes": [...],
+  "pipeline_steps": [
+    {
+      "step": "graph_retrieval",
+      "node_count": 3,
+      "config": {
+        "graph_traversal_depth": 2,
+        "max_knowledge_sequence": 30
+      }
+    },
+    {
+      "step": "vector_retrieval",
+      "node_count": 5,
+      "config": {
+        "top_k": 5
+      }
+    }
+  ],
+  "tool_outputs": [],
+  "query_mode": "hybrid",
+  "config": {
+    "graph": true,
+    "vector": true,
+    "tools": false,
+    "top_k": 5,
+    "graph_depth": 2
+  }
 }
 ```
 

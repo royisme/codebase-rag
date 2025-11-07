@@ -46,6 +46,12 @@ class DirectoryProcessRequest(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     mode: str = "hybrid"  # hybrid, graph_only, vector_only
+    use_graph: Optional[bool] = None
+    use_vector: Optional[bool] = None
+    use_tools: bool = False
+    top_k: Optional[int] = None
+    graph_depth: Optional[int] = None
+    tool_kwargs: Optional[Dict[str, Any]] = None
 
 class SearchRequest(BaseModel):
     query: str
@@ -181,7 +187,13 @@ async def query_knowledge(query_request: QueryRequest):
     try:
         result = await knowledge_service.query(
             question=query_request.question,
-            mode=query_request.mode
+            mode=query_request.mode,
+            use_graph=query_request.use_graph,
+            use_vector=query_request.use_vector,
+            use_tools=query_request.use_tools,
+            top_k=query_request.top_k,
+            graph_depth=query_request.graph_depth,
+            tool_kwargs=query_request.tool_kwargs,
         )
         
         if result.get("success"):

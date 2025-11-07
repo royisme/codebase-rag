@@ -229,6 +229,17 @@ Control the number of source documents retrieved:
 
 **Default**: `TOP_K=5` (from `.env` configuration)
 
+### Pipeline Step Mapping
+
+| Mode / Flags | Graph Retrieval | Vector Retrieval | Tool Hooks |
+| --- | --- | --- | --- |
+| `hybrid` (default) | ✅ | ✅ | Optional (`use_tools`) |
+| `graph_only` | ✅ | ❌ | Optional (`use_tools`) |
+| `vector_only` | ❌ | ✅ | Optional (`use_tools`) |
+| Custom (`use_graph` / `use_vector`) | As configured | As configured | Optional (`use_tools`) |
+
+When `use_tools` is set to `true`, the service invokes registered `FunctionTool`/`ToolNode` instances after retrieval.
+
 ### Similarity Search
 
 Find similar documents without LLM generation:
@@ -398,9 +409,10 @@ result = query_knowledge("How does RAG work?")
 
 print(f"Answer: {result['answer']}\n")
 print("Sources:")
-for source in result['sources']:
-    print(f"  - {source['metadata']['title']} (score: {source['score']:.2f})")
-    print(f"    {source['content'][:100]}...")
+for source in result['source_nodes']:
+    title = source['metadata'].get('title', 'unknown')
+    print(f"  - {title} (score: {source['score']:.2f})")
+    print(f"    {source['text'][:100]}...")
 ```
 
 ## HTTP API Usage
@@ -413,9 +425,22 @@ curl -X POST http://localhost:8000/api/v1/knowledge/query \
   -d '{
     "question": "What is the deployment architecture?",
     "mode": "hybrid",
-    "top_k": 5
+    "use_tools": false,
+    "top_k": 5,
+    "graph_depth": 2
   }'
 ```
+
+### Pipeline Step Mapping
+
+| Mode / Flags | Graph Retrieval | Vector Retrieval | Tool Hooks |
+| --- | --- | --- | --- |
+| `hybrid` (default) | ✅ | ✅ | Optional (`use_tools`) |
+| `graph_only` | ✅ | ❌ | Optional (`use_tools`) |
+| `vector_only` | ❌ | ✅ | Optional (`use_tools`) |
+| Custom (`use_graph` / `use_vector`) | As configured | As configured | Optional (`use_tools`) |
+
+When `use_tools` is set to `true`, the service invokes registered `FunctionTool`/`ToolNode` instances after retrieval.
 
 ### Similarity Search
 
@@ -434,14 +459,15 @@ curl -X POST http://localhost:8000/api/v1/knowledge/search \
 import httpx
 import asyncio
 
-async def query_knowledge(question: str, mode: str = "hybrid"):
+async def query_knowledge(question: str, mode: str = "hybrid", top_k: int = 5, use_tools: bool = False):
     async with httpx.AsyncClient() as client:
         response = await client.post(
             "http://localhost:8000/api/v1/knowledge/query",
             json={
                 "question": question,
                 "mode": mode,
-                "top_k": 5
+                "use_tools": use_tools,
+                "top_k": top_k
             },
             timeout=30.0
         )
@@ -452,6 +478,7 @@ result = asyncio.run(query_knowledge(
     "How do I configure the system?"
 ))
 print(result['answer'])
+print(result['pipeline_steps'])
 ```
 
 ## Query Performance
