@@ -1,6 +1,6 @@
 """MCP request handlers."""
 
-from src.codebase_rag.mcp.handlers import (
+from codebase_rag.mcp.handlers import (
     knowledge,
     code,
     memory,

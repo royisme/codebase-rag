@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Literal
 from loguru import logger
 
 from neo4j import AsyncGraphDatabase
-from src.codebase_rag.config import settings
+from codebase_rag.config import settings
 
 
 class MemoryStore:

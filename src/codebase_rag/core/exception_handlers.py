@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from src.codebase_rag.config import settings
+from codebase_rag.config import settings
 
 
 def setup_exception_handlers(app: FastAPI) -> None:

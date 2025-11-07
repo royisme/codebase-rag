@@ -28,7 +28,7 @@ def main():
         logger.info(f"Working directory: {Path.cwd()}")
 
         # Import and run the server from mcp/server.py
-        from src.codebase_rag.mcp.server import main as server_main
+        from codebase_rag.mcp.server import main as server_main
 
         logger.info("Starting MCP server...")
         asyncio.run(server_main())

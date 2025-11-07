@@ -5,7 +5,7 @@ A comprehensive system for code analysis, knowledge extraction, and RAG-based qu
 Supports MCP protocol for AI assistant integration.
 """
 
-from src.codebase_rag.__version__ import (
+from codebase_rag.__version__ import (
     __version__,
     __version_info__,
     get_version,

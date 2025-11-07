@@ -33,20 +33,20 @@ def main():
     args = parser.parse_args()
 
     if args.version:
-        from src.codebase_rag import __version__
+        from codebase_rag import __version__
         print(f"codebase-rag version {__version__}")
         return 0
 
     if args.mcp:
         # Run MCP server
         print("Starting MCP server...")
-        from src.codebase_rag.server.mcp import main as mcp_main
+        from codebase_rag.server.mcp import main as mcp_main
         return mcp_main()
 
     if args.web or not any([args.web, args.mcp, args.version]):
         # Default: start web server
         print("Starting web server...")
-        from src.codebase_rag.server.web import main as web_main
+        from codebase_rag.server.web import main as web_main
         return web_main()
 
     return 0

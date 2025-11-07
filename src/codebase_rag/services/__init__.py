@@ -13,9 +13,9 @@ This module provides all business logic services organized into logical subpacka
 
 Note: Subpackages are not eagerly imported to avoid triggering heavy dependencies.
 Import specific services from their subpackages as needed:
-    from src.codebase_rag.services.code import Neo4jGraphService
-    from src.codebase_rag.services.knowledge import Neo4jKnowledgeService
-    from src.codebase_rag.services.memory import MemoryStore
+    from codebase_rag.services.code import Neo4jGraphService
+    from codebase_rag.services.knowledge import Neo4jKnowledgeService
+    from codebase_rag.services.memory import MemoryStore
 """
 
 # Declare subpackages without eager importing to avoid dependency issues

@@ -4,12 +4,12 @@ Route configuration module
 
 from fastapi import FastAPI
 
-from src.codebase_rag.api.routes import router
-from src.codebase_rag.api.neo4j_routes import router as neo4j_router
-from src.codebase_rag.api.task_routes import router as task_router
-from src.codebase_rag.api.websocket_routes import router as ws_router
-from src.codebase_rag.api.sse_routes import router as sse_router
-from src.codebase_rag.api.memory_routes import router as memory_router
+from codebase_rag.api.routes import router
+from codebase_rag.api.neo4j_routes import router as neo4j_router
+from codebase_rag.api.task_routes import router as task_router
+from codebase_rag.api.websocket_routes import router as ws_router
+from codebase_rag.api.sse_routes import router as sse_router
+from codebase_rag.api.memory_routes import router as memory_router
 
 
 def setup_routes(app: FastAPI) -> None:

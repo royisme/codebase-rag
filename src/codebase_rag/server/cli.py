@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from loguru import logger
 
-from src.codebase_rag.config import (
+from codebase_rag.config import (
     settings,
     validate_neo4j_connection,
     validate_ollama_connection,

@@ -9,7 +9,7 @@ import asyncio
 import json
 from loguru import logger
 
-from src.codebase_rag.services.task_queue import task_queue
+from codebase_rag.services.task_queue import task_queue
 
 router = APIRouter()
 

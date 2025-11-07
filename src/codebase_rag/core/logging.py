@@ -5,7 +5,7 @@ Logging configuration module
 import sys
 from loguru import logger
 
-from src.codebase_rag.config import settings
+from codebase_rag.config import settings
 
 
 def setup_logging():

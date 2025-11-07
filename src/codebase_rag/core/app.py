@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from loguru import logger
 import os
 
-from src.codebase_rag.config import settings
+from codebase_rag.config import settings
 from .exception_handlers import setup_exception_handlers
 from .middleware import setup_middleware
 from .routes import setup_routes

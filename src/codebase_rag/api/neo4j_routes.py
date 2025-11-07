@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import tempfile
 import os
 
-from src.codebase_rag.services.neo4j_knowledge_service import neo4j_knowledge_service
+from codebase_rag.services.neo4j_knowledge_service import neo4j_knowledge_service
 
 router = APIRouter(prefix="/neo4j-knowledge", tags=["Neo4j Knowledge Graph"])
 

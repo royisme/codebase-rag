@@ -5,7 +5,7 @@ This module provides functions to validate connections to various services
 like Neo4j, Ollama, OpenAI, Gemini, and OpenRouter.
 """
 
-from src.codebase_rag.config.settings import settings
+from codebase_rag.config.settings import settings
 
 
 def validate_neo4j_connection() -> bool:

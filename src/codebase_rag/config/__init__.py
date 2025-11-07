@@ -4,8 +4,8 @@ Configuration module for Codebase RAG.
 This module exports all configuration-related objects and functions.
 """
 
-from src.codebase_rag.config.settings import Settings, settings
-from src.codebase_rag.config.validation import (
+from codebase_rag.config.settings import Settings, settings
+from codebase_rag.config.validation import (
     validate_neo4j_connection,
     validate_ollama_connection,
     validate_openai_connection,

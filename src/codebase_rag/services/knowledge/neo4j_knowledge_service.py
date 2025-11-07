@@ -36,7 +36,7 @@ from llama_index.graph_stores.neo4j import Neo4jGraphStore
 # Core components
 from llama_index.core.node_parser import SimpleNodeParser
 
-from src.codebase_rag.config import settings
+from codebase_rag.config import settings
 
 class Neo4jKnowledgeService:
     """knowledge graph service based on Neo4j's native vector index"""

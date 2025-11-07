@@ -7,7 +7,7 @@ from typing import Dict, Any
 import time
 from functools import wraps
 from loguru import logger
-from src.codebase_rag.config import settings
+from codebase_rag.config import settings
 
 # Create a custom registry to avoid conflicts
 registry = CollectorRegistry()

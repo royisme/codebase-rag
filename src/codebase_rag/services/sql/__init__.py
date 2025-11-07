@@ -1,8 +1,8 @@
 """SQL parsing and schema analysis services."""
 
-from src.codebase_rag.services.sql.sql_parser import SQLParser
-from src.codebase_rag.services.sql.sql_schema_parser import SQLSchemaParser
-from src.codebase_rag.services.sql.universal_sql_schema_parser import (
+from codebase_rag.services.sql.sql_parser import SQLParser
+from codebase_rag.services.sql.sql_schema_parser import SQLSchemaParser
+from codebase_rag.services.sql.universal_sql_schema_parser import (
     UniversalSQLSchemaParser,
 )
 

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from src.codebase_rag.config import settings
+from codebase_rag.config import settings
 
 
 def setup_middleware(app: FastAPI) -> None:
