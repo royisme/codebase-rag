@@ -1,6 +1,6 @@
 [project]
 name = "code-graph"
-version = "0.8.0"
+version = "0.7.0"
 description = "AI-powered code intelligence and knowledge management system with graph database"
 readme = "README.md"
 requires-python = ">=3.13"
