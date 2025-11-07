@@ -16,6 +16,7 @@ dependencies = [
     "llama-index-embeddings-ollama",
     "llama-index-embeddings-gemini",
     "llama-index-graph-stores-neo4j",
+    "llama-agents",
     "httpx",
     "aiofiles",
     "python-jose[cryptography]",

@@ -7,8 +7,15 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Ensure the project root and `src/` directory are available for imports.
+# pytest executes from the repository root, but our package lives in `src/`.
+ROOT_DIR = Path(__file__).parent.parent
+SRC_DIR = ROOT_DIR / "src"
+
+for path in (ROOT_DIR, SRC_DIR):
+    path_str = str(path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
 from fastapi.testclient import TestClient
 from src.codebase_rag.services.code import Neo4jGraphService

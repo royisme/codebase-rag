@@ -10,6 +10,7 @@ from codebase_rag.api.task_routes import router as task_router
 from codebase_rag.api.websocket_routes import router as ws_router
 from codebase_rag.api.sse_routes import router as sse_router
 from codebase_rag.api.memory_routes import router as memory_router
+from codebase_rag.api.agent_routes import router as agent_router
 
 
 def setup_routes(app: FastAPI) -> None:
@@ -21,4 +22,5 @@ def setup_routes(app: FastAPI) -> None:
     app.include_router(task_router, prefix="/api/v1", tags=["Task Management"])
     app.include_router(sse_router, prefix="/api/v1", tags=["Real-time Updates"])
     app.include_router(memory_router, tags=["Memory Management"])
+    app.include_router(agent_router, prefix="/api/v1", tags=["Agent Orchestration"])
  

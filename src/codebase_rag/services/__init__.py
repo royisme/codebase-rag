@@ -28,4 +28,5 @@ __all__ = [
     "utils",
     "pipeline",
     "graph",
+    "agents",
 ]
