@@ -361,250 +361,109 @@ except TimeoutError as e:
 
 ### Overview
 
-Query processing combines vector search, graph traversal, and LLM generation:
+The knowledge query path is orchestrated by a `Neo4jRAGPipeline` that is constructed during service initialization. The pipeline runs a deterministic sequence of components:
+
+1. Resolve the query configuration (mode, graph/vector toggles, tool options).
+2. Run `KnowledgeGraphRAGRetriever` for structured graph traversal.
+3. Run `VectorIndexRetriever` against the Neo4j vector index.
+4. Merge and deduplicate nodes before handing them to the `ResponseSynthesizer`.
+5. Optionally execute registered `FunctionTool`/`ToolNode` hooks.
+6. Return the synthesized answer together with pipeline traces and sources.
 
 ```mermaid
-graph TB
-    Query([User asks question]) --> Embed[Generate Query Embedding]
-    Embed --> VectorSearch[Vector Similarity Search]
-    VectorSearch --> TopK[Retrieve Top-K Chunks]
-    TopK --> GraphExpand[Expand via Graph Relationships]
-    GraphExpand --> Rerank[Rerank by Relevance]
-    Rerank --> BuildContext[Build Context Window]
-    BuildContext --> LLMPrompt[Create LLM Prompt]
-    LLMPrompt --> LLMGenerate[LLM Generate Answer]
-    LLMGenerate --> PostProcess[Post-process Response]
-    PostProcess --> Response([Return Answer + Sources])
-
-    style VectorSearch fill:#E6F3FF
-    style GraphExpand fill:#FFF4E6
-    style LLMGenerate fill:#F0E6FF
+graph TD
+    Q[User Question] --> Config[Resolve Pipeline Config]
+    Config --> Graph[KnowledgeGraphRAGRetriever]
+    Config --> Vector[VectorIndexRetriever]
+    Graph --> Merge[Merge & Deduplicate]
+    Vector --> Merge
+    Merge --> Synthesize[ResponseSynthesizer]
+    Synthesize --> Tools{use_tools?}
+    Tools -->|yes| Execute[FunctionTool / ToolNode]
+    Tools -->|no| Response([API Response])
+    Execute --> Response
 ```
 
 ### Step-by-Step Flow
 
-#### 1. Query Embedding
+#### 1. Pipeline Configuration
 
 **API Endpoint**: `POST /api/v1/knowledge/query`
 
-```python
-# Request
+```json
 {
     "question": "How does authentication work in the system?",
-    "top_k": 5
+    "mode": "hybrid",
+    "use_graph": true,
+    "use_vector": true,
+    "use_tools": false,
+    "top_k": 5,
+    "graph_depth": 2
 }
 ```
 
-**Generate embedding**:
 ```python
-query_embedding = await embed_model.get_query_embedding(question)
-# Same embedding model as documents for consistency
-```
-
-#### 2. Vector Similarity Search
-
-**Neo4j Vector Query**:
-
-```cypher
-CALL db.index.vector.queryNodes(
-    'knowledge_vectors',      // Index name
-    $top_k,                   // Number of results
-    $query_embedding          // Query vector
+config = service._resolve_pipeline_config(
+    mode=payload.get("mode", "hybrid"),
+    use_graph=payload.get("use_graph"),
+    use_vector=payload.get("use_vector"),
+    use_tools=payload.get("use_tools", False),
+    top_k=payload.get("top_k"),
+    graph_depth=payload.get("graph_depth"),
 )
-YIELD node, score
-
-MATCH (node)-[:BELONGS_TO]->(doc:Document)
-RETURN node.text as text,
-       doc.title as source,
-       score as similarity
-ORDER BY score DESC
 ```
 
-**Result**:
-```python
-[
-    {
-        "text": "The system uses JWT tokens for authentication...",
-        "source": "Authentication Guide",
-        "similarity": 0.89
-    },
-    {
-        "text": "Users authenticate via POST /api/auth/login...",
-        "source": "API Documentation",
-        "similarity": 0.84
-    },
-    # ... more results
-]
-```
+#### 2. Graph Retrieval
 
-#### 3. Graph-Based Expansion
-
-**Expand context via relationships**:
-
-```cypher
-// Get related chunks via entity relationships
-MATCH (chunk:Chunk)-[:MENTIONS]->(e:Entity)<-[:MENTIONS]-(related:Chunk)
-WHERE chunk.id IN $initial_chunk_ids
-  AND related.id NOT IN $initial_chunk_ids
-RETURN related.text as text,
-       COUNT(*) as connection_strength
-ORDER BY connection_strength DESC
-LIMIT 3
-```
-
-**Why expand?**
-- Capture related context
-- Find transitively related information
-- Improve answer completeness
-
-#### 4. Result Reranking
-
-**Combine scores**:
+`KnowledgeGraphRAGRetriever` performs entity extraction and multi-hop traversal to fetch relevant triples and document chunks. Depth defaults to `2` but can be overridden per request.
 
 ```python
-def rerank_results(results: List[dict]) -> List[dict]:
-    """Rerank by multiple factors"""
-    for result in results:
-        score = (
-            result['similarity'] * 0.6 +      # Vector similarity
-            result['graph_score'] * 0.2 +     # Graph connectivity
-            result['recency_score'] * 0.1 +   # Document age
-            result['metadata_match'] * 0.1    # Metadata relevance
-        )
-        result['final_score'] = score
-
-    return sorted(results, key=lambda x: x['final_score'], reverse=True)
+graph_nodes = KnowledgeGraphRAGRetriever(
+    storage_context=storage_context,
+    llm=Settings.llm,
+    graph_traversal_depth=config.graph_depth,
+).retrieve(QueryBundle(question))
 ```
 
-#### 5. Context Window Building
+#### 3. Vector Retrieval
 
-**Create prompt context**:
+`VectorIndexRetriever` queries the Neo4j vector index (loaded through `VectorStoreIndex.from_vector_store`) to find semantically similar chunks.
 
 ```python
-def build_context(chunks: List[dict], max_tokens: int = 2000) -> str:
-    """Build context staying within token limit"""
-    context_parts = []
-    total_tokens = 0
-
-    for chunk in chunks:
-        chunk_tokens = estimate_tokens(chunk['text'])
-        if total_tokens + chunk_tokens > max_tokens:
-            break
-
-        context_parts.append(f"[Source: {chunk['source']}]\n{chunk['text']}")
-        total_tokens += chunk_tokens
-
-    return "\n\n".join(context_parts)
+vector_nodes = VectorIndexRetriever(
+    vector_index,
+    similarity_top_k=config.top_k,
+).retrieve(QueryBundle(question))
 ```
 
-#### 6. LLM Prompt Construction
+#### 4. Response Synthesis
 
-**Prompt Template**:
+Retrieved nodes are merged and passed to the `ResponseSynthesizer`, which uses the configured LLM to generate the final response while keeping provenance.
 
 ```python
-prompt = f"""You are a helpful assistant. Answer the question based on the provided context.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer: Provide a comprehensive answer based on the context above. If the context doesn't contain enough information to fully answer the question, say so.
-"""
+response = response_synthesizer.synthesize(QueryBundle(question), merged_nodes)
 ```
 
-**Advanced Prompting**:
-```python
-# With instructions
-prompt = f"""You are a technical documentation expert.
+#### 5. Optional Tool Execution
 
-Context from knowledge base:
-{context}
+If `use_tools` is `true`, the pipeline invokes registered tools to extend the answer (for example, to run follow-up analytics). Tool execution results are attached to the API response.
 
-User question: {question}
+#### 6. Response Packaging
 
-Instructions:
-1. Answer based on the provided context
-2. Cite sources when possible
-3. If information is incomplete, state what's missing
-4. Use technical accuracy
+The API returns the synthesized answer along with full pipeline traces:
 
-Answer:"""
-```
-
-#### 7. LLM Generation
-
-**Call LLM**:
-
-```python
-# OpenAI example
-response = await llm.acomplete(prompt)
-answer = response.text
-
-# Ollama example
-response = await llm.acomplete(prompt)
-answer = response.text
-```
-
-**Streaming Support**:
-```python
-async for token in llm.astream_complete(prompt):
-    yield token.text  # Stream to client
-```
-
-#### 8. Response Assembly
-
-**Final Response**:
-
-```python
+```json
 {
-    "success": true,
-    "answer": "The system uses JWT token-based authentication...",
-    "sources": [
-        {
-            "title": "Authentication Guide",
-            "relevance": 0.89,
-            "excerpt": "JWT tokens are used..."
-        },
-        {
-            "title": "API Documentation",
-            "relevance": 0.84,
-            "excerpt": "Login endpoint returns..."
-        }
-    ],
-    "metadata": {
-        "chunks_retrieved": 5,
-        "chunks_used": 3,
-        "processing_time": 1.2,
-        "model": "gpt-3.5-turbo"
-    }
+  "answer": "The system uses JWT-based authentication...",
+  "source_nodes": [...],
+  "retrieved_nodes": [...],
+  "pipeline_steps": [
+    {"step": "graph_retrieval", "node_count": 3},
+    {"step": "vector_retrieval", "node_count": 5}
+  ],
+  "tool_outputs": [],
+  "config": {"graph": true, "vector": true, "tools": false}
 }
-```
-
-### Performance Optimization
-
-**Caching**:
-```python
-# Cache query embeddings
-@lru_cache(maxsize=1000)
-async def get_cached_embedding(query: str) -> List[float]:
-    return await embed_model.get_query_embedding(query)
-
-# Cache common queries
-query_cache = {}
-cache_key = f"{question}:{top_k}"
-if cache_key in query_cache:
-    return query_cache[cache_key]
-```
-
-**Parallel Processing**:
-```python
-# Parallel embedding and metadata lookup
-embedding_task = asyncio.create_task(generate_embedding(question))
-metadata_task = asyncio.create_task(get_metadata_filters(question))
-
-embedding = await embedding_task
-metadata = await metadata_task
 ```
 
 ## Memory Management Pipeline

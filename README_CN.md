@@ -150,7 +150,9 @@ response = httpx.post("http://localhost:8000/api/v1/documents/directory", json={
 # 查询知识库
 response = httpx.post("http://localhost:8000/api/v1/knowledge/query", json={
     "question": "认证系统是如何工作的？",
-    "mode": "hybrid"  # 或 "graph_only", "vector_only"
+    "mode": "hybrid",  # 或 "graph_only", "vector_only"
+    "use_tools": False,
+    "top_k": 5
 })
 
 # 搜索相似文档

@@ -367,9 +367,14 @@ async def lifespan(app: FastAPI):
 ```python
 class Neo4jKnowledgeService:
     def __init__(self):
-        self.graph_store = None          # Neo4j graph store
-        self.knowledge_index = None      # LlamaIndex KnowledgeGraphIndex
-        self.query_engine = None         # RAG query engine
+        self.graph_store = None              # Neo4j graph store
+        self.storage_context = None          # Shared storage context
+        self.knowledge_index = None          # KnowledgeGraphIndex
+        self.vector_index = None             # VectorStoreIndex for similarity search
+        self.response_synthesizer = None     # LLM-backed synthesizer
+        self.query_pipeline = None           # Graph/Vector pipeline
+        self.function_tools = []             # Workflow tools
+        self.tool_node = None                # Optional ToolNode
         self._initialized = False
 ```
 
@@ -389,7 +394,7 @@ sequenceDiagram
     KnowServ->>LlamaIndex: Configure Settings
     KnowServ->>LlamaIndex: Create KnowledgeGraphIndex
     LlamaIndex-->>KnowServ: Index ready
-    KnowServ->>KnowServ: Create query engine
+    KnowServ->>KnowServ: Build QueryPipeline (graph + vector + synth)
     KnowServ-->>Client: Initialized
 ```
 
@@ -419,23 +424,28 @@ async def add_document(
 async def query(
     self,
     question: str,
-    top_k: int = 5
+    *,
+    mode: str = "hybrid",
+    use_tools: bool = False
 ) -> Dict[str, Any]:
-    """Query knowledge base with RAG"""
-    # 1. Use query engine to retrieve relevant context
-    # 2. Generate answer using LLM with context
-    response = await asyncio.to_thread(
-        self.query_engine.query,
-        question
-    )
+    """Run the QueryPipeline composed of graph/vector retrievers and a synthesizer."""
+    config = self._resolve_pipeline_config(mode, use_tools=use_tools)
+    result = await asyncio.to_thread(self.query_pipeline.run, question, config)
 
-    # 3. Return answer with source nodes
     return {
         "success": True,
-        "answer": str(response),
-        "sources": [node.metadata for node in response.source_nodes]
+        "answer": str(result["response"]),
+        "source_nodes": format_sources(result["source_nodes"]),
+        "pipeline_steps": result["steps"],
+        "tool_outputs": result["tool_outputs"]
     }
 ```
+
+**Pipeline Components**:
+1. `KnowledgeGraphRAGRetriever` — extracts entities and traverses the property graph.
+2. `VectorIndexRetriever` — performs vector similarity search over the Neo4j vector index.
+3. `ResponseSynthesizer` — merges retrieved context and generates the final answer.
+4. `FunctionTool` / `ToolNode` (optional) — exposes the query as a workflow tool for multi-turn agents.
 
 #### 3. Semantic Search
 ```python

@@ -87,6 +87,22 @@ The platform combines vector search, graph traversal, and LLM-driven analysis to
 - Docker (optional, for containerized deployment)
 - Node.js 18+ (for frontend development)
 
+### Querying Knowledge
+```python
+# Query the knowledge base
+response = httpx.post("http://localhost:8000/api/v1/knowledge/query", json={
+    "question": "How does the authentication system work?",
+    "mode": "hybrid",  # or "graph_only", "vector_only"
+    "use_tools": False,
+    "top_k": 5
+})
+
+# Search similar documents
+response = httpx.post("http://localhost:8000/api/v1/knowledge/search", json={
+    "query": "user authentication",
+    "top_k": 10
+})
+```
 ### Installation
 
 Clone the repository and install dependencies:
