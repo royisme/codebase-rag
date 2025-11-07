@@ -82,21 +82,29 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.24.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
 
-      - name: Upload Trivy results to GitHub Security
+      # 只在“非 fork 的 push/PR”才上传；fork PR 跳过，避免报错
+      - name: Upload SARIF to GitHub Security
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results.sarif'
-        if: always()
+          sarif_file: trivy-results.sarif
+
+      # 可选：在 fork PR 上给出提示，避免混淆
+      - name: Note for fork PR
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: echo "Skipping SARIF upload on forked PR due to token restrictions."
