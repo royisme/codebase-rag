@@ -1,4 +1,4 @@
-"""Declarative tool definitions exposed to LlamaAgents."""
+"""Declarative tool definitions exposed to the workflow agent."""
 
 from __future__ import annotations
 

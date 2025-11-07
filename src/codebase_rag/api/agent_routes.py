@@ -1,4 +1,4 @@
-"""FastAPI routes exposing the unified LlamaAgents experience."""
+"""FastAPI routes exposing the unified LlamaIndex agent workflow."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Agent orchestration services built on top of LlamaAgents."""
+"""Agent orchestration services built on top of LlamaIndex workflows."""
 
 from .base import create_default_agent
 from .session_manager import AgentSessionManager

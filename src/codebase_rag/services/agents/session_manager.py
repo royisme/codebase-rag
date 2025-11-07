@@ -1,4 +1,4 @@
-"""Conversation orchestration built around LlamaAgents."""
+"""Conversation orchestration built around LlamaIndex workflow agents."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from llama_agents import FunctionCallingAgent
+from llama_index.core.agent import AgentOutput, ToolCall, ToolCallResult
+from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 
 from .base import create_default_agent
@@ -19,7 +20,7 @@ class AgentSession:
 
     session_id: str
     project_id: str
-    agent: FunctionCallingAgent
+    agent: FunctionAgent
     chat_history: List[ChatMessage] = field(default_factory=list)
     tool_events: List[Dict[str, Any]] = field(default_factory=list)
     task_trace: List[Dict[str, Any]] = field(default_factory=list)
@@ -41,42 +42,72 @@ def _to_chat_message(role: MessageRole, content: str) -> ChatMessage:
     return ChatMessage(role=role, content=content)
 
 
+def _serialize_chat_history(chat_history: List[ChatMessage]) -> List[Dict[str, str]]:
+    return [
+        {
+            "role": getattr(msg.role, "value", msg.role),
+            "content": msg.content,
+        }
+        for msg in chat_history
+    ]
+
+
 def _extract_response_text(response: Any) -> str:
     if response is None:
         return ""
 
-    if hasattr(response, "response") and isinstance(response.response, str):
-        return response.response
+    if isinstance(response, AgentOutput):
+        return response.response.content or ""
 
     message = getattr(response, "message", None)
     if message is not None and hasattr(message, "content"):
         return message.content
 
+    reply = getattr(response, "response", None)
+    if reply is not None and hasattr(reply, "content"):
+        return reply.content
+
+    if hasattr(response, "response") and isinstance(response.response, str):
+        return response.response
+
     return str(response)
 
 
-def _extract_tool_events(response: Any) -> List[Dict[str, Any]]:
-    events = getattr(response, "tool_events", None)
-    if not events:
-        events = getattr(response, "tool_calls", None)
+async def _collect_tool_activity(handler: Any) -> List[Dict[str, Any]]:
+    """Capture tool call activity emitted by the workflow handler."""
 
-    serialized: List[Dict[str, Any]] = []
-    if not events:
-        return serialized
+    collected: List[Dict[str, Any]] = []
+    call_index: Dict[str, int] = {}
 
-    for event in events:
-        event_dict = {
-            "tool": getattr(event, "tool", getattr(event, "tool_name", None)),
-            "input": getattr(event, "input", getattr(event, "tool_input", None)),
-            "output": getattr(event, "output", getattr(event, "tool_output", None)),
-        }
-        serialized.append({k: v for k, v in event_dict.items() if v is not None})
+    if not hasattr(handler, "stream_events"):
+        return collected
 
-    return serialized
+    async for event in handler.stream_events():
+        if isinstance(event, ToolCall):
+            call_index[event.tool_id] = len(collected)
+            collected.append(
+                {
+                    "tool": event.tool_name,
+                    "input": event.tool_kwargs,
+                }
+            )
+        elif isinstance(event, ToolCallResult):
+            payload = {
+                "tool": event.tool_name,
+                "input": event.tool_kwargs,
+                "output": getattr(event.tool_output, "content", event.tool_output),
+            }
+            existing_idx = call_index.get(event.tool_id)
+            if existing_idx is not None:
+                collected[existing_idx].update({k: v for k, v in payload.items() if v is not None})
+            else:
+                collected.append({k: v for k, v in payload.items() if v is not None})
+
+    return collected
 
 
 class AgentSessionManager:
-    """Manage long-lived LlamaAgent chat sessions and tool orchestration."""
+    """Manage long-lived workflow agent chat sessions and tool orchestration."""
 
     def __init__(self, agent_factory=create_default_agent):
         self._agent_factory = agent_factory
@@ -121,10 +152,7 @@ class AgentSessionManager:
             "session_id": session.session_id,
             "project_id": session.project_id,
             "metadata": session.metadata,
-            "chat_history": [
-                {"role": msg.role.value, "content": msg.content}
-                for msg in session.chat_history
-            ],
+            "chat_history": _serialize_chat_history(session.chat_history),
             "tool_events": session.tool_events,
             "task_trace": session.task_trace,
         }
@@ -144,10 +172,7 @@ class AgentSessionManager:
 
         session.chat_history.append(_to_chat_message(MessageRole.USER, message))
 
-        conversation_payload = [
-            {"role": msg.role.value, "content": msg.content}
-            for msg in session.chat_history
-        ]
+        conversation_payload = _serialize_chat_history(session.chat_history)
 
         call_kwargs = {
             "chat_history": session.chat_history,
@@ -158,19 +183,17 @@ class AgentSessionManager:
             },
         }
 
-        if hasattr(session.agent, "achat"):
-            response = await session.agent.achat(message, **call_kwargs)  # type: ignore[attr-defined]
-        elif hasattr(session.agent, "chat"):
-            response = session.agent.chat(message, **call_kwargs)  # type: ignore[attr-defined]
-        elif hasattr(session.agent, "arun"):
-            response = await session.agent.arun(message, **call_kwargs)  # type: ignore[attr-defined]
-        else:
-            raise AttributeError("FunctionCallingAgent does not expose a chat method")
+        handler = session.agent.run(message, **call_kwargs)
+
+        tool_events = await _collect_tool_activity(handler)
+        response = await handler
 
         reply_text = _extract_response_text(response)
-        session.chat_history.append(_to_chat_message(MessageRole.ASSISTANT, reply_text))
+        if isinstance(response, AgentOutput):
+            session.chat_history.append(response.response)
+        else:
+            session.chat_history.append(_to_chat_message(MessageRole.ASSISTANT, reply_text))
 
-        tool_events = _extract_tool_events(response)
         session.tool_events.extend(tool_events)
 
         task_record = {
@@ -185,9 +208,6 @@ class AgentSessionManager:
             "reply": reply_text,
             "tool_events": tool_events,
             "task": task_record,
-            "chat_history": [
-                {"role": msg.role.value, "content": msg.content}
-                for msg in session.chat_history
-            ],
+            "chat_history": _serialize_chat_history(session.chat_history),
         }
 

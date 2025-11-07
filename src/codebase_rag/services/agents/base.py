@@ -1,17 +1,17 @@
-"""Factories for constructing LlamaAgents based assistants."""
+"""Factories for constructing LlamaIndex workflow agents."""
 
 from typing import Sequence
 
-from llama_agents import FunctionCallingAgent
 from llama_index.core import Settings
+from llama_index.core.agent.workflow import FunctionAgent
 
 from codebase_rag.config import settings
 
 from .tools import AGENT_TOOLS
 
 
-def create_default_agent(*, tools: Sequence = AGENT_TOOLS) -> FunctionCallingAgent:
-    """Create a FunctionCallingAgent wired with the default toolset.
+def create_default_agent(*, tools: Sequence = AGENT_TOOLS) -> FunctionAgent:
+    """Create a FunctionAgent wired with the default toolset.
 
     The agent uses the globally configured LlamaIndex LLM settings and provides
     instructions aimed at orchestrating knowledge retrieval, memory extraction and
@@ -35,7 +35,7 @@ def create_default_agent(*, tools: Sequence = AGENT_TOOLS) -> FunctionCallingAge
         "memories when relevant. Make sure responses explain which tools were used."
     )
 
-    return FunctionCallingAgent(
+    return FunctionAgent(
         name=settings.app_name or "codebase-rag-agent",
         description=description,
         system_prompt=system_prompt,
