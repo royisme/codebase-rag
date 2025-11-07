@@ -4,339 +4,427 @@ Enterprise knowledge management platform with Neo4j graph database, multi-interf
 
 ## Overview
 
-Code Graph Knowledge System is an enterprise-grade solution that transforms unstructured development documentation and code into a structured, queryable knowledge graph. By combining vector search, graph database technology, and large language models, it provides intelligent code analysis, documentation management, and development assistance capabilities.
+Code Graph Knowledge System is a production-ready platform that transforms code repositories and development documentation into a queryable knowledge graph. Built on Neo4j's graph database technology and powered by large language models, the system provides three distinct interfaces for different use cases: MCP protocol for AI assistants, Web UI for human users, and REST API for programmatic access.
 
-## Key Features
+The platform combines vector search, graph traversal, and LLM-driven analysis to deliver intelligent code intelligence capabilities including repository analysis, dependency mapping, impact assessment, and automated documentation generation.
 
-### Current Features (Phase 1: Document Intelligence & Vector Search)
-- **Multi-format Document Processing**: Support for various document formats including text, markdown, PDF, and code files
-- **Neo4j GraphRAG Integration**: Advanced graph-based retrieval augmented generation using Neo4j's native vector index
-- **Universal SQL Schema Parser**: Configurable database schema analysis with industry-specific templates
-- **Intelligent Query Engine**: Hybrid search combining vector similarity and graph traversal
-- **Asynchronous Task Processing**: Background processing for large document collections with real-time monitoring
-- **Real-time Task Monitoring**: Multiple real-time monitoring solutions
-  - Web UI Monitoring: NiceGUI interface with file upload and directory batch processing
-  - SSE Streaming API: HTTP Server-Sent Events for real-time task progress updates
-  - MCP Real-time Tools: AI assistant integrated task monitoring tools
-- **Multi-Database Support**: Oracle, MySQL, PostgreSQL, SQL Server schema parsing and analysis
-- **RESTful API**: Complete API endpoints for document management and knowledge querying
-- **MCP Protocol Support**: Model Context Protocol integration for AI assistant compatibility
-- **Multi-provider LLM Support**: Compatible with Ollama, OpenAI, Gemini, and OpenRouter models
-- **Large File Handling Strategy**: Intelligent file size detection with multiple processing approaches
+## Core Capabilities
 
-### Technical Architecture
-- **FastAPI Backend**: High-performance async web framework
-- **Neo4j Database**: Graph database with native vector search capabilities
-- **LlamaIndex Integration**: Advanced document processing and retrieval pipeline
-- **Flexible Embedding Models**: Support for HuggingFace and Ollama embedding models
-- **Modular Design**: Clean separation of concerns with pluggable components
+### Multi-Interface Architecture
 
-## 📚 Documentation
+**MCP Protocol (Port 8000)** - Model Context Protocol server for AI assistant integration
+- Direct integration with Claude Desktop, Cursor, and other MCP-compatible tools
+- 25+ specialized tools for code analysis and knowledge management
+- Real-time task monitoring via Server-Sent Events
+- Supports stdio and SSE transport modes
 
-For detailed documentation, guides, and API references, visit our official documentation site:
+**Web UI (Port 8080)** - Browser-based interface for team collaboration
+- Real-time task monitoring dashboard
+- Repository ingestion and management
+- Metrics visualization with interactive charts
+- Built with React 18, TypeScript, and shadcn/ui components
 
-**[📖 Complete Documentation](https://vantagecraft.dev/docs/code-graph)**
+**REST API (Ports 8000, 8080)** - HTTP endpoints for system integration
+- Document ingestion and knowledge querying
+- Task management and monitoring
+- Prometheus metrics export
+- OpenAPI/Swagger documentation
 
-## Project Roadmap
+### Knowledge Graph Engine
 
-### Phase 2: Structured Data & Graph Enhancement (SQL & Graph-Awareness)
-**Objective**: Integrate SQL file parsing capabilities and build a comprehensive knowledge graph for precise structured queries.
+**Code Intelligence** - Graph-based code analysis without requiring LLMs
+- Repository structure mapping and dependency tracking
+- Function and class relationship analysis
+- Impact analysis for code changes
+- Context pack generation for AI assistants
+- Support for 15+ programming languages
 
-**Completed Features**:
-- ✅ **Universal SQL Schema Parser** with configurable business domain classification
-- ✅ **Multi-dialect Support** (Oracle, MySQL, PostgreSQL, SQL Server)
-- ✅ **Pre-built Industry Templates** (Insurance, E-commerce, Banking, Healthcare)
-- ✅ **Configuration-driven** business domain classification via YAML/JSON
-- ✅ **Real-world Testing** on 356 table Oracle database with 4,511 columns
-- ✅ **Zero-impact Integration** with existing codebase
-- ✅ **Professional Documentation** generation
+**Memory Store** - Project knowledge tracking with temporal awareness
+- Fact, decision, pattern, and insight recording
+- Memory evolution with superseding relationships
+- Automatic extraction from conversations, commits, and code
+- Vector search with embedding-based retrieval
 
-**In Progress**:
-- Neo4j knowledge graph integration for schema querying
-- Natural language queries for database structure exploration
+**Knowledge RAG** - Document processing with hybrid search
+- Multi-format document ingestion (Markdown, PDF, code files)
+- Neo4j native vector indexing
+- Hybrid search combining vector similarity and graph traversal
+- Configurable chunking and embedding strategies
 
-**Planned Features**:
-- Database relationship mapping and foreign key detection
-- Cross-reference linking between code and database schemas
-- Enhanced graph traversal algorithms
-- Structured query optimization
+**SQL Schema Parser** - Database schema analysis with business domain classification
+- Multi-dialect support (Oracle, MySQL, PostgreSQL, SQL Server)
+- Configurable business domain templates (Insurance, E-commerce, Banking, Healthcare)
+- Automated relationship detection and documentation generation
+- Integration with knowledge graph for cross-referencing
 
-### Phase 3: Deep Code Intelligence & Automation (Code Intelligence & Automation)
-**Objective**: Enable the system to "understand" code and introduce asynchronous tasks with Git integration, creating a "living" system.
+## Technology Stack
 
-**Planned Features**:
-- Advanced code parsing and analysis (AST-based)
-- Function and class relationship mapping
-- Git repository integration and change tracking
-- Automated code documentation generation
-- Code review assistance and suggestions
-- Intelligent code completion and refactoring suggestions
-- Dependency analysis and impact assessment
-- Continuous integration pipeline integration
+**Backend Infrastructure**
+- FastAPI - High-performance async web framework
+- Neo4j 5.x - Graph database with native vector indexing
+- Python 3.13+ - Modern Python with type hints
+- Uvicorn - ASGI server with WebSocket support
 
-## Installation
+**AI and ML Integration**
+- LlamaIndex - Document processing and retrieval pipeline
+- Multiple LLM providers (Ollama, OpenAI, Gemini, OpenRouter)
+- Flexible embedding models (HuggingFace, Ollama, OpenAI)
+- Model Context Protocol (MCP) for AI assistant integration
+
+**Frontend Technology**
+- React 18 - Modern UI library with concurrent features
+- TypeScript - Type-safe development
+- TanStack Router - Type-safe routing
+- shadcn/ui - Accessible component library
+- Vite - Fast build tooling
+
+## Quick Start
 
 ### Prerequisites
+
 - Python 3.13 or higher
 - Neo4j 5.0 or higher
-- Ollama (optional, for local LLM support)
+- Docker (optional, for containerized deployment)
+- Node.js 18+ (for frontend development)
 
-### Quick Start
+### Installation
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/royisme/codebase-rag.git
-   cd code-graph
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   # or using uv (recommended)
-   uv pip install -e .
-   ```
-
-3. **Configure Environment**
-   ```bash
-   cp env.example .env
-   # Edit .env with your configuration
-   ```
-
-4. **Start Neo4j Database**
-   ```bash
-   # Using Docker
-   docker run \
-       --name neo4j-code-graph \
-       -p 7474:7474 -p 7687:7687 \
-       -e NEO4J_AUTH=neo4j/password \
-       -e NEO4J_PLUGINS='["apoc"]' \
-       neo4j:5.15
-   ```
-
-5. **Run the Application**
-   ```bash
-   # Start main service
-   python start.py
-   # or use script entry points
-   uv run server
-   
-   # Start MCP service (optional)
-   python start_mcp.py
-   # or use script entry points
-   uv run mcp_client
-   ```
-
-6. **Access the Interface**
-   - API Documentation: http://localhost:8000/docs
-   - Task Monitor: http://localhost:8000/ui/monitor
-   - Real-time SSE Monitor: http://localhost:8000/api/v1/sse/tasks
-   - Health Check: http://localhost:8000/api/v1/health
-
-## API Usage
-
-### Adding Documents
-```python
-import httpx
-
-# Add a single document
-response = httpx.post("http://localhost:8000/api/v1/documents/", json={
-    "content": "Your document content here",
-    "title": "Document Title",
-    "metadata": {"source": "manual", "type": "documentation"}
-})
-
-# Add a file
-response = httpx.post("http://localhost:8000/api/v1/documents/file", json={
-    "file_path": "/path/to/your/document.md"
-})
-
-# Add a directory
-response = httpx.post("http://localhost:8000/api/v1/documents/directory", json={
-    "directory_path": "/path/to/docs",
-    "recursive": true,
-    "file_extensions": [".md", ".txt", ".py"]
-})
-```
-
-### Querying Knowledge
-```python
-# Query the knowledge base
-response = httpx.post("http://localhost:8000/api/v1/knowledge/query", json={
-    "question": "How does the authentication system work?",
-    "mode": "hybrid"  # or "graph_only", "vector_only"
-})
-
-# Search similar documents
-response = httpx.post("http://localhost:8000/api/v1/knowledge/search", json={
-    "query": "user authentication",
-    "top_k": 10
-})
-```
-
-## Real-time Task Monitoring
-
-The system provides three real-time task monitoring approaches:
-
-### 1. Web UI Monitoring Interface
-Access http://localhost:8000/ui/monitor for graphical monitoring:
-- Real-time task status updates
-- File upload functionality (50KB size limit)
-- Directory batch processing
-- Task progress visualization
-
-### 2. Server-Sent Events (SSE) API
-Real-time monitoring via HTTP streaming endpoints:
-
-```javascript
-// Monitor single task
-const eventSource = new EventSource('/api/v1/sse/task/task-id');
-eventSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    console.log('Task progress:', data.progress);
-};
-
-// Monitor all tasks
-const allTasksSource = new EventSource('/api/v1/sse/tasks');
-```
-
-### 3. MCP Real-time Tools
-Task monitoring via MCP protocol:
-
-```python
-# Use pure MCP client monitoring
-# See examples/pure_mcp_client.py
-
-# Monitor single task
-result = await session.call_tool("watch_task", {
-    "task_id": task_id,
-    "timeout": 300,
-    "interval": 1.0
-})
-
-# Monitor multiple tasks
-result = await session.call_tool("watch_tasks", {
-    "task_ids": [task1, task2, task3],
-    "timeout": 300
-})
-```
-
-## MCP Integration
-
-The system supports Model Context Protocol (MCP) for seamless integration with AI assistants:
+Clone the repository and install dependencies:
 
 ```bash
-# Start MCP server
-python start_mcp.py
+git clone https://github.com/royisme/codebase-rag.git
+cd codebase-rag
+pip install -r requirements.txt
+# or using uv (recommended)
+uv pip install -e .
+```
 
-# Or integrate with your MCP client
+Configure environment variables:
+
+```bash
+cp env.example .env
+# Edit .env with your Neo4j credentials and LLM provider settings
+```
+
+Start Neo4j database:
+
+```bash
+docker run --name neo4j-code-graph \
+  -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/password \
+  -e NEO4J_PLUGINS='["apoc"]' \
+  neo4j:5.15
+```
+
+### Running the System
+
+**Complete System (MCP + Web UI + REST API)**
+
+```bash
+python start.py
+```
+
+Access points:
+- MCP SSE Service: `http://localhost:8000/sse`
+- Web UI: `http://localhost:8080`
+- REST API Documentation: `http://localhost:8080/docs`
+- Prometheus Metrics: `http://localhost:8080/metrics`
+
+**MCP Server Only**
+
+```bash
+python start_mcp.py
+```
+
+### Docker Deployment
+
+Three deployment modes available:
+
+**Minimal Mode** - Code Graph only (no LLM required)
+```bash
+make docker-minimal
+```
+
+**Standard Mode** - Code Graph + Memory Store (embedding model required)
+```bash
+make docker-standard
+```
+
+**Full Mode** - All features (LLM + embedding required)
+```bash
+make docker-full
+```
+
+## Usage Examples
+
+### MCP Integration
+
+Configure in Claude Desktop or compatible MCP client:
+
+```json
 {
   "mcpServers": {
     "code-graph": {
       "command": "python",
-      "args": ["start_mcp.py"],
-      "cwd": "/path/to/code-graph"
+      "args": ["/path/to/start_mcp.py"],
+      "cwd": "/path/to/codebase-rag"
     }
   }
 }
 ```
 
-### Client Implementation Examples
-- `examples/pure_mcp_client.py`: Pure MCP client using MCP tools for monitoring
-- `examples/hybrid_http_sse_client.py`: HTTP + SSE hybrid approach
+Available MCP tools include:
+- `code_graph_ingest_repo` - Ingest code repository
+- `code_graph_related` - Find related code elements
+- `code_graph_impact` - Analyze change impact
+- `query_knowledge` - Query knowledge base
+- `add_memory` - Store project knowledge
+- `extract_from_conversation` - Extract insights from chat
+- `watch_task` - Monitor task progress
+
+### REST API
+
+**Ingest a repository:**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/repositories/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://github.com/user/repo.git",
+    "mode": "incremental",
+    "languages": ["python", "typescript"]
+  }'
+```
+
+**Query knowledge base:**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/knowledge/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "How does authentication work in this codebase?",
+    "mode": "hybrid",
+    "top_k": 5
+  }'
+```
+
+**Monitor tasks:**
+
+```bash
+curl http://localhost:8080/api/v1/tasks?status=processing
+```
+
+### Web UI
+
+Navigate to `http://localhost:8080` to access:
+
+- **Dashboard** - System health and quick actions
+- **Tasks** - Real-time task monitoring with progress indicators
+- **Repositories** - Repository management and ingestion
+- **Metrics** - System performance and usage metrics
 
 ## Configuration
 
-Key configuration options in `.env`:
+Key environment variables:
 
 ```bash
-# Application
-APP_NAME=Code Graph Knowledge System
-DEBUG=true
-HOST=0.0.0.0
-PORT=8000
-
-# Monitoring Interface
-ENABLE_MONITORING=true        # Enable/disable web monitoring interface
-MONITORING_PATH=/ui          # Base path for monitoring interface
+# Server Ports
+MCP_PORT=8000              # MCP SSE service
+WEB_UI_PORT=8080           # Web UI and REST API
 
 # Neo4j Configuration
 NEO4J_URI=bolt://localhost:7687
-NEO4J_USERNAME=neo4j
+NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
 NEO4J_DATABASE=neo4j
 
-# LLM Configuration
-LLM_PROVIDER=ollama  # or openai, gemini
-OLLAMA_BASE_URL=http://localhost:11434
+# LLM Provider (ollama, openai, gemini, openrouter)
+LLM_PROVIDER=ollama
+OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=llama3.2
-EMBEDDING_MODEL=nomic-embed-text
+
+# Embedding Provider (ollama, openai, gemini, huggingface)
+EMBEDDING_PROVIDER=ollama
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 
 # Processing Configuration
-CHUNK_SIZE=1000
-CHUNK_OVERLAP=200
-TOP_K=10
-VECTOR_DIMENSION=768
+CHUNK_SIZE=512
+CHUNK_OVERLAP=50
+TOP_K=5
+VECTOR_DIMENSION=384
+```
+
+For complete configuration options, see [Configuration Guide](https://vantagecraft.dev/docs/code-graph/getting-started/configuration).
+
+## Architecture
+
+### Dual-Server Design
+
+The system employs a dual-server architecture optimized for different access patterns:
+
+**Port 8000 (Primary)** - MCP SSE Service
+- Server-Sent Events endpoint for real-time communication
+- Optimized for AI assistant integration
+- Handles long-running task monitoring
+- WebSocket support for bidirectional communication
+
+**Port 8080 (Secondary)** - Web UI + REST API
+- React-based monitoring interface
+- RESTful API for external integrations
+- Prometheus metrics endpoint
+- Static file serving for frontend
+
+Both servers share the same backend services and Neo4j database, ensuring consistency across all interfaces.
+
+### Component Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Client Interfaces                      │
+├──────────────┬──────────────┬──────────────────────────┤
+│  MCP Client  │   Web UI     │      REST API            │
+│  (AI Tools)  │  (Browser)   │   (External Systems)     │
+└──────┬───────┴──────┬───────┴──────────┬───────────────┘
+       │              │                  │
+       └──────────────┼──────────────────┘
+                      │
+       ┌──────────────▼──────────────┐
+       │     FastAPI Application      │
+       ├──────────────┬──────────────┤
+       │   Services   │  Task Queue  │
+       └──────┬───────┴──────┬───────┘
+              │              │
+       ┌──────▼──────┐  ┌───▼────┐
+       │   Neo4j     │  │  LLM   │
+       │  Database   │  │Provider│
+       └─────────────┘  └────────┘
 ```
 
 ## Development
 
 ### Project Structure
+
 ```
-code_graph/
-├── api/                    # FastAPI route handlers
-├── core/                   # Application core (FastAPI setup, middleware)
-├── services/               # Business logic services
-│   ├── neo4j_knowledge_service.py      # Neo4j knowledge graph service
-│   ├── sql_schema_parser.py            # Legacy SQL parser (insurance-specific)
-│   ├── universal_sql_schema_parser.py  # Universal configurable SQL parser
-│   ├── sql_parser.py                   # Individual SQL statement parser
-│   └── task_queue.py                   # Asynchronous task management
-├── monitoring/             # Task monitoring interface (NiceGUI)
-├── configs/                # Configuration files
-│   └── insurance_schema_config.yaml    # Example schema parser configuration
-├── data/                   # Data storage and models
-├── tests/                  # Test suite including SQL parser tests
-├── docs/                   # Documentation
-└── config.py              # Configuration management
+codebase-rag/
+├── src/codebase_rag/
+│   ├── api/                    # FastAPI routes
+│   ├── core/                   # Application core
+│   ├── services/               # Business logic
+│   │   ├── code_ingestor.py    # Code repository processing
+│   │   ├── graph_service.py    # Graph operations
+│   │   ├── memory_store.py     # Project memory management
+│   │   ├── neo4j_knowledge_service.py  # Knowledge base
+│   │   ├── task_queue.py       # Async task processing
+│   │   └── sql/                # SQL parsing services
+│   └── mcp/                    # MCP protocol handlers
+├── frontend/                   # React Web UI
+│   ├── src/
+│   │   ├── components/         # UI components
+│   │   ├── routes/             # Page routes
+│   │   └── lib/                # API client
+│   └── package.json
+├── tests/                      # Test suite
+├── docs/                       # Documentation
+└── scripts/                    # Utility scripts
 ```
 
 ### Running Tests
+
 ```bash
-pytest tests/
+# Backend tests
+pytest tests/ -v
+
+# Frontend tests
+cd frontend && npm test
+
+# Integration tests (requires Neo4j)
+pytest tests/ -m integration
+
+# Coverage report
+pytest tests/ --cov=src --cov-report=html
 ```
 
 ### Code Quality
+
 ```bash
 # Format code
 black .
 isort .
 
-# Run linting
+# Linting
 ruff check .
+ruff check . --fix
+
+# Type checking
+mypy src/
 ```
 
-## Contributing
+### Frontend Development
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+```bash
+cd frontend
+npm install
+npm run dev        # Start dev server at http://localhost:3000
+npm run build      # Build for production
+npm run lint       # Check for issues
+npm test           # Run tests
+```
+
+## Deployment
+
+### Production Deployment
+
+See [Docker Deployment Guide](https://vantagecraft.dev/docs/code-graph/deployment/docker) for production deployment configurations including:
+
+- Multi-stage Docker builds
+- Environment-specific configurations
+- Scaling and load balancing
+- Security best practices
+- Monitoring and logging setup
+
+### System Requirements
+
+**Minimum Configuration**
+- CPU: 2 cores
+- RAM: 4 GB
+- Storage: 10 GB
+
+**Recommended Configuration**
+- CPU: 4+ cores
+- RAM: 8+ GB
+- Storage: 50+ GB SSD
+- Network: 100 Mbps+
+
+## Documentation
+
+Complete documentation available at [https://vantagecraft.dev/docs/code-graph](https://vantagecraft.dev/docs/code-graph)
+
+### Key Documentation Sections
+
+- [Quick Start Guide](https://vantagecraft.dev/docs/code-graph/getting-started/quickstart) - Get up and running in 5 minutes
+- [Architecture Overview](https://vantagecraft.dev/docs/code-graph/architecture/overview) - System design and components
+- [MCP Integration](https://vantagecraft.dev/docs/code-graph/guide/mcp/overview) - AI assistant integration
+- [REST API Reference](https://vantagecraft.dev/docs/code-graph/api/rest) - Complete API documentation
+- [Deployment Guide](https://vantagecraft.dev/docs/code-graph/deployment/overview) - Production deployment
+- [Development Guide](https://vantagecraft.dev/docs/code-graph/development/setup) - Contributing and development
+
+## Community and Support
+
+- **Documentation**: [Complete Documentation](https://vantagecraft.dev/docs/code-graph)
+- **Neo4j Guide**: [README_Neo4j.md](README_Neo4j.md)
+- **Issues**: [GitHub Issues](https://github.com/royisme/codebase-rag/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/royisme/codebase-rag/discussions)
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
-
-- 📚 **Documentation**: [Complete Documentation](https://vantagecraft.dev/docs/code-graph)
-- 📖 **Neo4j Guide**: [README_Neo4j.md](README_Neo4j.md)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/royisme/codebase-rag/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/royisme/codebase-rag/discussions)
-
 ## Acknowledgments
 
-- [Neo4j](https://neo4j.com/) for the powerful graph database technology
-- [LlamaIndex](https://llamaindex.ai/) for the document processing framework
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
-- [NiceGUI](https://nicegui.io/) for the monitoring interface
+Built with excellent open source technologies:
+
+- [Neo4j](https://neo4j.com/) - Graph database platform
+- [LlamaIndex](https://llamaindex.ai/) - Data framework for LLM applications
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework for Python
+- [React](https://react.dev/) - Library for building user interfaces
+- [Model Context Protocol](https://github.com/anthropics/mcp) - AI assistant integration standard
