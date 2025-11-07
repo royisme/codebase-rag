@@ -411,7 +411,8 @@ print(f"Answer: {result['answer']}\n")
 print("Sources:")
 for source in result['source_nodes']:
     title = source['metadata'].get('title', 'unknown')
-    print(f"  - {title} (score: {source['score']:.2f})")
+    score = source['score'] if source['score'] is not None else 0.0
+    print(f"  - {title} (score: {score:.2f})")
     print(f"    {source['text'][:100]}...")
 ```
 
