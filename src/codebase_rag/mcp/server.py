@@ -366,84 +366,9 @@ async def main():
                     notification_options=None,
                     experimental_capabilities={}
                 )
-
-                if search_results:
-                    ranked = ranker.rank_files(
-                        files=search_results,
-                        query=keyword,
-                        limit=10
-                    )
-
-                    for file in ranked:
-                        all_nodes.append({
-                            "type": "file",
-                            "path": file["path"],
-                            "lang": file["lang"],
-                            "score": file["score"],
-                            "ref": ranker.generate_ref_handle(path=file["path"])
-                        })
-
-        # Add focus files with high priority
-        if focus_list:
-            for focus_path in focus_list:
-                all_nodes.append({
-                    "type": "file",
-                    "path": focus_path,
-                    "lang": "unknown",
-                    "score": 10.0,  # High priority
-                    "ref": ranker.generate_ref_handle(path=focus_path)
-                })
-
-        # Build context pack
-        if ctx:
-            await ctx.info(f"Packing {len(all_nodes)} candidate files into context...")
-
-        context_result = pack_builder.build_context_pack(
-            nodes=all_nodes,
-            budget=budget,
-            stage=stage,
-            repo_id=repo_id,
-            file_limit=8,
-            symbol_limit=12,
-            enable_deduplication=True
+            )
         )
 
-        # Format items
-        items = []
-        for item in context_result.get("items", []):
-            items.append({
-                "kind": item.get("kind", "file"),
-                "title": item.get("title", "Unknown"),
-                "summary": item.get("summary", ""),
-                "ref": item.get("ref", ""),
-                "extra": {
-                    "lang": item.get("extra", {}).get("lang"),
-                    "score": item.get("extra", {}).get("score", 0.0)
-                }
-            })
-
-        if ctx:
-            await ctx.info(f"Context pack built: {len(items)} items, {context_result.get('budget_used', 0)} tokens")
-
-        return {
-            "success": True,
-            "items": items,
-            "budget_used": context_result.get("budget_used", 0),
-            "budget_limit": budget,
-            "stage": stage,
-            "repo_id": repo_id,
-            "category_counts": context_result.get("category_counts", {})
-        }
-
-    except Exception as e:
-        error_msg = f"Context pack generation failed: {str(e)}"
-        logger.error(error_msg)
-        if ctx:
-            await ctx.error(error_msg)
-        return {
-            "success": False,
-            "error": error_msg
-        }
 
 # ===================================
 # MCP Resources

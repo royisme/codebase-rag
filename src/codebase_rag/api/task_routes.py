@@ -9,8 +9,7 @@ from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 from datetime import datetime
 
-from codebase_rag.services.task_queue import task_queue, TaskStatus
-from codebase_rag.services.task_storage import TaskType
+from codebase_rag.services.tasks import task_queue, TaskStatus, TaskType
 from loguru import logger
 from codebase_rag.config import settings
 
