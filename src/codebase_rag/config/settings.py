@@ -7,7 +7,7 @@ Settings can be configured via environment variables or .env file.
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any
 
 
 class Settings(BaseSettings):
@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     # Document Processing Settings
     max_document_size: int = Field(default=10 * 1024 * 1024, description="Maximum document size in bytes (10MB)")
     max_payload_size: int = Field(default=50 * 1024 * 1024, description="Maximum task payload size for storage (50MB)")
+    ingestion_pipelines: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Optional ingestion pipeline overrides",
+    )
 
     # API Settings
     cors_origins: list = Field(default=["*"], description="CORS allowed origins")
