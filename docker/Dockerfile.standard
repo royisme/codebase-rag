@@ -2,7 +2,7 @@
 # Standard Docker image - Code Graph + Memory Store (Embedding required)
 #
 # IMPORTANT: Frontend MUST be pre-built before docker build:
-#   ./build-frontend.sh
+#   ./scripts/build-frontend.sh
 #
 # This Dockerfile expects frontend/dist/ to exist
 
@@ -48,13 +48,9 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 
 # Copy application code
-COPY --chown=appuser:appuser api ./api
-COPY --chown=appuser:appuser core ./core
-COPY --chown=appuser:appuser services ./services
-COPY --chown=appuser:appuser mcp_tools ./mcp_tools
-COPY --chown=appuser:appuser start.py start_mcp.py mcp_server.py config.py main.py ./
+COPY --chown=appuser:appuser src ./src
 
-# Copy pre-built frontend (MUST exist - run ./build-frontend.sh first)
+# Copy pre-built frontend (MUST exist - run ./scripts/build-frontend.sh first)
 COPY --chown=appuser:appuser frontend/dist ./static
 
 USER appuser
@@ -67,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
 # Start application (dual-port mode)
-CMD ["python", "main.py"]
+CMD ["python", "-m", "codebase_rag"]

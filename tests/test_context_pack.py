@@ -3,7 +3,7 @@ Tests for context pack generation
 Tests GET /context/pack endpoint
 """
 import pytest
-from services.pack_builder import PackBuilder
+from src.codebase_rag.services.pipeline import PackBuilder
 
 
 class TestPackBuilder:

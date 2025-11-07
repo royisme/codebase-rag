@@ -188,8 +188,8 @@ from fastapi import FastAPI, HTTPException
 from neo4j import GraphDatabase
 
 # Local imports
-from services.neo4j_knowledge_service import Neo4jKnowledgeService
-from core.config import settings
+from src.codebase_rag.services.knowledge import Neo4jKnowledgeService
+from src.codebase_rag.core.config import settings
 ```
 
 **Type Hints:**

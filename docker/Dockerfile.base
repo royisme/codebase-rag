@@ -2,7 +2,7 @@
 # Base Docker image for Code Graph Knowledge System
 #
 # IMPORTANT: Frontend MUST be pre-built before docker build:
-#   ./build-frontend.sh
+#   ./scripts/build-frontend.sh
 #
 # This Dockerfile expects frontend/dist/ to exist
 
@@ -53,7 +53,7 @@ COPY --chown=appuser:appuser services ./services
 COPY --chown=appuser:appuser mcp_tools ./mcp_tools
 COPY --chown=appuser:appuser start.py start_mcp.py mcp_server.py config.py main.py ./
 
-# Copy pre-built frontend (MUST exist - run ./build-frontend.sh first)
+# Copy pre-built frontend (MUST exist - run ./scripts/build-frontend.sh first)
 COPY --chown=appuser:appuser frontend/dist ./static
 
 USER appuser

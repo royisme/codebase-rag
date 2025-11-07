@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SCHEMA_FILE="$PROJECT_ROOT/services/graph/schema.cypher"
+SCHEMA_FILE="$PROJECT_ROOT/src/codebase_rag/services/graph/schema.cypher"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}Neo4j Schema Bootstrap${NC}"
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     user = os.getenv("NEO4J_USER", "neo4j")
     password = os.getenv("NEO4J_PASSWORD", "password")
     database = os.getenv("NEO4J_DATABASE", "neo4j")
-    schema_file = sys.argv[1] if len(sys.argv) > 1 else "services/graph/schema.cypher"
+    schema_file = sys.argv[1] if len(sys.argv) > 1 else "src/codebase_rag/services/graph/schema.cypher"
 
     print(f"Connecting to {uri} as {user}...")
     apply_schema(uri, user, password, database, schema_file)

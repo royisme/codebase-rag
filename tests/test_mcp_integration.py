@@ -15,9 +15,9 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 import json
 
-from mcp_tools.tool_definitions import get_tool_definitions
-from mcp_tools.resources import get_resource_list, read_resource_content
-from mcp_tools.prompts import get_prompt_list, get_prompt_content
+from src.codebase_rag.mcp.tools import get_tool_definitions
+from src.codebase_rag.mcp.resources import get_resource_list, read_resource_content
+from src.codebase_rag.mcp.prompts import get_prompt_list, get_prompt_content
 
 
 class TestToolDefinitions:
@@ -309,7 +309,7 @@ class TestToolExecutionRouting:
     @pytest.mark.asyncio
     async def test_knowledge_tool_routing(self, mock_knowledge_service):
         """Test that knowledge tools route to correct service"""
-        from mcp_tools.knowledge_handlers import handle_query_knowledge
+        from src.codebase_rag.mcp.handlers.knowledge import handle_query_knowledge
 
         mock_knowledge_service.query.return_value = {
             "success": True,
@@ -327,7 +327,7 @@ class TestToolExecutionRouting:
     @pytest.mark.asyncio
     async def test_memory_tool_routing(self, mock_memory_store):
         """Test that memory tools route to correct service"""
-        from mcp_tools.memory_handlers import handle_add_memory
+        from src.codebase_rag.mcp.handlers.memory import handle_add_memory
 
         mock_memory_store.add_memory.return_value = {
             "success": True,
@@ -350,7 +350,7 @@ class TestToolExecutionRouting:
     @pytest.mark.asyncio
     async def test_task_tool_routing(self, mock_task_queue, mock_task_status):
         """Test that task tools route to correct service"""
-        from mcp_tools.task_handlers import handle_get_queue_stats
+        from src.codebase_rag.mcp.handlers.tasks import handle_get_queue_stats
 
         mock_task_queue.get_stats.return_value = {
             "pending": 5,
@@ -368,7 +368,7 @@ class TestToolExecutionRouting:
     @pytest.mark.asyncio
     async def test_system_tool_routing(self, mock_knowledge_service):
         """Test that system tools route to correct service"""
-        from mcp_tools.system_handlers import handle_get_statistics
+        from src.codebase_rag.mcp.handlers.system import handle_get_statistics
 
         mock_knowledge_service.get_statistics.return_value = {
             "success": True,
@@ -390,7 +390,7 @@ class TestErrorHandlingPatterns:
     @pytest.mark.asyncio
     async def test_knowledge_service_error(self, mock_knowledge_service):
         """Test knowledge service error handling"""
-        from mcp_tools.knowledge_handlers import handle_query_knowledge
+        from src.codebase_rag.mcp.handlers.knowledge import handle_query_knowledge
 
         mock_knowledge_service.query.return_value = {
             "success": False,
@@ -408,7 +408,7 @@ class TestErrorHandlingPatterns:
     @pytest.mark.asyncio
     async def test_memory_store_error(self, mock_memory_store):
         """Test memory store error handling"""
-        from mcp_tools.memory_handlers import handle_get_memory
+        from src.codebase_rag.mcp.handlers.memory import handle_get_memory
 
         mock_memory_store.get_memory.return_value = {
             "success": False,
@@ -426,7 +426,7 @@ class TestErrorHandlingPatterns:
     @pytest.mark.asyncio
     async def test_task_queue_error(self, mock_task_queue, mock_task_status):
         """Test task queue error handling"""
-        from mcp_tools.task_handlers import handle_get_task_status
+        from src.codebase_rag.mcp.handlers.tasks import handle_get_task_status
 
         mock_task_queue.get_task.return_value = None
 
@@ -442,7 +442,7 @@ class TestErrorHandlingPatterns:
     @pytest.mark.asyncio
     async def test_code_handler_exception(self, mock_code_ingestor, mock_git_utils):
         """Test code handler exception handling"""
-        from mcp_tools.code_handlers import handle_code_graph_ingest_repo
+        from src.codebase_rag.mcp.handlers.code import handle_code_graph_ingest_repo
 
         mock_git_utils.is_git_repo.side_effect = Exception("Git error")
 
@@ -462,7 +462,7 @@ class TestAsyncTaskHandling:
     @pytest.mark.asyncio
     async def test_large_document_async_processing(self, mock_knowledge_service, mock_submit_document_task):
         """Test large documents trigger async processing"""
-        from mcp_tools.knowledge_handlers import handle_add_document
+        from src.codebase_rag.mcp.handlers.knowledge import handle_add_document
 
         mock_submit_document_task.return_value = "task-123"
         large_content = "x" * 15000  # 15KB
@@ -481,7 +481,7 @@ class TestAsyncTaskHandling:
     @pytest.mark.asyncio
     async def test_directory_always_async(self, mock_submit_directory_task):
         """Test directory processing always uses async"""
-        from mcp_tools.knowledge_handlers import handle_add_directory
+        from src.codebase_rag.mcp.handlers.knowledge import handle_add_directory
 
         mock_submit_directory_task.return_value = "task-456"
 
@@ -497,7 +497,7 @@ class TestAsyncTaskHandling:
     @pytest.mark.asyncio
     async def test_watch_task_monitors_progress(self, mock_task_queue, mock_task_status):
         """Test watch_task monitors task until completion"""
-        from mcp_tools.task_handlers import handle_watch_task
+        from src.codebase_rag.mcp.handlers.tasks import handle_watch_task
 
         # Simulate task completing immediately
         mock_task = Mock()
@@ -525,7 +525,7 @@ class TestDataValidation:
     @pytest.mark.asyncio
     async def test_clear_knowledge_base_requires_confirmation(self, mock_knowledge_service):
         """Test clear_knowledge_base requires explicit confirmation"""
-        from mcp_tools.system_handlers import handle_clear_knowledge_base
+        from src.codebase_rag.mcp.handlers.system import handle_clear_knowledge_base
 
         # Without confirmation
         result = await handle_clear_knowledge_base(
@@ -555,7 +555,7 @@ class TestDataValidation:
     @pytest.mark.asyncio
     async def test_memory_importance_defaults(self, mock_memory_store):
         """Test memory importance has sensible default"""
-        from mcp_tools.memory_handlers import handle_add_memory
+        from src.codebase_rag.mcp.handlers.memory import handle_add_memory
 
         mock_memory_store.add_memory.return_value = {
             "success": True,
@@ -580,7 +580,7 @@ class TestDataValidation:
     @pytest.mark.asyncio
     async def test_search_top_k_defaults(self, mock_knowledge_service):
         """Test search top_k has sensible default"""
-        from mcp_tools.knowledge_handlers import handle_search_similar_nodes
+        from src.codebase_rag.mcp.handlers.knowledge import handle_search_similar_nodes
 
         mock_knowledge_service.search_similar_nodes.return_value = {
             "success": True,

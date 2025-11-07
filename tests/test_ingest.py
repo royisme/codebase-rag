@@ -3,8 +3,7 @@ Tests for repository ingestion functionality
 Tests POST /ingest/repo endpoint
 """
 import pytest
-from services.code_ingestor import CodeIngestor
-from services.graph_service import Neo4jGraphService
+from src.codebase_rag.services.code import CodeIngestor, Neo4jGraphService
 
 
 class TestCodeIngestor:

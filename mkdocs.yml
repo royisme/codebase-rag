@@ -1,10 +1,12 @@
 site_name: Code Graph Knowledge System
-site_url: https://code-graph.vantagecraft.dev
+site_url: https://vantagecraft.dev/docs/code-graph/
 site_description: AI-powered code intelligence and knowledge management system
 site_author: VantageCraft
 repo_url: https://github.com/royisme/codebase-rag
 repo_name: codebase-rag
 edit_uri: edit/main/docs/
+use_directory_urls: true
+
 
 theme:
   name: material
@@ -170,6 +172,7 @@ nav:
     - MCP Tools: api/mcp-tools.md
     - Python SDK: api/python-sdk.md
   - Architecture:
+    - Overview: architecture/overview.md
     - System Design: architecture/design.md
     - Components: architecture/components.md
     - Data Flow: architecture/dataflow.md
@@ -177,6 +180,7 @@ nav:
     - Contributing: development/contributing.md
     - Development Setup: development/setup.md
     - Testing: development/testing.md
+    - Migration Guide (v0.8.0): development/migration-guide.md
     - Version Management: development/version-management.md
     - Changelog Automation: development/changelog-automation.md
     - Release Process: development/release.md

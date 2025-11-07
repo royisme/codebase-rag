@@ -81,7 +81,7 @@ http://localhost:8080/api/v1/
 curl -fsSL https://bun.sh/install | bash
 
 # Build frontend
-./build-frontend.sh
+./scripts/build-frontend.sh
 ```
 
 This pre-builds the React frontend and generates static files in `frontend/dist/`, which are then copied into the Docker image. The production image does not include Node.js, npm, or any frontend build tools (~405MB savings).
@@ -94,7 +94,7 @@ git clone https://github.com/royisme/codebase-rag.git
 cd codebase-rag
 
 # Build frontend first (REQUIRED)
-./build-frontend.sh
+./scripts/build-frontend.sh
 
 # Build minimal
 docker build -f docker/Dockerfile.minimal -t my-codebase-rag:minimal .

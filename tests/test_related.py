@@ -3,7 +3,7 @@ Tests for related files search functionality
 Tests GET /graph/related endpoint
 """
 import pytest
-from services.ranker import Ranker
+from src.codebase_rag.services.utils import Ranker
 
 
 class TestRanker:

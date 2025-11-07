@@ -158,7 +158,7 @@ pip install -e .
 # Follow: https://neo4j.com/docs/operations-manual/current/installation/
 
 # Configure and run
-python start.py
+python -m codebase_rag
 ```
 
 **Note**: Docker is recommended for easier setup and isolation.
@@ -396,7 +396,7 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 # Restart
 docker-compose restart api
 # or
-pkill -f start.py && python start.py
+pkill -f start.py && python -m codebase_rag
 ```
 
 No data migration needed - embeddings are recalculated automatically.
@@ -887,7 +887,7 @@ jobs:
 ```bash
 # In your build.sh
 python -c "
-from services.memory_store import MemoryStore
+from src.codebase_rag.services.memory import MemoryStore
 # Auto-extract memories after build
 "
 ```

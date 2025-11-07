@@ -33,7 +33,7 @@ search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
 [[tool.bumpversion.files]]
-filename = "src/__version__.py"
+filename = "src/codebase_rag/__version__.py"
 search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 

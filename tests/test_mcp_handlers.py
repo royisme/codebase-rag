@@ -17,20 +17,20 @@ from datetime import datetime
 import asyncio
 
 # Import handlers
-from mcp_tools.knowledge_handlers import (
+from src.codebase_rag.mcp.handlers.knowledge import (
     handle_query_knowledge,
     handle_search_similar_nodes,
     handle_add_document,
     handle_add_file,
     handle_add_directory,
 )
-from mcp_tools.code_handlers import (
+from src.codebase_rag.mcp.handlers.code import (
     handle_code_graph_ingest_repo,
     handle_code_graph_related,
     handle_code_graph_impact,
     handle_context_pack,
 )
-from mcp_tools.memory_handlers import (
+from src.codebase_rag.mcp.handlers.memory import (
     handle_add_memory,
     handle_search_memories,
     handle_get_memory,
@@ -39,7 +39,7 @@ from mcp_tools.memory_handlers import (
     handle_supersede_memory,
     handle_get_project_summary,
 )
-from mcp_tools.task_handlers import (
+from src.codebase_rag.mcp.handlers.tasks import (
     handle_get_task_status,
     handle_watch_task,
     handle_watch_tasks,
@@ -47,7 +47,7 @@ from mcp_tools.task_handlers import (
     handle_cancel_task,
     handle_get_queue_stats,
 )
-from mcp_tools.system_handlers import (
+from src.codebase_rag.mcp.handlers.system import (
     handle_get_graph_schema,
     handle_get_statistics,
     handle_clear_knowledge_base,

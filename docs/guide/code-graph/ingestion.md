@@ -863,8 +863,8 @@ ORDER BY count DESC
 For complex workflows, use the Python API directly:
 
 ```python
-from services.graph_service import graph_service
-from services.code_ingestor import CodeIngestor
+from src.codebase_rag.services.code import graph_service
+from src.codebase_rag.services.code import CodeIngestor
 
 # Initialize
 await graph_service.connect()

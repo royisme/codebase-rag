@@ -81,7 +81,7 @@ import pytest
 @pytest.mark.unit
 async def test_parse_memory_type():
     """Test memory type parsing logic."""
-    from services.memory_store import parse_memory_type
+    from src.codebase_rag.services.memory import parse_memory_type
 
     result = parse_memory_type("decision")
     assert result == "decision"
@@ -513,7 +513,7 @@ def test_with_env_vars(mocker):
         'NEO4J_PASSWORD': 'testpass'
     })
 
-    from core.config import settings
+    from src.codebase_rag.core.config import settings
     assert settings.neo4j_uri == 'bolt://test:7687'
 ```
 
@@ -678,7 +678,7 @@ and memory relationships.
 import pytest
 from typing import Dict, Any
 
-from services.memory_store import MemoryStore
+from src.codebase_rag.services.memory import MemoryStore
 
 
 class TestMemoryStore:

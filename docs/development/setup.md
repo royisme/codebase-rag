@@ -593,7 +593,7 @@ ollama list
 
 ```bash
 # Start the application
-python start.py
+python -m codebase_rag
 
 # You should see:
 # ✓ All service health checks passed

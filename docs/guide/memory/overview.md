@@ -376,7 +376,7 @@ curl -X POST http://localhost:8000/api/v1/memory/search \
 For Python applications:
 
 ```python
-from services.memory_store import memory_store
+from src.codebase_rag.services.memory import memory_store
 import asyncio
 
 async def main():

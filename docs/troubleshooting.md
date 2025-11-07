@@ -51,7 +51,7 @@ curl http://localhost:8000/api/v1/health
 
 ```bash
 # Check all services
-python start.py --check
+python -m codebase_rag --check
 
 # Check logs
 tail -f logs/application.log
@@ -778,10 +778,10 @@ Error: MCP server failed to start
 
 ```bash
 # Try starting manually
-python start_mcp.py
+python -m codebase_rag --mcp
 
 # Check logs
-python start_mcp.py 2>&1 | tee mcp.log
+python -m codebase_rag --mcp 2>&1 | tee mcp.log
 ```
 
 **Solutions:**

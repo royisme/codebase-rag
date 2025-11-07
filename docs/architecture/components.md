@@ -1482,7 +1482,7 @@ Critical for avoiding circular dependencies:
 
 ```python
 # 1. Configuration (no dependencies)
-from config import settings
+from src.codebase_rag.config import settings
 
 # 2. Storage layer (no app dependencies)
 neo4j_connection = Neo4jGraphStore(...)
@@ -1555,7 +1555,7 @@ class Settings(BaseSettings):
 
 Components access configuration:
 ```python
-from config import settings
+from src.codebase_rag.config import settings
 
 # Use in service
 self.timeout = settings.operation_timeout

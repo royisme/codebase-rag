@@ -30,7 +30,7 @@ jobs:
           echo "pyproject.toml version: $PROJECT_VERSION"
 
           # Get version from __version__.py
-          VERSION_PY=$(grep '__version__ = ' src/__version__.py | cut -d'"' -f2)
+          VERSION_PY=$(grep '__version__ = ' src/codebase_rag/__version__.py | cut -d'"' -f2)
           echo "__version__.py version: $VERSION_PY"
 
           # Validate Python version file
@@ -70,7 +70,7 @@ jobs:
           bun-version: latest
 
       - name: Build Frontend
-        run: ./build-frontend.sh
+        run: ./scripts/build-frontend.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -121,7 +121,7 @@ jobs:
           bun-version: latest
 
       - name: Build Frontend
-        run: ./build-frontend.sh
+        run: ./scripts/build-frontend.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -172,7 +172,7 @@ jobs:
           bun-version: latest
 
       - name: Build Frontend
-        run: ./build-frontend.sh
+        run: ./scripts/build-frontend.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

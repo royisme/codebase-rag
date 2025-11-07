@@ -2,7 +2,25 @@
 
 Get Code Graph Knowledge System up and running in 5 minutes!
 
-## 🎯 Choose Your Path
+## 🎯 Choose Your Deployment Mode
+
+Code Graph Knowledge System offers **three deployment modes** based on which features you need:
+
+| Mode | Description | Ports | LLM Required | Use Case |
+|------|-------------|-------|--------------|----------|
+| **Minimal** | Code Graph only | 7474, 7687, 8000, 8080 | ❌ No | Static code analysis, repository exploration |
+| **Standard** | Code Graph + Memory Store | 7474, 7687, 8000, 8080 | Embedding only | Project knowledge tracking, AI agent memory |
+| **Full** | All Features + Knowledge RAG | 7474, 7687, 8000, 8080 | LLM + Embedding | Complete intelligent knowledge management |
+
+!!! info "What's Running?"
+    All modes start **two servers**:
+
+    - **Port 8000**: MCP SSE Service (for AI assistants)
+    - **Port 8080**: Web UI + REST API (for humans & programs)
+
+    See [Architecture Overview](../architecture/overview.md) to understand how these work together.
+
+## 🚀 Choose Your Path
 
 === "Minimal (Recommended)"
     **Code Graph only** - No LLM required
@@ -73,6 +91,54 @@ You should see:
 - ✅ Neo4j running at http://localhost:7474
 - ✅ API running at http://localhost:8000
 - ✅ API docs at http://localhost:8000/docs
+
+## 📡 Understanding the Interfaces
+
+After starting the services, you have **three ways** to interact with the system:
+
+### 1. REST API (Port 8080)
+
+**For**: Programmatic access, scripts, CI/CD integration
+
+```bash
+# Health check
+curl http://localhost:8080/api/v1/health
+
+# Query knowledge
+curl -X POST http://localhost:8080/api/v1/knowledge/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How does authentication work?"}'
+```
+
+**Use cases**:
+- Automation scripts
+- CI/CD pipelines
+- Custom applications
+- Testing and monitoring
+
+[Full REST API Documentation](../api/rest.md)
+
+### 2. Web UI (Port 8080)
+
+**For**: Human users, visual monitoring
+
+Open in browser: http://localhost:8080
+
+Features:
+- 📊 Task monitoring dashboard
+- 📁 File and directory upload
+- 📈 System health and statistics
+- ⚙️ Configuration management
+
+### 3. MCP Protocol (Port 8000)
+
+**For**: AI assistants (Claude Desktop, Cursor, etc.)
+
+Configure your AI tool to connect via MCP. The system provides 25+ tools for code intelligence.
+
+[MCP Integration Guide](../guide/mcp/overview.md)
+
+---
 
 ## 🚀 First Steps
 

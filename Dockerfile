@@ -50,10 +50,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy application source code for local package installation
 COPY pyproject.toml README.md ./
-COPY api ./api
-COPY core ./core
-COPY services ./services
-COPY mcp_tools ./mcp_tools
+COPY src ./src
 COPY *.py ./
 
 # Install local package (without dependencies, already installed)
@@ -95,7 +92,7 @@ COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 COPY --chown=appuser:appuser . .
 
 # Copy pre-built frontend (if exists)
-# Run ./build-frontend.sh before docker build to generate frontend/dist
+# Run ./scripts/build-frontend.sh before docker build to generate frontend/dist
 # If frontend/dist doesn't exist, the app will run as API-only (no web UI)
 RUN if [ -d frontend/dist ]; then \
         mkdir -p static && \
@@ -103,7 +100,7 @@ RUN if [ -d frontend/dist ]; then \
         echo "✅ Frontend copied to static/"; \
     else \
         echo "⚠️  No frontend/dist found - running as API-only"; \
-        echo "   Run ./build-frontend.sh to build frontend"; \
+        echo "   Run ./scripts/build-frontend.sh to build frontend"; \
     fi
 
 # Switch to non-root user
@@ -129,6 +126,6 @@ EXPOSE 8000 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
-# Default command - starts HTTP API (not MCP)
-# For MCP service, run on host: python start_mcp.py
-CMD ["python", "start.py"]
+# Default command - starts both MCP and Web services (dual-port mode)
+# Alternative: python -m codebase_rag --mcp (MCP only) or --web (Web only)
+CMD ["python", "-m", "codebase_rag"]
