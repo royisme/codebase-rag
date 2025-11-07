@@ -207,7 +207,7 @@ class Neo4jRAGPipeline:
             elif self.function_tools:
                 for tool in self.function_tools:
                     try:
-                        result = tool(question=question, **(config.tool_kwargs or {}))
+                        result = tool(query=question, **(config.tool_kwargs or {}))
                         tool_outputs.append(
                             {
                                 "tool": result.tool_name,
