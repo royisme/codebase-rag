@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import time
 from dataclasses import dataclass
 from importlib import import_module
@@ -238,16 +239,30 @@ def merge_pipeline_configs(
 ) -> Dict[str, Dict[str, Any]]:
     """Merge user supplied pipeline configuration with defaults."""
 
-    merged = {**default_config}
+    def _merge_values(default: Any, override: Any) -> Any:
+        if isinstance(default, dict) and isinstance(override, dict):
+            merged_dict: Dict[str, Any] = {}
+            for key in default.keys() | override.keys():
+                if key in override:
+                    if key in default:
+                        merged_dict[key] = _merge_values(default[key], override[key])
+                    else:
+                        merged_dict[key] = copy.deepcopy(override[key])
+                else:
+                    merged_dict[key] = copy.deepcopy(default[key])
+            return merged_dict
+        if isinstance(override, dict):
+            return copy.deepcopy(override)
+        return override
+
+    merged = copy.deepcopy(default_config)
     if not override_config:
         return merged
 
     for key, value in override_config.items():
         if key in merged:
-            combined = dict(merged[key])
-            combined.update(value)
-            merged[key] = combined
+            merged[key] = _merge_values(merged[key], value)
         else:
-            merged[key] = value
+            merged[key] = copy.deepcopy(value)
     return merged
 
