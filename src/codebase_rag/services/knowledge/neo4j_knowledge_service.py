@@ -23,17 +23,17 @@ from llama_index.core.schema import NodeWithScore, QueryBundle
 
 # Tools / workflow
 from llama_index.core.tools import FunctionTool
-from llama_index.embeddings.gemini import GeminiEmbedding
 
 # Embedding Providers
+from llama_index.embeddings.gemini import GeminiEmbedding
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 # Graph Store
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
-from llama_index.llms.gemini import Gemini
 
 # LLM Providers
+from llama_index.llms.gemini import Gemini
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.openai import OpenAI
 from llama_index.llms.openrouter import OpenRouter
