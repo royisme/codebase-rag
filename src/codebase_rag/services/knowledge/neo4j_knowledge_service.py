@@ -316,8 +316,10 @@ class Neo4jKnowledgeService:
         timeout: Optional[int] = None,
     ) -> Dict[str, Any]:
         if pipeline_name not in self._pipeline_bundles:
-            raise ValueError(f"Pipeline '{pipeline_name}' is not configured")
-
+            available_pipelines = ", ".join(self._pipeline_bundles.keys())
+            raise ValueError(
+                f"Pipeline '{pipeline_name}' is not configured. Available pipelines: {available_pipelines}"
+            )
         bundle = self._pipeline_bundles[pipeline_name]
         connector = bundle.instantiate_connector(**connector_overrides)
 
