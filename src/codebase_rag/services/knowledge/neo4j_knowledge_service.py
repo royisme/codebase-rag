@@ -368,6 +368,26 @@ class Neo4jKnowledgeService:
             self.query_pipeline.function_tools = self.function_tools
             self.query_pipeline.tool_node = self.tool_node
 
+    def _build_pipeline(self) -> None:
+        """(Re)build the retrieval pipeline and refresh tool bindings."""
+
+        if self.storage_context is None:
+            raise RuntimeError("Storage context is not available")
+        if self.response_synthesizer is None:
+            raise RuntimeError("Response synthesizer is not available")
+
+        self.query_pipeline = Neo4jRAGPipeline(
+            storage_context=self.storage_context,
+            response_synthesizer=self.response_synthesizer,
+            llm=Settings.llm,
+            default_top_k=settings.top_k,
+            default_graph_depth=2,
+            max_knowledge_sequence=30,
+            verbose=settings.debug,
+            vector_index=self.vector_index,
+        )
+        self._register_tools()
+
     async def initialize(self) -> bool:
         """initialize service"""
         try:
@@ -443,17 +463,7 @@ class Neo4jKnowledgeService:
             )
 
             # Construct the retrieval pipeline
-            self.query_pipeline = Neo4jRAGPipeline(
-                storage_context=self.storage_context,
-                response_synthesizer=self.response_synthesizer,
-                llm=Settings.llm,
-                default_top_k=settings.top_k,
-                default_graph_depth=2,
-                max_knowledge_sequence=30,
-                verbose=settings.debug,
-                vector_index=self.vector_index,
-            )
-            self._register_tools()
+            self._build_pipeline()
 
             self._initialized = True
             logger.success("Neo4j Knowledge Service initialized successfully")
@@ -945,6 +955,143 @@ class Neo4jKnowledgeService:
                 "success": False,
                 "error": str(e),
             }
+
+    async def get_statistics(self) -> Dict[str, Any]:
+        """Return lightweight service statistics for legacy API compatibility."""
+
+        if not self._initialized:
+            raise Exception("Service not initialized")
+
+        def _collect_statistics() -> Dict[str, Any]:
+            base_stats: Dict[str, Any] = {
+                "initialized": self._initialized,
+                "graph_store_type": type(self.graph_store).__name__
+                if self.graph_store
+                else None,
+                "vector_index_type": type(self.vector_index).__name__
+                if self.vector_index
+                else None,
+                "pipeline": {
+                    "default_top_k": getattr(self.query_pipeline, "default_top_k", None),
+                    "default_graph_depth": getattr(
+                        self.query_pipeline, "default_graph_depth", None
+                    ),
+                    "supports_tools": bool(self.function_tools),
+                },
+            }
+
+            if self.graph_store is None:
+                return base_stats
+
+            try:
+                node_result = self.graph_store.query(
+                    "MATCH (n) RETURN count(n) AS node_count"
+                )
+                base_stats["node_count"] = (
+                    node_result[0].get("node_count", 0) if node_result else 0
+                )
+            except Exception as exc:
+                base_stats["node_count_error"] = str(exc)
+
+            try:
+                rel_result = self.graph_store.query(
+                    "MATCH ()-[r]->() RETURN count(r) AS relationship_count"
+                )
+                base_stats["relationship_count"] = (
+                    rel_result[0].get("relationship_count", 0)
+                    if rel_result
+                    else 0
+                )
+            except Exception as exc:
+                base_stats["relationship_count_error"] = str(exc)
+
+            return base_stats
+
+        try:
+            statistics = await asyncio.wait_for(
+                asyncio.to_thread(_collect_statistics),
+                timeout=self.operation_timeout,
+            )
+            return {"success": True, "statistics": statistics}
+        except asyncio.TimeoutError:
+            error_msg = f"Statistics retrieval timed out after {self.operation_timeout}s"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "timeout": self.operation_timeout,
+            }
+        except Exception as exc:
+            logger.error(f"Failed to collect statistics: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    async def clear_knowledge_base(self) -> Dict[str, Any]:
+        """Clear Neo4j data and rebuild service indices for legacy API compatibility."""
+
+        if not self._initialized:
+            raise Exception("Service not initialized")
+
+        async def _clear_graph() -> None:
+            def _clear_sync() -> None:
+                if self.graph_store is None:
+                    raise RuntimeError("Graph store is not available")
+
+                # Remove all nodes/relationships
+                self.graph_store.query("MATCH (n) DETACH DELETE n")
+
+                # Best-effort vector store reset (depends on backend capabilities)
+                vector_store = getattr(self.storage_context, "vector_store", None)
+                if vector_store is not None:
+                    delete_method = getattr(vector_store, "delete", None)
+                    if callable(delete_method):
+                        try:
+                            delete_method(delete_all=True)
+                        except TypeError:
+                            delete_method()
+                        except Exception as exc:  # pragma: no cover - defensive logging
+                            logger.warning(
+                                f"Vector store clear failed: {exc}"
+                            )
+
+            await asyncio.to_thread(_clear_sync)
+
+        try:
+            await asyncio.wait_for(
+                _clear_graph(),
+                timeout=self.operation_timeout,
+            )
+
+            # Recreate storage context and indexes to reflect cleared state
+            self.storage_context = StorageContext.from_defaults(
+                graph_store=self.graph_store
+            )
+            self.knowledge_index = KnowledgeGraphIndex(
+                nodes=[],
+                storage_context=self.storage_context,
+                show_progress=True,
+            )
+            self.vector_index = VectorStoreIndex.from_vector_store(
+                self.storage_context.vector_store,
+                embed_model=Settings.embed_model,
+            )
+            self._build_pipeline()
+
+            logger.info("Knowledge base cleared successfully")
+            return {
+                "success": True,
+                "message": "Knowledge base cleared successfully",
+            }
+        except asyncio.TimeoutError:
+            error_msg = f"Clear operation timed out after {self.operation_timeout}s"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "timeout": self.operation_timeout,
+            }
+        except Exception as exc:
+            logger.error(f"Failed to clear knowledge base: {exc}")
+            return {"success": False, "error": str(exc)}
 
     async def execute_cypher(
         self,
