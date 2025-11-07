@@ -1,6 +1,6 @@
 [project]
 name = "code-graph"
-version = "0.8.0"
+version = "0.9.0"
 description = "Enterprise knowledge management platform with Neo4j graph database, multi-interface architecture (MCP/Web/REST), and intelligent code analysis"
 readme = "README.md"
 requires-python = ">=3.13"

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-11-07
+
+### Maintenance
+
+- 
+- Major improvements:
+- Major improvements:
+- - Update pyproject.toml description from 'AI-powered code intelligence' to 'Enterprise knowledge management platform'
+- - Remove invalid ../README.md references from mkdocs.yml (mkdocs can't access files outside docs/)
+- - Move frontend documentation to appropriate docs/ directories
+
+
 ## [0.8.0] - 2025-11-06
 
 ### Added
