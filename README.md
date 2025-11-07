@@ -243,7 +243,7 @@ LLM_PROVIDER=ollama
 OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 
-# Embedding Provider (ollama, openai, gemini, huggingface)
+# Embedding Provider (ollama, openai, gemini, openrouter)
 EMBEDDING_PROVIDER=ollama
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 

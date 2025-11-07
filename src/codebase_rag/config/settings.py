@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     openrouter_max_tokens: int = Field(default=2048, description="OpenRouter max tokens for completion", alias="OPENROUTER_MAX_TOKENS")
 
     # Embedding Provider Configuration
-    embedding_provider: Literal["ollama", "openai", "gemini", "huggingface", "openrouter"] = Field(
+    embedding_provider: Literal["ollama", "openai", "gemini", "openrouter"] = Field(
         default="ollama",
         description="Embedding provider to use",
         alias="EMBEDDING_PROVIDER"
@@ -75,9 +75,6 @@ class Settings(BaseSettings):
 
     # Gemini Embedding
     gemini_embedding_model: str = Field(default="models/embedding-001", description="Gemini embedding model", alias="GEMINI_EMBEDDING_MODEL")
-
-    # HuggingFace Embedding
-    huggingface_embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", description="HuggingFace embedding model", alias="HF_EMBEDDING_MODEL")
 
     # OpenRouter Embedding
     openrouter_embedding_model: str = Field(default="text-embedding-ada-002", description="OpenRouter embedding model", alias="OPENROUTER_EMBEDDING_MODEL")

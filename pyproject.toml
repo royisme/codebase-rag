@@ -29,15 +29,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-milvus = [
-    "pymilvus",
-    "llama-index-vector-stores-milvus",
-]
 openrouter = [
     "llama-index-llms-openrouter",
-]
-huggingface = [
-    "llama-index-embeddings-huggingface",
 ]
 dev = [
     "bump-my-version>=0.26.0",

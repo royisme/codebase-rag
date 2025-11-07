@@ -48,7 +48,7 @@ ENABLE_KNOWLEDGE_RAG=false
 ENABLE_AUTO_EXTRACTION=false
 
 # Embedding Provider (choose one)
-EMBEDDING_PROVIDER=ollama  # or openai, gemini, huggingface
+EMBEDDING_PROVIDER=ollama  # or openai, gemini, openrouter
 
 # Ollama Configuration (if using Ollama)
 OLLAMA_BASE_URL=http://host.docker.internal:11434
@@ -166,14 +166,6 @@ OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 OPENAI_API_BASE=https://openrouter.ai/api/v1
 ```
 
-### HuggingFace (Local Embeddings)
-
-Free local embeddings without API:
-
-```bash
-EMBEDDING_PROVIDER=huggingface
-HF_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-```
 
 ## Advanced Configuration
 

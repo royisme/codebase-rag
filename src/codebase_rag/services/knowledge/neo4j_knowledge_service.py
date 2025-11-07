@@ -28,7 +28,6 @@ from llama_index.llms.openrouter import OpenRouter
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.embeddings.gemini import GeminiEmbedding
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 # Graph Store
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
@@ -123,10 +122,6 @@ class Neo4jKnowledgeService:
             return GeminiEmbedding(
                 model_name=settings.gemini_embedding_model,
                 api_key=settings.google_api_key
-            )
-        elif provider == "huggingface":
-            return HuggingFaceEmbedding(
-                model_name=settings.huggingface_embedding_model
             )
         elif provider == "openrouter":
             if not settings.openrouter_api_key:
