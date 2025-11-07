@@ -1,6 +1,6 @@
 [tool.bumpversion]
 # Current version number (automatically read from pyproject.toml)
-current_version = "0.8.0"
+current_version = "0.7.0"
 
 # Version parsing format (supports major.minor.patch)
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
@@ -15,7 +15,8 @@ replace = "{new_version}"
 # Git integration
 commit = true
 commit_args = ""
-tag = true
+tag = false
+#true
 tag_name = "v{new_version}"
 tag_message = "Release version {new_version}"
 sign_tags = false

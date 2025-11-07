@@ -124,8 +124,7 @@ if [[ "$GENERATE_CHANGELOG" == true ]]; then
       # 3) Amend the previous bump commit to include changelog
       git commit --amend --no-edit
 
-      # 4) Force-move tag to amended commit (keep tag pointing at final state)
-      git tag -f "v$NEW_VERSION"
+      git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
     else
       echo -e "${YELLOW}⚠ Changelog generation failed, leaving version bump commit as-is${NC}"
     fi
@@ -142,6 +141,6 @@ echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "  1. Review the changes: git show"
 echo "  2. Push commit:        git push origin HEAD"
-echo "  3. Push tag:           git push -f origin v$NEW_VERSION"
+echo "  3. Push tag:           git push origin v$NEW_VERSION"
 echo ""
 echo -e "${GREEN}GitHub Actions will automatically build and publish artifacts (if configured).${NC}"
