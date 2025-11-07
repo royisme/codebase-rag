@@ -1,6 +1,6 @@
 # Code Graph Knowledge System
 
-A comprehensive intelligent knowledge management system for software development, leveraging Neo4j GraphRAG technology to build advanced code intelligence and automated development assistance.
+Enterprise knowledge management platform with Neo4j graph database, multi-interface architecture (MCP/Web/REST), and intelligent code analysis for modern software development teams.
 
 ## Overview
 

@@ -1,7 +1,9 @@
 # Code Graph Knowledge System
 
 
-**AI-Powered Code Intelligence & Knowledge Management**
+**Enterprise Knowledge Management Platform**
+
+*Neo4j-powered graph database with multi-interface architecture (MCP/Web/REST) and intelligent code analysis*
 
 [![Docker Hub](https://img.shields.io/docker/pulls/royisme/codebase-rag?style=flat-square)](https://hub.docker.com/r/royisme/codebase-rag)
 [![GitHub](https://img.shields.io/github/stars/royisme/codebase-rag?style=flat-square)](https://github.com/royisme/codebase-rag)
