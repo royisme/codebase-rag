@@ -8,7 +8,7 @@
 # to the Docker image's /app/static directory.
 #
 # Usage:
-#   ./build-frontend.sh [--clean]
+#   ./scripts/build-frontend.sh [--clean]
 #
 # Options:
 #   --clean    Clean node_modules and dist before building

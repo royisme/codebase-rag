@@ -81,11 +81,11 @@ if [[ -z "$DRY_RUN" ]]; then
     echo -e "${YELLOW}This will:${NC}"
     if [[ "$GENERATE_CHANGELOG" == true ]]; then
         echo "  1. Generate changelog from git commits"
-        echo "  2. Update version in pyproject.toml, src/__version__.py"
+        echo "  2. Update version in pyproject.toml, src/codebase_rag/__version__.py"
         echo "  3. Create a git commit"
         echo "  4. Create a git tag v$NEW_VERSION"
     else
-        echo "  1. Update version in pyproject.toml, src/__version__.py"
+        echo "  1. Update version in pyproject.toml, src/codebase_rag/__version__.py"
         echo "  2. Create a git commit"
         echo "  3. Create a git tag v$NEW_VERSION"
     fi

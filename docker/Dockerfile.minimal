@@ -2,7 +2,7 @@
 # Minimal Docker image - Code Graph only (No LLM required)
 #
 # IMPORTANT: Frontend MUST be pre-built before docker build:
-#   ./build-frontend.sh
+#   ./scripts/build-frontend.sh
 #
 # This Dockerfile expects frontend/dist/ to exist
 
@@ -50,7 +50,7 @@ COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 # Copy application code
 COPY --chown=appuser:appuser src ./src
 
-# Copy pre-built frontend (MUST exist - run ./build-frontend.sh first)
+# Copy pre-built frontend (MUST exist - run ./scripts/build-frontend.sh first)
 COPY --chown=appuser:appuser frontend/dist ./static
 
 USER appuser

@@ -92,7 +92,7 @@ COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/
 COPY --chown=appuser:appuser . .
 
 # Copy pre-built frontend (if exists)
-# Run ./build-frontend.sh before docker build to generate frontend/dist
+# Run ./scripts/build-frontend.sh before docker build to generate frontend/dist
 # If frontend/dist doesn't exist, the app will run as API-only (no web UI)
 RUN if [ -d frontend/dist ]; then \
         mkdir -p static && \
@@ -100,7 +100,7 @@ RUN if [ -d frontend/dist ]; then \
         echo "✅ Frontend copied to static/"; \
     else \
         echo "⚠️  No frontend/dist found - running as API-only"; \
-        echo "   Run ./build-frontend.sh to build frontend"; \
+        echo "   Run ./scripts/build-frontend.sh to build frontend"; \
     fi
 
 # Switch to non-root user
