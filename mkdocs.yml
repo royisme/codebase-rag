@@ -136,6 +136,8 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - README (English): ../README.md
+  - README (中文): ../README_CN.md
   - Getting Started:
     - Quick Start: getting-started/quickstart.md
     - Installation: getting-started/installation.md
@@ -167,6 +169,8 @@ nav:
       - Overview: guide/mcp/overview.md
       - Claude Desktop: guide/mcp/claude-desktop.md
       - VS Code: guide/mcp/vscode.md
+    - Web UI:
+      - Overview: guide/frontend.md
   - API Reference:
     - REST API: api/rest.md
     - MCP Tools: api/mcp-tools.md
@@ -179,7 +183,9 @@ nav:
   - Development:
     - Contributing: development/contributing.md
     - Development Setup: development/setup.md
-    - Testing: development/testing.md
+    - Testing:
+      - Overview: development/testing.md
+      - Frontend Testing: development/testing/frontend.md
     - Migration Guide (v0.8.0): development/migration-guide.md
     - Version Management: development/version-management.md
     - Changelog Automation: development/changelog-automation.md

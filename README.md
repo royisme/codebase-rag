@@ -31,6 +31,12 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 - **Flexible Embedding Models**: Support for HuggingFace and Ollama embedding models
 - **Modular Design**: Clean separation of concerns with pluggable components
 
+## 📚 Documentation
+
+For detailed documentation, guides, and API references, visit our official documentation site:
+
+**[📖 Complete Documentation](https://vantagecraft.dev/docs/code-graph)**
+
 ## Project Roadmap
 
 ### Phase 2: Structured Data & Graph Enhancement (SQL & Graph-Awareness)
@@ -79,7 +85,7 @@ Code Graph Knowledge System is an enterprise-grade solution that transforms unst
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/code-graph.git
+   git clone https://github.com/royisme/codebase-rag.git
    cd code-graph
    ```
 
@@ -323,10 +329,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- Documentation: [GitHub Wiki](https://github.com/yourusername/code-graph/wiki)
-- Neo4j Technical Guide: [README_Neo4j.md](README_Neo4j.md)
-- Issues: [GitHub Issues](https://github.com/yourusername/code-graph/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/code-graph/discussions)
+- 📚 **Documentation**: [Complete Documentation](https://vantagecraft.dev/docs/code-graph)
+- 📖 **Neo4j Guide**: [README_Neo4j.md](README_Neo4j.md)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/royisme/codebase-rag/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/royisme/codebase-rag/discussions)
 
 ## Acknowledgments
 
