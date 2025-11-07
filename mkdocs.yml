@@ -170,6 +170,7 @@ nav:
     - MCP Tools: api/mcp-tools.md
     - Python SDK: api/python-sdk.md
   - Architecture:
+    - Overview: architecture/overview.md
     - System Design: architecture/design.md
     - Components: architecture/components.md
     - Data Flow: architecture/dataflow.md
