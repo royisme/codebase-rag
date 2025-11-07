@@ -253,7 +253,7 @@ def merge_pipeline_configs(
             return merged_dict
         if isinstance(override, dict):
             return copy.deepcopy(override)
-        return override
+        return copy.deepcopy(override)
 
     merged = copy.deepcopy(default_config)
     if not override_config:
