@@ -181,7 +181,7 @@ def import_from_string(dotted_path: str) -> Any:
 
     module_path, _, attribute = dotted_path.rpartition(".")
     if not module_path:
-        raise ImportError(f"Invalid class path: {dotted_path}")
+        raise ImportError(f"Invalid class path (must contain at least one dot): {dotted_path}")
     module = import_module(module_path)
     try:
         return getattr(module, attribute)
