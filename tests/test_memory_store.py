@@ -7,7 +7,7 @@ Requires Neo4j connection to run.
 
 import pytest
 import asyncio
-from services.memory_store import MemoryStore
+from src.codebase_rag.services.memory import MemoryStore
 
 
 # Test fixtures

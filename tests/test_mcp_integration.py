@@ -15,9 +15,9 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 import json
 
-from mcp_tools.tool_definitions import get_tool_definitions
-from mcp_tools.resources import get_resource_list, read_resource_content
-from mcp_tools.prompts import get_prompt_list, get_prompt_content
+from src.codebase_rag.mcp.tools import get_tool_definitions
+from src.codebase_rag.mcp.resources import get_resource_list, read_resource_content
+from src.codebase_rag.mcp.prompts import get_prompt_list, get_prompt_content
 
 
 class TestToolDefinitions:

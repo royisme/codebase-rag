@@ -8,7 +8,7 @@ This module contains tests for utility functions used by MCP handlers:
 """
 
 import pytest
-from mcp_tools.utils import format_result
+from src.codebase_rag.mcp.utils import format_result
 
 
 class TestFormatResult:
