@@ -9,31 +9,24 @@ dependencies = [
     "uvicorn[standard]",
     "python-multipart",
     "sqlglot",
-    "pymilvus",
     "neo4j",
     "llama-index",
     "llama-index-embeddings-huggingface",
     "llama-index-llms-ollama",
-    "llama-index-vector-stores-milvus",
     "llama-index-graph-stores-neo4j",
     "httpx",
     "aiofiles",
+    "aiohttp",
     "python-jose[cryptography]",
     "pydantic",
     "pydantic-settings",
     "python-dotenv",
     "loguru",
-    "pytest",
-    "pytest-asyncio",
-    "black",
-    "isort",
-    "llama-index-vector-stores-neo4jvector>=0.3.0",
     "llama-index-embeddings-ollama>=0.6.0",
     "fastmcp>=2.7.1",
     "llama-index-llms-gemini>=0.5.0",
     "llama-index-embeddings-gemini>=0.3.2",
     "google-generativeai>=0.3.0",
-    "matplotlib>=3.10.3",
     "nicegui>=2.19.0",
     "llama-index-llms-openrouter>=0.3.2",
     "sqlalchemy[asyncio]>=2.0.44",
@@ -44,11 +37,23 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "pycasbin>=2.4.0",
     "casbin-sqlalchemy-adapter>=1.4.0",
-    "pytest-cov>=7.0.0",
     "ghapi",
     "python-gitlab",
-    "ollama>=0.6.0",
     "llama-index-embeddings-google-genai>=0.3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov>=7.0.0",
+]
+
+milvus = [
+    "pymilvus",
+    "llama-index-vector-stores-milvus",
 ]
 
 [project.scripts]
