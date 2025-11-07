@@ -1,276 +1,314 @@
-# Code Graph Knowledge System - Frontend
+# Web User Interface
 
-Modern React frontend with shadcn UI and TanStack Router for the Code Graph Knowledge System.
+## Introduction
 
-## Features
+The Code Graph Knowledge System provides a modern, responsive **Web UI** for human users to monitor and interact with the system. Built with React 18, TypeScript, and shadcn/ui components, the Web UI offers real-time monitoring capabilities and an intuitive interface for managing your knowledge graph operations.
 
-- **Dashboard**: System health monitoring and quick links
-- **Tasks**: Real-time task monitoring with progress tracking
-- **Repositories**: Repository ingestion and management
-- **Metrics**: Prometheus metrics visualization
+The Web UI runs on **Port 8080** as part of the dual-server architecture, complementing the MCP service (Port 8000) and REST API.
 
-## Tech Stack
+## What is the Web UI?
 
-- **React 18** - UI library
-- **TypeScript** - Type safety
-- **Vite** - Build tool and dev server
-- **TanStack Router** - Type-safe routing
-- **TanStack Query** - Data fetching and caching
-- **shadcn/ui** - Beautiful UI components
-- **Tailwind CSS** - Utility-first CSS
-- **Recharts** - Chart library
-- **Lucide React** - Icons
+The Web UI is a browser-based interface that provides:
 
-## Getting Started
+- **Real-time system monitoring** with live updates
+- **Task management** for long-running operations
+- **Repository ingestion** controls and progress tracking
+- **Metrics visualization** with interactive charts
+- **Responsive design** for desktop and mobile devices
 
-### Prerequisites
-
-- Node.js 18+ or Bun
-- Backend API running on http://localhost:8000
-
-### Installation
-
-```bash
-# Install dependencies
-npm install
-# or
-bun install
-```
-
-### Development
-
-```bash
-# Start dev server
-npm run dev
-# or
-bun dev
-
-# Frontend will be available at http://localhost:3000
-# API proxy configured to http://localhost:8000
-```
-
-### Build
-
-```bash
-# Build for production
-npm run build
-# or
-bun run build
-
-# Preview production build
-npm run preview
-```
-
-## Project Structure
-
-```
-frontend/
-├── src/
-│   ├── components/
-│   │   └── ui/           # shadcn UI components
-│   ├── lib/
-│   │   ├── api.ts        # API client and types
-│   │   └── utils.ts      # Utility functions
-│   ├── routes/
-│   │   ├── __root.tsx    # Root layout with navigation
-│   │   ├── index.tsx     # Dashboard page
-│   │   ├── tasks.tsx     # Tasks monitoring page
-│   │   ├── repositories.tsx  # Repository management
-│   │   └── metrics.tsx   # Metrics visualization
-│   ├── index.css         # Global styles with Tailwind
-│   └── main.tsx          # Application entry point
-├── public/               # Static assets
-├── index.html            # HTML entry point
-├── package.json          # Dependencies
-├── tsconfig.json         # TypeScript config
-├── vite.config.ts        # Vite config
-├── tailwind.config.js    # Tailwind config
-└── postcss.config.js     # PostCSS config
-```
+Unlike the MCP protocol (for AI assistants) and REST API (for programs), the Web UI is specifically designed for **human interaction** with visual feedback and intuitive controls.
 
 ## Key Features
 
-### Real-time Updates
+### 1. Real-time Dashboard
 
-- Tasks page auto-refreshes every 3 seconds
-- Dashboard health check updates every 5 seconds
-- Metrics refresh every 10 seconds
+Monitor system health and status at a glance:
 
-### API Integration
+- **Service Connectivity**: Check Neo4j, embedding service, and LLM availability
+- **System Statistics**: View node counts, relationship counts, and database size
+- **Quick Actions**: Direct links to common operations
+- **Auto-refresh**: Health checks every 5 seconds
 
-All API calls are proxied through Vite dev server:
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8000`
-- Proxy: `/api/*` → `http://localhost:8000/api/*`
+### 2. Task Monitoring
 
-### Responsive Design
+Track long-running operations with detailed progress:
 
-Fully responsive layout that works on:
-- Desktop (1920px+)
-- Laptop (1280px+)
-- Tablet (768px+)
-- Mobile (320px+)
+- **Live Progress Bars**: Visual indicators for file processing
+- **Status Filtering**: View tasks by status (pending, processing, completed, failed)
+- **Task Details**: Error messages, timing information, and operation context
+- **Auto-refresh**: Task status updates every 3 seconds
 
-### Type Safety
+### 3. Repository Management
 
-- Full TypeScript support
-- Type-safe routing with TanStack Router
-- API types defined in `lib/api.ts`
+Ingest and manage code repositories:
 
-## Available Pages
+- **Multiple Sources**: Git URLs, local paths, or file uploads
+- **Language Detection**: Automatic identification of 15+ programming languages
+- **Ingestion Modes**: Full or incremental processing
+- **Progress Tracking**: Real-time feedback during large repository processing
 
-### Dashboard (`/`)
-- System health status
-- Service connectivity
-- Quick navigation links
+### 4. Metrics Visualization
 
-### Tasks (`/tasks`)
-- Real-time task monitoring
-- Progress bars for running tasks
+Monitor system performance and usage:
+
+- **Neo4j Statistics**: Database metrics, query performance, index usage
+- **Operation Metrics**: Task completion rates, processing times
+- **Resource Monitoring**: Memory usage, storage consumption
+- **Interactive Charts**: Recharts-based visualizations with filtering options
+
+## Accessing the Web UI
+
+### Production Deployment
+
+When you start the complete system:
+
+```bash
+python start.py
+```
+
+The Web UI is available at: **http://localhost:8080**
+
+!!! info "Dual-Server Architecture"
+    The system runs two servers simultaneously:
+
+    - **Port 8000**: MCP SSE Service + REST API
+    - **Port 8080**: Web UI + REST API
+
+    Both servers share the same REST API endpoints.
+
+### Development Mode
+
+For frontend development:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Development server: **http://localhost:3000**
+API proxy: `http://localhost:8000` (configured automatically)
+
+## User Interface Overview
+
+### Navigation Structure
+
+```
+┌─────────────────────────────────────────┐
+│ Code Graph Knowledge System             │
+├─────────────────────────────────────────┤
+│ Dashboard  Tasks  Repositories  Metrics │
+├─────────────────────────────────────────┤
+│                                         │
+│              Main Content               │
+│                                         │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### Pages and Features
+
+#### Dashboard (`/`)
+- System health indicators
+- Quick action buttons
+- Recent task summary
+- Database statistics
+
+#### Tasks (`/tasks`)
+- Active task monitoring
+- Historical task list
 - Status filtering
-- Task history
+- Error details and troubleshooting
 
-### Repositories (`/repositories`)
+#### Repositories (`/repositories`)
 - Repository ingestion form
-- Support for Git URLs and local paths
-- Full and incremental modes
-- Multi-language support (Python, TS, JS, Java, PHP, Go)
+- Language selection options
+- Progress tracking
+- Batch operations
 
-### Metrics (`/metrics`)
-- Prometheus metrics visualization
-- Neo4j statistics
-- Graph operation metrics
-- Raw metrics view
+#### Metrics (`/metrics`)
+- Interactive charts
+- Time range filtering
+- Metric type selection
+- Raw data export
 
-## Development
+## Technology Stack
 
-### Adding New Pages
+### Core Technologies
 
-1. Create a new file in `src/routes/`:
-```tsx
-// src/routes/my-page.tsx
-import { createFileRoute } from '@tanstack/react-router'
+- **React 18**: Modern UI library with hooks and concurrent features
+- **TypeScript**: Type safety and better developer experience
+- **Vite**: Fast build tool and development server
+- **TanStack Router**: Type-safe routing with code splitting
 
-export const Route = createFileRoute('/my-page')({
-  component: MyPage,
-})
+### UI Framework
 
-function MyPage() {
-  return <div>My Page</div>
+- **shadcn/ui**: Beautiful, accessible component library
+- **Tailwind CSS**: Utility-first CSS framework
+- **Lucide React**: Consistent icon system
+- **Recharts**: Declarative chart library
+
+### Data Management
+
+- **TanStack Query**: Server state management and caching
+- **Axios**: HTTP client with request/response interceptors
+- **React Hook Form**: Form validation and management
+
+## Responsive Design
+
+The Web UI is fully responsive and works across devices:
+
+| Device | Screen Width | Layout |
+|--------|--------------|--------|
+| Desktop | 1280px+ | Full multi-column layout |
+| Laptop | 1024px-1279px | Optimized two-column layout |
+| Tablet | 768px-1023px | Single column with navigation |
+| Mobile | 320px-767px | Compact mobile layout |
+
+## Real-time Updates
+
+### Update Frequencies
+
+- **Dashboard Health**: Every 5 seconds
+- **Task Status**: Every 3 seconds
+- **Metrics Data**: Every 10 seconds
+- **Repository Progress**: Real-time during ingestion
+
+### WebSocket Connections
+
+For critical operations, the Web UI uses WebSocket connections to provide instant updates:
+
+```typescript
+// Example: Real-time task updates
+const ws = new WebSocket('ws://localhost:8080/ws/tasks')
+ws.onmessage = (event) => {
+  const taskUpdate = JSON.parse(event.data)
+  updateTaskStatus(taskUpdate)
 }
 ```
 
-2. Add navigation link in `src/routes/__root.tsx`
+## Integration with System Architecture
 
-### Adding New Components
+### Data Flow
 
-1. Create component in `src/components/`:
-```tsx
-// src/components/MyComponent.tsx
-export function MyComponent() {
-  return <div>My Component</div>
-}
+```
+User Action → Web UI → REST API → Backend Service → Neo4j
+    ↑                                                    ↓
+Real-time Updates ← SSE/WebSocket ← Task Queue ← Background Processing
 ```
 
-2. Import and use in pages
+### Shared REST API
 
-### Adding shadcn Components
+The Web UI consumes the same REST API used by external applications:
+
+- **Tasks API**: Monitor and manage background operations
+- **Repositories API**: Ingest and query repository data
+- **Metrics API**: Access system performance data
+- **Health API**: Check system status and connectivity
+
+## Configuration
+
+### Environment Variables
+
+The Web UI doesn't require additional environment variables. It inherits configuration from the backend:
 
 ```bash
-# Use shadcn CLI to add components
-npx shadcn-ui@latest add [component-name]
+# Backend configuration (automatically shared)
+WEB_UI_PORT=8080
+API_BASE_URL=http://localhost:8000
 ```
 
-## Environment Variables
+### Custom Configuration
 
-No environment variables needed for frontend. Backend URL is configured in `vite.config.ts` proxy settings.
+For advanced customization, you can modify `frontend/src/config.ts`:
 
-## Production Deployment
-
-### Static Hosting
-
-```bash
-# Build
-npm run build
-
-# Deploy dist/ folder to:
-# - Vercel
-# - Netlify
-# - GitHub Pages
-# - Any static hosting
-```
-
-### Docker
-
-```dockerfile
-FROM node:18-alpine as build
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-```
-
-### Nginx Configuration
-
-```nginx
-server {
-    listen 80;
-    server_name _;
-    root /usr/share/nginx/html;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://backend:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+```typescript
+export const config = {
+  apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  refreshInterval: {
+    dashboard: 5000,    // 5 seconds
+    tasks: 3000,        // 3 seconds
+    metrics: 10000      // 10 seconds
+  }
 }
 ```
 
 ## Troubleshooting
 
-### Port Already in Use
+### Common Issues
 
-```bash
-# Change port in vite.config.ts
-server: {
-  port: 3001,  # Use different port
+#### API Connection Problems
+
+!!! error "Connection Failed"
+    If the Web UI can't connect to the backend:
+
+    1. **Check backend status**: `curl http://localhost:8000/api/v1/health`
+    2. **Verify port configuration**: Ensure ports 8000 and 8080 are available
+    3. **Check browser console**: Look for CORS or network errors
+    4. **Refresh the page**: Sometimes a simple refresh resolves connection issues
+
+#### Real-time Updates Not Working
+
+!!! warning "WebSocket Issues"
+    If real-time updates stop working:
+
+    1. **Check network connection**: WebSocket requires stable connection
+    2. **Disable browser extensions**: Some ad-blockers interfere with WebSockets
+    3. **Clear browser cache**: Old cached scripts might cause conflicts
+    4. **Restart servers**: Try restarting both backend services
+
+#### Performance Issues
+
+!!! tip "Optimization Tips"
+    For better performance with large datasets:
+
+    1. **Use filters**: Apply date and status filters to reduce data
+    2. **Limit batch sizes**: Process repositories in smaller chunks
+    3. **Close unused tabs**: Multiple tabs can compete for resources
+    4. **Check system resources**: Monitor memory and CPU usage
+
+## Development and Customization
+
+### Adding New Pages
+
+1. **Create route file**:
+```typescript
+// frontend/src/routes/my-feature.tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/my-feature')({
+  component: MyFeature,
+})
+```
+
+2. **Create component**:
+```typescript
+function MyFeature() {
+  return <div>My New Feature</div>
 }
 ```
 
-### API Connection Issues
+3. **Add navigation**:
+Update `frontend/src/routes/__root.tsx` to include the new page in navigation.
 
-1. Check backend is running: `curl http://localhost:8000/api/v1/health`
-2. Check proxy configuration in `vite.config.ts`
-3. Check browser console for CORS errors
+### Customizing UI Components
 
-### Build Errors
+The Web UI uses shadcn/ui components which can be customized:
 
 ```bash
-# Clear cache and reinstall
-rm -rf node_modules package-lock.json
-npm install
-npm run build
+# Add new components
+cd frontend
+npx shadcn-ui@latest add [component-name]
+
+# Customize existing components
+# Edit: frontend/src/components/ui/[component].tsx
 ```
 
-## Contributing
+## Next Steps
 
-1. Follow existing code style
-2. Use TypeScript for all new files
-3. Add types for API responses
-4. Test on multiple screen sizes
-5. Update this README for new features
+- **Repository Management**: Learn how to ingest and manage code repositories
+- **Task Monitoring**: Understand task processing and troubleshooting
+- **API Integration**: Explore REST API endpoints for custom integrations
+- **Architecture Overview**: Understand the complete system design
 
-## License
-
-Same as parent project
+For technical implementation details, see [Frontend Testing Guide](../development/testing/frontend.md).

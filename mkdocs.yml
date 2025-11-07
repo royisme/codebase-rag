@@ -136,8 +136,6 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - README (English): ../README.md
-  - README (中文): ../README_CN.md
   - Getting Started:
     - Quick Start: getting-started/quickstart.md
     - Installation: getting-started/installation.md
