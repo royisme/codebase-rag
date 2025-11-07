@@ -7,6 +7,187 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-11-06
+
+### Added
+
+- Add Memory Store for AI agent project knowledge persistence (v0.6)
+
+### Maintenance
+
+- 
+- 
+- 
+- 
+- 
+- 
+- Update permission settings
+- Claude/refactor directory structure 011 c us sd tp bi mf1 eiq b hx zr m
+- Fix import paths for reorganized services subpackage structure
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- 
+- CRITICAL FIX (P0): Fixed all internal imports to use codebase_rag.* namespace
+- Fixed all dynamic imports inside test functions that were still using
+- Updated all test files to use new import paths:
+- - Update build-frontend.sh references: ./build-frontend.sh → ./scripts/build-frontend.sh
+- 
+- - Remove docs/CNAME (use GitHub Pages default URL)
+- This reverts commit 393317ca41e73916a763d1edfc80455061949212.
+- Added professional technical documentation to explain:
+- Comprehensive documentation update to reflect the new src-layout structure.
+- Complete removal of backward compatibility shims and legacy code structure.
+- Scripts documentation should be in docs/development/ instead of
+- Phase 6: Non-code file organization and cleanup
+- 
+- Major restructuring to align with Python best practices:
+- 
+- Updated cache-to configuration to include a TTL of 7 days.
+- Fetch Latest Main Branch Updates
+- REMOVED from all Dockerfiles:
+- Changed from 'version' to 'bun-version' per official docs:
+- - uses: oven-sh/setup-bun@v2 (was @v1)
+- CRITICAL FIXES:
+- Removed temporary documentation files created during development:
+- Updated all docker-compose files to support two-port architecture:
+- ## User Feedback
+- ## Context
+- ## Context
+- ## Problem
+- ## Problem
+- ## Changes
+- ## Problem
+- ## Problem
+- These files are now in .gitignore and should not be tracked:
+- 
+- As TS Type Safety Auditor, eliminated ALL type issues:
+- Upgraded frontend to production-ready modern stack:
+- This commit fixes multiple issues that prevented Docker build from succeeding:
+- The frontend-builder stage in Dockerfile.full and Dockerfile.standard
+- Migrate monitor features from NiceGUI to frontend
+- Properly integrate the React frontend into the Docker build process to enable
+- Backend Docker images don't need frontend code:
+- Runtime images don't need README.md or pyproject.toml:
+- ## Critical Docker Build Issues Fixed
+- ## Phase 3: Remove NiceGUI Dependencies
+- This commit migrates all task monitoring features from NiceGUI to the React frontend:
+- 
+- 
+- 
+- 
+- Delete old file
+- Fix Docker setup and MCP image building
+- Implemented complete changelog automation using Conventional Commits:
+- 
+- Implemented complete version management automation:
+- Removed manual "Table of Contents" sections from 3 documentation files:
+- Fixed all 9 broken links causing build failures in strict mode:
+- 
+- Added comprehensive documentation (13,000+ more lines):
+- Added comprehensive user documentation (13,000+ lines):
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Added complete documentation for all three deployment modes:
+- 
+- - Create logo.svg with code graph visualization
+- - Remove non-existent custom_dir (docs/overrides)
+- - Remove temporary documentation files (CONFIGURATION_GUIDE, summaries)
+- Address PR review feedback: align Python versions and clarify Ollama config
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- 
+- Updated remaining references from docs.vantagecraft.dev to code-graph.vantagecraft.dev
+- Complete step-by-step guide covering:
+- Complete documentation of Docker MCP Registry submission:
+- Add submission files for Docker MCP Registry with 3 variants:
+- BREAKING CHANGE: Default docker-compose.yml now points to minimal mode
+- Implement automatic memory extraction features
+- Address code review feedback: extract magic numbers and fix variable reassignment bug
+- Co-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- 
+- Comprehensive implementation of automatic memory extraction features using LLM analysis.
+- 
+- 
+- 
+- Fixed test failures caused by MCP SDK type handling:
+- [WIP] Add memory management system for AI agent project
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- 
+- 
+- 
+- Addressed two issues from code review:
+- Fixed two critical P1 bugs in Memory Store:
+- Co-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>
+- Co-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>
+- 
+- Add complete testing infrastructure with 105+ unit tests and CI/CD workflows
+- BREAKING CHANGE: FastMCP v1 removed, Official MCP SDK is now the only version
+- Migration Summary:
+- 
+- Implements official Model Context Protocol SDK alongside existing FastMCP version,
+- Implements a comprehensive Memory Management system for AI agents to maintain
+- 
+- This commit adds a complete modern frontend application to replace the
+- Fix get_changed_files() dict access in incremental ingestion
+- 
+- Fix deduplication silently dropping nodes without ref
+- Fix dict access, missing parameters, and key mismatches from PR #6 review
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Review codebase-rag against requirements
+- 
+- 
+- 
+- This commit adds multi-language support and production-ready Docker deployment.
+- This commit completes v0.5 milestone by adding MCP tools for code graph
+- - Added v0.4 status and progress tracking (90% complete)
+- Implements major v0.4 features: incremental mode and pack enhancements.
+- Implements v0.3 requirement: extract import/dependency relationships between files.
+- Added detailed documentation covering:
+- This commit addresses critical gaps in the v0.2 specification:
+- Add repository ingestion, related search, and context packing APIs
+- Per feedback, keeping original Python 3.13 requirement
+- - Remove all v02-suffixed files and backend/ directory structure
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- Co-authored-by: royisme <350731+royisme@users.noreply.github.com>
+- 
+- Roy/tests fix query bug
+- This commit introduces a complete real-time monitoring ecosystem with three distinct approaches:
+- 
+- 
+- ```python
+- Here's the corrected *SEARCH/REPLACE* block:
+- 1. Added OpenRouterEmbeddingGenerator implementation for embedding generation
+- 1. Added OpenRouter fields in config model info
+- 1. Adding OpenRouter configuration settings (API key, base URL, models)
+- 
+- This reverts commit 0b8fd12143282f0a73b55f42096e9cd886f4abfe.
+- 
+- 
+- 
+- 
+- 
+
+### Other
+
+- 1. services/__init__.py:
+   - Removed eager imports of all subpackages to avoid triggering heavy
+     dependencies (llama_index, etc.) when tests import services
+   - Updated documentation with correct import examples
+- 1. Remove docs/CNAME file (use GitHub Pages default URL)
+2. Update site_url to vantagecraft.dev/docs/code-graph/
+3. Update workflow notification URL
+4. Add comprehensive Cloudflare setup guide
+- - Remove main branch push trigger from docker-build.yml
+- Now Docker images are built only when version tags are pushed
+- This aligns with the bump-version.sh workflow where tags are created
+- Keep PR and manual workflow_dispatch triggers for testing
+- Avoid conflicts with user's main GitHub Pages site (royisme.github.io)
+and allow multiple project-specific subdomains.
+
+
 ### Planned Features
 - API authentication with JWT
 - Web-based configuration UI
