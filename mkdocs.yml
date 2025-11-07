@@ -5,6 +5,8 @@ site_author: VantageCraft
 repo_url: https://github.com/royisme/codebase-rag
 repo_name: codebase-rag
 edit_uri: edit/main/docs/
+use_directory_urls: true
+
 
 theme:
   name: material
