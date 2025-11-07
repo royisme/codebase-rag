@@ -4,18 +4,16 @@ uses LlamaIndex's KnowledgeGraphIndex and Neo4j's native vector search functiona
 supports multiple LLM and embedding model providers
 """
 
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 import asyncio
 from loguru import logger
 import time
 
 from llama_index.core import (
-    KnowledgeGraphIndex, 
-    Document, 
+    KnowledgeGraphIndex,
     Settings,
     StorageContext,
-    SimpleDirectoryReader
 )
 
 # LLM Providers
@@ -33,10 +31,12 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 # Graph Store
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 
-# Core components
-from llama_index.core.node_parser import SimpleNodeParser
-
 from codebase_rag.config import settings
+from codebase_rag.services.knowledge.pipeline_components import (
+    PipelineBundle,
+    build_pipeline_bundle,
+    merge_pipeline_configs,
+)
 
 class Neo4jKnowledgeService:
     """knowledge graph service based on Neo4j's native vector index"""
@@ -46,6 +46,7 @@ class Neo4jKnowledgeService:
         self.knowledge_index = None
         self.query_engine = None
         self._initialized = False
+        self._pipeline_bundles: Dict[str, PipelineBundle] = {}
         
         # get timeout settings from config
         self.connection_timeout = settings.connection_timeout
@@ -101,7 +102,7 @@ class Neo4jKnowledgeService:
     def _create_embedding_model(self):
         """create embedding model instance based on config"""
         provider = settings.embedding_provider.lower()
-        
+
         if provider == "ollama":
             return OllamaEmbedding(
                 model_name=settings.ollama_embedding_model,
@@ -139,7 +140,101 @@ class Neo4jKnowledgeService:
             )
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
-    
+
+    def _default_pipeline_configs(self) -> Dict[str, Dict[str, Any]]:
+        """Return the built-in ingestion pipeline configuration."""
+
+        node_parser_config = {
+            "class_path": "llama_index.core.node_parser.SimpleNodeParser",
+            "kwargs": {
+                "chunk_size": settings.chunk_size,
+                "chunk_overlap": settings.chunk_overlap,
+            },
+        }
+        metadata_transform = (
+            "codebase_rag.services.knowledge.pipeline_components.MetadataEnrichmentTransformation"
+        )
+        writer_path = (
+            "codebase_rag.services.knowledge.pipeline_components.Neo4jKnowledgeGraphWriter"
+        )
+
+        return {
+            "manual_input": {
+                "connector": {
+                    "class_path": "codebase_rag.services.knowledge.pipeline_components.ManualDocumentConnector",
+                },
+                "transformations": [
+                    dict(node_parser_config),
+                    {
+                        "class_path": metadata_transform,
+                        "kwargs": {"metadata": {"pipeline": "manual_input"}},
+                    },
+                ],
+                "writer": {"class_path": writer_path},
+            },
+            "file": {
+                "connector": {
+                    "class_path": "codebase_rag.services.knowledge.pipeline_components.SimpleFileConnector",
+                },
+                "transformations": [
+                    dict(node_parser_config),
+                    {
+                        "class_path": metadata_transform,
+                        "kwargs": {"metadata": {"pipeline": "file"}},
+                    },
+                ],
+                "writer": {"class_path": writer_path},
+            },
+            "directory": {
+                "connector": {
+                    "class_path": "codebase_rag.services.knowledge.pipeline_components.SimpleDirectoryConnector",
+                    "kwargs": {
+                        "recursive": True,
+                        "file_extensions": [
+                            ".txt",
+                            ".md",
+                            ".py",
+                            ".js",
+                            ".ts",
+                            ".sql",
+                            ".json",
+                            ".yaml",
+                            ".yml",
+                        ],
+                    },
+                },
+                "transformations": [
+                    dict(node_parser_config),
+                    {
+                        "class_path": metadata_transform,
+                        "kwargs": {"metadata": {"pipeline": "directory"}},
+                    },
+                ],
+                "writer": {"class_path": writer_path},
+            },
+        }
+
+    def _setup_ingestion_pipelines(self) -> None:
+        """Build ingestion pipelines from defaults and user configuration."""
+
+        default_config = self._default_pipeline_configs()
+        merged_config = merge_pipeline_configs(default_config, settings.ingestion_pipelines)
+
+        bundles: Dict[str, PipelineBundle] = {}
+        for name, config in merged_config.items():
+            try:
+                bundles[name] = build_pipeline_bundle(
+                    name,
+                    knowledge_index=self.knowledge_index,
+                    graph_store=self.graph_store,
+                    configuration=config,
+                )
+                logger.debug(f"Built ingestion pipeline '{name}'")
+            except Exception as exc:
+                logger.error(f"Failed to build ingestion pipeline '{name}': {exc}")
+
+        self._pipeline_bundles = bundles
+
     async def initialize(self) -> bool:
         """initialize service"""
         try:
@@ -202,203 +297,161 @@ class Neo4jKnowledgeService:
                 response_mode="tree_summarize",
                 embedding_mode="hybrid"
             )
-            
+
+            self._setup_ingestion_pipelines()
+
             self._initialized = True
             logger.success("Neo4j Knowledge Service initialized successfully")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize Neo4j Knowledge Service: {e}")
             return False
-    
-    async def add_document(self, 
-                         content: str, 
+
+    async def _run_ingestion_pipeline(
+        self,
+        pipeline_name: str,
+        *,
+        connector_overrides: Dict[str, Any],
+        timeout: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        if pipeline_name not in self._pipeline_bundles:
+            raise ValueError(f"Pipeline '{pipeline_name}' is not configured")
+
+        bundle = self._pipeline_bundles[pipeline_name]
+        connector = bundle.instantiate_connector(**connector_overrides)
+
+        documents = await connector.aload_data()
+        documents = list(documents)
+        if not documents:
+            return {
+                "success": False,
+                "error": f"Pipeline '{pipeline_name}' produced no documents",
+            }
+
+        timeout = timeout or self.operation_timeout
+        total_chars = sum(len(doc.text) for doc in documents)
+        logger.info(
+            f"Running pipeline '{pipeline_name}' with {len(documents)} documents (total chars: {total_chars})"
+        )
+
+        def _process_pipeline() -> Dict[str, Any]:
+            nodes = bundle.pipeline.run(show_progress=False, documents=documents)
+            bundle.writer.write(nodes)
+            return {
+                "nodes_count": len(nodes),
+                "documents_count": len(documents),
+            }
+
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(_process_pipeline),
+                timeout=timeout,
+            )
+            logger.info(
+                f"Pipeline '{pipeline_name}' completed with {result['nodes_count']} nodes"
+            )
+            return {
+                "success": True,
+                "pipeline": pipeline_name,
+                "documents_count": result["documents_count"],
+                "nodes_count": result["nodes_count"],
+                "total_chars": total_chars,
+            }
+        except asyncio.TimeoutError:
+            error_msg = (
+                f"Pipeline '{pipeline_name}' execution timed out after {timeout}s"
+            )
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg, "timeout": timeout}
+        except Exception as exc:
+            logger.error(f"Pipeline '{pipeline_name}' failed: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    async def add_document(self,
+                         content: str,
                          title: str = None,
                          metadata: Dict[str, Any] = None) -> Dict[str, Any]:
         """add document to knowledge graph"""
         if not self._initialized:
             raise Exception("Service not initialized")
-        
-        try:
-            # create document
-            doc = Document(
-                text=content,
-                metadata={
-                    "title": title or "Untitled",
-                    "source": "manual_input",
-                    "timestamp": time.time(),
-                    **(metadata or {})
-                }
-            )
-            
-            # select timeout based on document size
-            content_size = len(content)
-            timeout = self.operation_timeout if content_size < 10000 else self.large_document_timeout
-            
-            logger.info(f"Adding document '{title}' (size: {content_size} chars, timeout: {timeout}s)")
-            
-            # use async timeout control for insert operation
-            await asyncio.wait_for(
-                asyncio.to_thread(self.knowledge_index.insert, doc),
-                timeout=timeout
-            )
-            
-            logger.info(f"Successfully added document: {title}")
-            
-            return {
-                "success": True,
-                "message": f"Document '{title}' added to knowledge graph",
-                "document_id": doc.doc_id,
-                "content_size": content_size
-            }
-            
-        except asyncio.TimeoutError:
-            error_msg = f"Document insertion timed out after {timeout}s"
-            logger.error(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "timeout": timeout
-            }
-        except Exception as e:
-            logger.error(f"Failed to add document: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+
+        metadata = metadata or {}
+        metadata.setdefault("title", title or metadata.get("title", "Untitled"))
+        metadata.setdefault("source", metadata.get("source", "manual_input"))
+        metadata.setdefault("timestamp", metadata.get("timestamp", time.time()))
+
+        content_size = len(content)
+        timeout = (
+            self.operation_timeout if content_size < 10000 else self.large_document_timeout
+        )
+
+        result = await self._run_ingestion_pipeline(
+            "manual_input",
+            connector_overrides={
+                "content": content,
+                "title": title,
+                "metadata": metadata,
+            },
+            timeout=timeout,
+        )
+
+        if result.get("success"):
+            result.update({
+                "message": f"Document '{metadata['title']}' added to knowledge graph",
+                "content_size": content_size,
+            })
+        return result
     
     async def add_file(self, file_path: str) -> Dict[str, Any]:
         """add file to knowledge graph"""
         if not self._initialized:
             raise Exception("Service not initialized")
-        
-        try:
-            # read file
-            documents = await asyncio.to_thread(
-                lambda: SimpleDirectoryReader(input_files=[file_path]).load_data()
+
+        absolute_path = str(Path(file_path).expanduser())
+        result = await self._run_ingestion_pipeline(
+            "file",
+            connector_overrides={"file_path": absolute_path},
+        )
+
+        if result.get("success"):
+            result.setdefault(
+                "message",
+                f"File '{absolute_path}' processed with {result.get('nodes_count', 0)} nodes",
             )
-            
-            if not documents:
-                return {
-                    "success": False,
-                    "error": "No documents loaded from file"
-                }
-            
-            # batch insert, handle timeout for each document
-            success_count = 0
-            errors = []
-            
-            for i, doc in enumerate(documents):
-                try:
-                    content_size = len(doc.text)
-                    timeout = self.operation_timeout if content_size < 10000 else self.large_document_timeout
-                    
-                    await asyncio.wait_for(
-                        asyncio.to_thread(self.knowledge_index.insert, doc),
-                        timeout=timeout
-                    )
-                    success_count += 1
-                    logger.debug(f"Added document {i+1}/{len(documents)} from {file_path}")
-                    
-                except asyncio.TimeoutError:
-                    error_msg = f"Document {i+1} timed out"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-                except Exception as e:
-                    error_msg = f"Document {i+1} failed: {str(e)}"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-            
-            logger.info(f"Added {success_count}/{len(documents)} documents from {file_path}")
-            
-            return {
-                "success": success_count > 0,
-                "message": f"Added {success_count}/{len(documents)} documents from {file_path}",
-                "documents_count": len(documents),
-                "success_count": success_count,
-                "errors": errors
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to add file {file_path}: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+        else:
+            result.setdefault("error", f"Failed to process file '{absolute_path}'")
+        return result
     
-    async def add_directory(self, 
+    async def add_directory(self,
                           directory_path: str,
                           recursive: bool = True,
                           file_extensions: List[str] = None) -> Dict[str, Any]:
         """batch add files in directory"""
         if not self._initialized:
             raise Exception("Service not initialized")
-        
-        try:
-            # set file extension filter
-            if file_extensions is None:
-                file_extensions = [".txt", ".md", ".py", ".js", ".ts", ".sql", ".json", ".yaml", ".yml"]
-            
-            # read directory
-            reader = SimpleDirectoryReader(
-                input_dir=directory_path,
-                recursive=recursive,
-                file_extractor={ext: None for ext in file_extensions}
+
+        absolute_path = str(Path(directory_path).expanduser())
+        overrides: Dict[str, Any] = {
+            "directory_path": absolute_path,
+            "recursive": recursive,
+        }
+        if file_extensions is not None:
+            overrides["file_extensions"] = file_extensions
+
+        result = await self._run_ingestion_pipeline(
+            "directory",
+            connector_overrides=overrides,
+        )
+
+        if result.get("success"):
+            result.setdefault(
+                "message",
+                f"Directory '{absolute_path}' processed with {result.get('documents_count', 0)} documents",
             )
-            
-            documents = await asyncio.to_thread(reader.load_data)
-            
-            if not documents:
-                return {
-                    "success": False,
-                    "error": "No documents found in directory"
-                }
-            
-            # batch insert, handle timeout for each document
-            success_count = 0
-            errors = []
-            
-            logger.info(f"Processing {len(documents)} documents from {directory_path}")
-            
-            for i, doc in enumerate(documents):
-                try:
-                    content_size = len(doc.text)
-                    timeout = self.operation_timeout if content_size < 10000 else self.large_document_timeout
-                    
-                    await asyncio.wait_for(
-                        asyncio.to_thread(self.knowledge_index.insert, doc),
-                        timeout=timeout
-                    )
-                    success_count += 1
-                    
-                    if i % 10 == 0:  # record progress every 10 documents
-                        logger.info(f"Progress: {i+1}/{len(documents)} documents processed")
-                        
-                except asyncio.TimeoutError:
-                    error_msg = f"Document {i+1} ({doc.metadata.get('file_name', 'unknown')}) timed out"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-                except Exception as e:
-                    error_msg = f"Document {i+1} ({doc.metadata.get('file_name', 'unknown')}) failed: {str(e)}"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-            
-            logger.info(f"Successfully added {success_count}/{len(documents)} documents from {directory_path}")
-            
-            return {
-                "success": success_count > 0,
-                "message": f"Added {success_count}/{len(documents)} documents from {directory_path}",
-                "documents_count": len(documents),
-                "success_count": success_count,
-                "errors": errors
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to add directory {directory_path}: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+        else:
+            result.setdefault("error", f"Failed to process directory '{absolute_path}'")
+        return result
     
     async def query(self, 
                    question: str,

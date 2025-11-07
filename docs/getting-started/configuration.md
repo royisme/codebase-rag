@@ -192,6 +192,44 @@ OPERATION_TIMEOUT=300
 LARGE_DOCUMENT_TIMEOUT=600
 ```
 
+### Ingestion Pipelines
+
+Document ingestion now uses [LlamaIndex ingestion pipelines](https://docs.llamaindex.ai/) with pluggable connectors, transformations, and writers. The service ships with three pipelines (`manual_input`, `file`, `directory`), and you can override or extend them from configuration by providing a JSON-style mapping in your `.env` file:
+
+```bash
+INGESTION_PIPELINES='{
+  "file": {
+    "transformations": [
+      {
+        "class_path": "llama_index.core.node_parser.SimpleNodeParser",
+        "kwargs": {"chunk_size": 256, "chunk_overlap": 20}
+      },
+      {
+        "class_path": "codebase_rag.services.knowledge.pipeline_components.MetadataEnrichmentTransformation",
+        "kwargs": {"metadata": {"language": "python"}}
+      }
+    ]
+  },
+  "git": {
+    "connector": {
+      "class_path": "my_project.pipeline.GitRepositoryConnector",
+      "kwargs": {"branch": "main"}
+    },
+    "transformations": [
+      {
+        "class_path": "my_project.pipeline.CodeBlockParser",
+        "kwargs": {"max_tokens": 400}
+      }
+    ],
+    "writer": {
+      "class_path": "codebase_rag.services.knowledge.pipeline_components.Neo4jKnowledgeGraphWriter"
+    }
+  }
+}'
+```
+
+Each entry is merged with the defaults. This means you can change chunking behaviour, add metadata enrichment steps, or register new data sources by publishing your own connector class. At runtime the knowledge service builds and reuses the configured pipeline instances so changes only require a service restart.
+
 ### Neo4j Performance Tuning
 
 For large repositories:
