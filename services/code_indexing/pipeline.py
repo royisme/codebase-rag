@@ -16,13 +16,15 @@ from loguru import logger
 from config import settings
 from database.models import ParseStatus
 from schemas import ParseJobUpdate
-from services.source_service import SourceService
+from services.source_service import SourceService, update_job_with_new_session
 
-from .code_parser import CodeParser, ParseSummary, ParsedFile
-from .embedding import DeterministicEmbeddingGenerator, EmbeddingSummary
+from .code_parser import CodeParser, ParseSummary, ParsedFile, ParsedFunction
+from .embedding import EmbeddingSummary
 from .file_scanner import FileScanner, FileScanResult
 from .git_sync import GitSyncService, GitSyncResult, GitDiffResult
 from .graph_builder import GraphBuilder, GraphBuildResult
+from services.embedding_client import EmbeddingClient
+from services.embedding_utils import effective_vector_dimension
 
 
 @dataclass
@@ -76,7 +78,8 @@ class CodeIndexingPipeline:
             max_file_size_kb=settings.code_max_file_size_kb,
         )
         self.parser = CodeParser()
-        self.embedder = DeterministicEmbeddingGenerator()
+        effective_dim = effective_vector_dimension(settings.vector_dimension)
+        self.embedding_client = EmbeddingClient(dimension=effective_dim)
         self.graph_builder = GraphBuilder(graph_service=graph_service)
 
         self.summary: Dict[str, Any] = {
@@ -668,15 +671,47 @@ class CodeIndexingPipeline:
         task_progress_callback: Optional[Callable[[float, str], None]],
     ) -> EmbeddingSummary:
         start = time.perf_counter()
-        functions = [
-            function for parsed in parsed_files for function in parsed.functions
-        ]
-        summary = await asyncio.to_thread(self.embedder.generate, functions)
+
+        embed_payloads: List[str] = []
+        for parsed in parsed_files:
+            try:
+                file_text = parsed.file.absolute_path.read_text(encoding="utf-8", errors="ignore")
+            except Exception as exc:  # pragma: no cover - filesystem edge case
+                logger.debug("Failed to read file for embedding stage {}: {}", parsed.file.relative_path, exc)
+                file_text = ""
+
+            lines = file_text.splitlines() if file_text else []
+            for function in parsed.functions:
+                snippet = ""
+                if lines:
+                    start_line = max(function.start_line - 1, 0)
+                    end_line = max(function.end_line, function.start_line)
+                    snippet = "\n".join(lines[start_line:end_line])
+
+                text_parts = [
+                    f"Function: {function.name}",
+                    f"Language: {function.language}",
+                    f"File: {function.file_path.as_posix()}",
+                    f"Lines: {function.start_line}-{function.end_line}",
+                    "\n",
+                    snippet,
+                ]
+                embed_payloads.append("\n".join(text_parts))
+
+        vectors = await self.embedding_client.embed_texts(embed_payloads)
         duration = time.perf_counter() - start
+
+        embedding_dimension = len(vectors[0]) if vectors else self.embedding_client.dimension
+        summary = EmbeddingSummary(
+            functions_embedded=len(vectors),
+            embedding_dimension=embedding_dimension,
+            average_magnitude=self.embedding_client.average_magnitude(vectors),
+        )
 
         stage_payload = {
             "functions_embedded": summary.functions_embedded,
             "average_magnitude": summary.average_magnitude,
+            "embedding_dimension": summary.embedding_dimension,
             "duration_seconds": duration,
         }
         self.summary["functions_embedded"] = summary.functions_embedded
@@ -790,26 +825,27 @@ class CodeIndexingPipeline:
             )
             return {"documents_created": 0, "skipped": True}
 
-        documents = []
+        documents: List[Document] = []
         for parsed_file in parsed_files:
             scanned = parsed_file.file
             file_path = scanned.relative_path.as_posix()
             language = scanned.language or "unknown"
 
-            content_parts: List[str] = [
-                f"# 文件: {file_path}",
-            ]
+            try:
+                file_text = scanned.absolute_path.read_text(
+                    encoding="utf-8", errors="ignore"
+                )
+            except Exception as exc:  # pragma: no cover - filesystem edge case
+                logger.debug("Failed to read snippet for {}: {}", file_path, exc)
+                file_text = ""
 
+            # 文件级文档
+            content_parts: List[str] = [f"# 文件: {file_path}"]
             if source_name:
                 content_parts.append(f"所属仓库: {source_name}")
+            content_parts.append(f"\n编程语言: {language}")
 
-            content_parts.append(
-                f"\n编程语言: {language}",
-            )
-
-            function_names = [
-                function.name for function in (parsed_file.functions or [])
-            ]
+            function_names = [fn.name for fn in (parsed_file.functions or [])]
             if function_names:
                 content_parts.append("\n## 函数列表")
                 for name in function_names[:15]:
@@ -831,19 +867,11 @@ class CodeIndexingPipeline:
                 for module in import_modules[:10]:
                     content_parts.append(f"- {module}")
 
-            try:
-                snippet = scanned.absolute_path.read_text(
-                    encoding="utf-8", errors="ignore"
-                )[:500]
-            except Exception as exc:  # pragma: no cover - filesystem edge case
-                logger.debug("Failed to read snippet for {}: {}", file_path, exc)
-                snippet = ""
-
+            snippet = (file_text or "")[:800]
             if snippet.strip():
                 content_parts.append("\n## 代码摘要")
                 content_parts.append(snippet)
 
-            doc_text = "\n".join(content_parts)
             metadata = {
                 "source_type": "code_file",
                 "file_path": file_path,
@@ -855,18 +883,51 @@ class CodeIndexingPipeline:
                 metadata["source_id"] = source_id
             if source_name:
                 metadata["source_name"] = source_name
-            documents.append(Document(text=doc_text, metadata=metadata))
+            documents.append(Document(text="\n".join(content_parts), metadata=metadata))
 
-        for document in documents:
+            # 函数级文档
+            if file_text:
+                lines = file_text.splitlines()
+            else:
+                lines = []
+
+            for fn in parsed_file.functions:
+                fn_lines: List[str] = []
+                if lines:
+                    start = max(fn.start_line - 1, 0)
+                    end = max(fn.end_line, fn.start_line)
+                    fn_lines = lines[start:end]
+                fn_snippet = "\n".join(fn_lines)[:1500]
+
+                fn_metadata = {
+                    "source_type": "code_function",
+                    "function_name": fn.name,
+                    "file_path": file_path,
+                    "language": fn.language,
+                    "start_line": fn.start_line,
+                    "end_line": fn.end_line,
+                }
+                if source_id:
+                    fn_metadata["source_id"] = source_id
+                if source_name:
+                    fn_metadata["source_name"] = source_name
+
+                fn_text_parts = [
+                    f"# 函数: {fn.name}",
+                    f"文件: {file_path}",
+                    f"语言: {fn.language}",
+                    f"行号: {fn.start_line}-{fn.end_line}",
+                    "\n## 代码实现",
+                    fn_snippet or "(内容缺失)",
+                ]
+                documents.append(Document(text="\n".join(fn_text_parts), metadata=fn_metadata))
+
+        if documents:
             try:
-                await asyncio.to_thread(knowledge_index.insert, document)
-                documents_created += 1
+                inserted = await neo4j_knowledge_service.insert_documents(documents)
+                documents_created += inserted
             except Exception as exc:  # pragma: no cover - downstream service failure
-                logger.error(
-                    "Failed to insert knowledge document for {}: {}",
-                    document.metadata.get("file_path"),
-                    exc,
-                )
+                logger.error("Failed to insert documents into vector index: {}", exc)
 
         duration = time.perf_counter() - start
 
@@ -918,7 +979,7 @@ class CodeIndexingPipeline:
         self.summary.setdefault("stage_history", []).append(stage_entry)
 
         if job_uuid:
-            await self.source_service.update_job(
+            await update_job_with_new_session(
                 job_uuid,
                 ParseJobUpdate(
                     status=status,

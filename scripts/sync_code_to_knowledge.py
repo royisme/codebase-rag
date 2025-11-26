@@ -18,6 +18,11 @@ async def sync_code_to_knowledge():
     
     # 1. 初始化服务
     await neo4j_knowledge_service.initialize()
+    if not graph_service._connected:
+        connected = await graph_service.connect()
+        if not connected:
+            logger.error("无法连接到 Neo4j，终止同步。")
+            return
     
     if not neo4j_knowledge_service.knowledge_index:
         logger.error("知识索引未初始化")

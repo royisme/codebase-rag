@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Any, Dict, List
 
 from loguru import logger
+import jieba
 
 from services.graph_service import Neo4jGraphService, graph_service
 from services.neo4j_knowledge_service import Neo4jKnowledgeService, neo4j_knowledge_service
@@ -56,7 +57,7 @@ INTENT_KEYWORDS = {
 }
 
 
-QUESTION_KEYWORD_REGEX = re.compile(r"[A-Za-z0-9_./-]+", re.UNICODE)
+QUESTION_KEYWORD_REGEX = re.compile(r"[A-Za-z0-9_./-]+|[\u4e00-\u9fa5]+", re.UNICODE)
 
 
 @dataclass
@@ -107,8 +108,25 @@ class GraphContextBuilder:
         return GraphQueryIntent.DEFAULT
 
     def _extract_keywords(self, question: str) -> List[str]:
-        candidates = QUESTION_KEYWORD_REGEX.findall(question)
-        return [kw.lower() for kw in candidates if len(kw) > 2][:5]
+        # 优先使用 jieba 分词提取关键词，回退到正则方案
+        keywords: List[str] = []
+        try:
+            segments = jieba.cut_for_search(question)
+            for seg in segments:
+                token = seg.strip()
+                if len(token) < 2:
+                    continue
+                keywords.append(token.lower())
+                if len(keywords) >= 5:
+                    break
+        except Exception as exc:
+            logger.debug("jieba segmentation failed: {}", exc)
+
+        if not keywords:
+            candidates = QUESTION_KEYWORD_REGEX.findall(question)
+            keywords = [kw.lower() for kw in candidates if len(kw) > 2][:5]
+
+        return keywords
 
     async def _ensure_graph_ready(self) -> bool:
         if self._neo4j_ready:

@@ -116,9 +116,9 @@ Based on graph structure traversal, suitable for relationship queries.
 
 ### Neo4j Optimization
 ```cypher
--- Create vector index
-CREATE VECTOR INDEX knowledge_vectors 
-FOR (n:Document) ON (n.embedding) 
+-- Create vector index (service auto-creates this as needed)
+CREATE VECTOR INDEX vector IF NOT EXISTS
+FOR (n:Document) ON (n.embedding)
 OPTIONS {indexConfig: {
   `vector.dimensions`: 768,
   `vector.similarity_function`: 'cosine'
@@ -140,8 +140,8 @@ FOR (n:Document) ON EACH [n.text, n.title]
 ### Neo4j Configuration
 ```python
 # Vector index configuration
-vector_index_name = "knowledge_vectors"
-vector_dimension = 768  # Adjust based on embedding model
+vector_index_name = "vector"  # aligns with Neo4j default
+vector_dimension = 768        # service will override based on provider when needed
 ```
 
 ### LlamaIndex Configuration
@@ -192,9 +192,9 @@ ollama pull nomic-embed-text
 // Check index status
 SHOW INDEXES
 
-// Rebuild index
-DROP INDEX knowledge_vectors IF EXISTS;
-CREATE VECTOR INDEX knowledge_vectors ...
+// Rebuild index (service also handles this automatically)
+DROP INDEX vector IF EXISTS;
+CREATE VECTOR INDEX vector ...
 ```
 
 ## Development Guide

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -24,6 +25,31 @@ _enforcer: Optional[casbin.Enforcer] = None
 _model_path = Path(__file__).with_name("casbin_model.conf")
 
 
+def normalize_action_pattern(action: Optional[str]) -> str:
+    """Normalize action string to a valid regex pattern."""
+    if not action:
+        return ""
+    pattern = action.strip()
+    if pattern == "*":
+        return ".*"
+    return pattern
+
+
+def regex_match_safe(name1: str, name2: str) -> bool:
+    """防御性处理，确保策略中的 action 作为正则表达式时不会抛异常。"""
+    pattern = normalize_action_pattern(name2)
+    try:
+        return re.match(pattern, name1) is not None
+    except re.error as exc:
+        logger.warning(
+            "Invalid regex in policy action '%s': %s. Falling back to literal match.",
+            name2,
+            exc,
+        )
+        safe_pattern = re.escape(pattern)
+        return re.match(safe_pattern, name1) is not None
+
+
 def _initialize_enforcer() -> casbin.Enforcer:
     """Initialize the Casbin enforcer with lazy loading."""
     global _adapter, _enforcer
@@ -33,6 +59,7 @@ def _initialize_enforcer() -> casbin.Enforcer:
         _adapter = Adapter(sync_engine, filtered=False)
         _enforcer = casbin.Enforcer(str(_model_path), _adapter, enable_log=False)
         _enforcer.add_function("key_match2", util.key_match2)
+        _enforcer.add_function("regex_match", regex_match_safe)
         _enforcer.enable_auto_save(settings.casbin_auto_save)
         _enforcer.load_policy()
         logger.info("Casbin enforcer initialized successfully")

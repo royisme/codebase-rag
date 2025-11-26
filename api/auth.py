@@ -18,7 +18,12 @@ from security.auth import (
     current_superuser,
     fastapi_users,
 )
-from security.casbin_enforcer import get_enforcer, reload_policies, require_permission
+from security.casbin_enforcer import (
+    get_enforcer,
+    reload_policies,
+    require_permission,
+    normalize_action_pattern,
+)
 from security.constants import DEFAULT_ROLES
 from security.schemas import (
     PolicyCreateRequest,
@@ -152,11 +157,13 @@ async def create_policy(
     user=Depends(require_permission("/admin/policies", "POST")),
 ):
     enforcer = get_enforcer()
+    domain = payload.domain or "global"
+    action_pattern = normalize_action_pattern(payload.action)
     added = enforcer.add_policy(
         payload.subject,
-        payload.domain,
+        domain,
         payload.resource,
-        payload.action,
+        action_pattern,
     )
     if not added:
         raise HTTPException(
@@ -183,9 +190,9 @@ async def create_policy(
             p
             for p in policies
             if p.v0 == payload.subject
-            and p.v1 == payload.domain
+            and p.v1 == domain
             and p.v2 == payload.resource
-            and p.v3 == payload.action
+            and p.v3 == action_pattern
         ),
         None,
     )

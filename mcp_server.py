@@ -8,6 +8,7 @@ from services.graph_service import graph_service
 from services.task_queue import task_queue, TaskStatus, submit_document_processing_task, submit_directory_processing_task
 from services.task_processors import processor_registry
 from config import settings, get_current_model_info
+from services.embedding_utils import effective_vector_dimension
 
 # initialize MCP server
 mcp = FastMCP("Neo4j Knowledge Graph MCP Server")
@@ -849,7 +850,7 @@ async def get_knowledge_config() -> Dict[str, Any]:
         "chunk_size": settings.chunk_size,
         "chunk_overlap": settings.chunk_overlap,
         "top_k": settings.top_k,
-        "vector_dimension": settings.vector_dimension,
+        "vector_dimension": effective_vector_dimension(settings.vector_dimension),
         "timeouts": {
             "connection": settings.connection_timeout,
             "operation": settings.operation_timeout,

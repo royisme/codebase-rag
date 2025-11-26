@@ -10,6 +10,7 @@ from sqlalchemy import Select, func, select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from database import async_session_factory
 from database.models import KnowledgeSource, ParseJob, ParseStatus, User
 from schemas import KnowledgeSourceCreate, KnowledgeSourceUpdate, ParseJobCreate, ParseJobUpdate
 from services.audit_logger import audit_logger
@@ -64,7 +65,7 @@ class SourceService:
             description=source_data.description,
             source_type=source_data.source_type,
             connection_config=source_data.connection_config,
-            source_metadata=source_data.metadata,
+            source_metadata=source_data.source_metadata,
             is_active=source_data.is_active,
             sync_frequency_minutes=source_data.sync_frequency_minutes,
             created_by=created_by,
@@ -187,8 +188,8 @@ class SourceService:
         update_dict = update_data.model_dump(exclude_unset=True)
         updated_fields = list(update_dict.keys())
 
-        if "metadata" in update_dict:
-            source.source_metadata = update_dict.pop("metadata")
+        if "source_metadata" in update_dict:
+            source.source_metadata = update_dict.pop("source_metadata")
 
         for field, value in update_dict.items():
             setattr(source, field, value)
@@ -495,3 +496,15 @@ class SourceService:
 def get_source_service(session: AsyncSession) -> SourceService:
     """获取知识源服务实例。"""
     return SourceService(session)
+
+
+async def update_job_with_new_session(
+    job_id: uuid.UUID,
+    update_data: ParseJobUpdate,
+) -> ParseJob:
+    """在独立事务中更新解析任务，确保更新立刻对其他会话可见。"""
+    async with async_session_factory() as session:
+        service = get_source_service(session)
+        job = await service.update_job(job_id, update_data)
+        await session.commit()
+        return job

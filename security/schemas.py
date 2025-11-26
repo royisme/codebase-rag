@@ -50,7 +50,7 @@ class PolicySchema(BaseModel):
 
 class PolicyCreateRequest(BaseModel):
     subject: str
-    domain: str
+    domain: str = ""
     resource: str
     action: str
 

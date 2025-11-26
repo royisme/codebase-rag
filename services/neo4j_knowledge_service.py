@@ -12,11 +12,12 @@ import time
 import uuid
 
 from llama_index.core import (
-    KnowledgeGraphIndex, 
-    Document, 
+    KnowledgeGraphIndex,
+    Document,
     Settings,
     StorageContext,
-    SimpleDirectoryReader
+    SimpleDirectoryReader,
+    VectorStoreIndex,
 )
 
 # LLM Providers
@@ -33,11 +34,15 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 # Graph Store
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
+from llama_index.vector_stores.neo4jvector import Neo4jVectorStore
 
 # Core components
 from llama_index.core.node_parser import SimpleNodeParser
 
+from neo4j import GraphDatabase
+
 from config import settings
+from services.embedding_utils import expected_dimension_for_provider
 
 class Neo4jKnowledgeService:
     """knowledge graph service based on Neo4j's native vector index"""
@@ -45,6 +50,8 @@ class Neo4jKnowledgeService:
     def __init__(self):
         self.graph_store = None
         self.knowledge_index = None
+        self.vector_store = None
+        self.vector_index = None
         self.query_engine = None
         self._initialized = False
         
@@ -140,6 +147,81 @@ class Neo4jKnowledgeService:
             )
         else:
             raise ValueError(f"Unsupported embedding provider: {provider}")
+
+    def _ensure_vector_index_dimension(self, embedding_dimension: int) -> None:
+        """Ensure Neo4j vector index exists with the correct embedding dimension."""
+        driver = None
+
+        try:
+            driver = GraphDatabase.driver(
+                settings.neo4j_uri,
+                auth=(settings.neo4j_username, settings.neo4j_password),
+            )
+            with driver.session(database=settings.neo4j_database) as session:
+                record = session.run(
+                    """
+                    SHOW INDEXES YIELD name, type, options
+                    WHERE name = $name
+                    RETURN name, type, options
+                    """,
+                    {"name": settings.vector_index_name},
+                ).single()
+
+                should_create = False
+
+                if record:
+                    index_type = record.get("type")
+                    index_options = record.get("options") or {}
+                    index_config = index_options.get("indexConfig") or {}
+                    current_dim = index_config.get("vector.dimensions")
+
+                    if index_type != "VECTOR":
+                        logger.warning(
+                            "Index %s exists but is %s instead of VECTOR. Recreating.",
+                            settings.vector_index_name,
+                            index_type,
+                        )
+                        session.run(
+                            f"DROP INDEX {settings.vector_index_name} IF EXISTS"
+                        )
+                        should_create = True
+                    elif current_dim != embedding_dimension:
+                        logger.warning(
+                            "Vector index %s dimension %s mismatches embedding dimension %s. Recreating index.",
+                            settings.vector_index_name,
+                            current_dim,
+                            embedding_dimension,
+                        )
+                        session.run(
+                            f"DROP INDEX {settings.vector_index_name} IF EXISTS"
+                        )
+                        should_create = True
+                else:
+                    should_create = True
+
+                if should_create:
+                    session.run(
+                        f"""
+                        CREATE VECTOR INDEX {settings.vector_index_name} IF NOT EXISTS
+                        FOR (n:Document) ON (n.embedding)
+                        OPTIONS {{
+                            indexConfig: {{
+                                `vector.dimensions`: {embedding_dimension},
+                                `vector.similarity_function`: 'cosine'
+                            }}
+                        }}
+                        """
+                    )
+                    logger.info(
+                        f"Ensured Neo4j vector index {settings.vector_index_name} exists with dimension {embedding_dimension}."
+                    )
+                else:
+                    logger.info(
+                        f"Neo4j vector index {settings.vector_index_name} already matches dimension {embedding_dimension}."
+                    )
+        finally:
+            if driver:
+                driver.close()
     
     async def initialize(self) -> bool:
         """initialize service"""
@@ -167,7 +249,30 @@ class Neo4jKnowledgeService:
                 password=settings.neo4j_password,
                 url=settings.neo4j_uri,
                 database=settings.neo4j_database,
-                timeout=self.connection_timeout
+                timeout=self.connection_timeout,
+            )
+            embedding_dimension = settings.vector_dimension
+            embed_model = settings.embedding_provider.lower()
+            expected_dim = expected_dimension_for_provider(embed_model)
+            if expected_dim and embedding_dimension != expected_dim:
+                logger.warning(
+                    f"VECTOR_DIMENSION={embedding_dimension} does not match "
+                    f"{embed_model} embedding dimension ({expected_dim}). Using {expected_dim}."
+                )
+                embedding_dimension = expected_dim
+
+            self._ensure_vector_index_dimension(embedding_dimension)
+            self.vector_store = Neo4jVectorStore(
+                username=settings.neo4j_username,
+                password=settings.neo4j_password,
+                url=settings.neo4j_uri,
+                embedding_dimension=embedding_dimension,
+                database=settings.neo4j_database,
+                index_name=settings.vector_index_name,
+                node_label="Document",
+                text_node_property="text",
+                embedding_node_property="embedding",
+                metadata_node_property="metadata",
             )
             
             # create storage context
@@ -181,7 +286,11 @@ class Neo4jKnowledgeService:
             self.knowledge_index = KnowledgeGraphIndex(
                 nodes=[],
                 storage_context=storage_context,
-                show_progress=True
+                show_progress=True,
+            )
+            self.vector_index = VectorStoreIndex.from_vector_store(
+                self.vector_store,
+                show_progress=True,
             )
             logger.info("Knowledge graph index initialized (data loaded from Neo4j if exists)")
             
@@ -255,6 +364,156 @@ class Neo4jKnowledgeService:
                 "success": False,
                 "error": str(e)
             }
+
+    async def insert_documents(self, documents: List[Document]) -> int:
+        """Insert multiple documents into the Neo4j vector index."""
+
+        if not self.vector_index:
+            raise RuntimeError("Vector index is not initialized")
+
+        inserted = 0
+        for doc in documents:
+            try:
+                await asyncio.to_thread(self.vector_index.insert, doc)
+                inserted += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Failed to insert document %s: %s", doc.metadata.get("file_path"), exc)
+        return inserted
+
+    async def _build_vector_context(
+        self,
+        question: str,
+        max_results: int,
+    ) -> tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Retrieve vector nodes and format them into context/evidence structures."""
+
+        if not self.vector_index:
+            return "", [], []
+
+        retriever = self.vector_index.as_retriever(
+            similarity_top_k=max_results,
+            include_text=True,
+        )
+        nodes = await asyncio.to_thread(retriever.retrieve, question)
+        return self._format_nodes_as_context(nodes, max_results)
+
+    def _format_nodes_as_context(
+        self,
+        nodes: List[Any],
+        max_results: int,
+    ) -> tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Format retrieved nodes into context text, source nodes, and evidence data."""
+
+        context_parts: List[str] = []
+        source_nodes: List[Dict[str, Any]] = []
+        evidence_metadata: List[Dict[str, Any]] = []
+
+        for idx, node in enumerate(nodes[:max_results], start=1):
+            metadata = getattr(node, "metadata", None) or {}
+            snippet = (getattr(node, "text", None) or "")
+            truncated = snippet[:300] + ("..." if len(snippet) > 300 else "")
+
+            file_path = metadata.get("file_path", metadata.get("title", "unknown"))
+            location = file_path
+            start_line = metadata.get("start_line")
+            end_line = metadata.get("end_line")
+            if start_line:
+                location += f" (L{start_line}"
+                if end_line and end_line != start_line:
+                    location += f"-{end_line}"
+                location += ")"
+
+            context_parts.append(f"[{idx}] {location}:\n{truncated}")
+            source_nodes.append(
+                {
+                    "node_id": getattr(node, "node_id", None),
+                    "text": truncated,
+                    "metadata": metadata,
+                    "score": getattr(node, "score", 0.0),
+                }
+            )
+            evidence_metadata.append(
+                {
+                    "id": getattr(node, "node_id", None) or f"node_{idx}",
+                    "snippet": truncated,
+                    "full_text": snippet,
+                    "repo": metadata.get("repo"),
+                    "branch": metadata.get("branch", "main"),
+                    "file_path": file_path,
+                    "start_line": start_line,
+                    "end_line": end_line,
+                    "source_type": metadata.get("source_type", "code"),
+                    "score": getattr(node, "score", 0.0),
+                }
+            )
+
+        context_text = "\n\n".join(context_parts)
+        return context_text, source_nodes, evidence_metadata
+
+    @staticmethod
+    def _build_evidence_link(ev_data: Dict[str, Any]) -> Optional[str]:
+        repo = ev_data.get("repo")
+        file_path = ev_data.get("file_path")
+        if not repo or not file_path:
+            return None
+        branch = ev_data.get("branch", "main")
+        start_line = ev_data.get("start_line")
+        end_line = ev_data.get("end_line")
+        link = f"https://github.com/{repo}/blob/{branch}/{file_path}"
+        if start_line:
+            link += f"#L{start_line}"
+            if end_line and end_line != start_line:
+                link += f"-L{end_line}"
+        return link
+
+    @classmethod
+    def _format_reference_lines(cls, evidence_metadata: List[Dict[str, Any]]) -> List[str]:
+        if not evidence_metadata:
+            return []
+        lines = ["\n\n**参考资料**"]
+        for idx, ev in enumerate(evidence_metadata, start=1):
+            label = ev.get("file_path") or ev.get("id") or f"来源 {idx}"
+            link = cls._build_evidence_link(ev)
+            if link:
+                lines.append(f"[{idx}] {label} ([链接]({link}))")
+            else:
+                lines.append(f"[{idx}] {label}")
+        return lines
+
+    async def _query_via_vector_index(
+        self,
+        question: str,
+        *,
+        max_results: int = 10,
+    ) -> Dict[str, Any]:
+        """Retrieve contexts via vector index and run the LLM."""
+
+        if not self.vector_index:
+            raise RuntimeError("Vector index not available")
+
+        context_text, source_nodes, _ = await self._build_vector_context(
+            question, max_results
+        )
+        llm = Settings.llm
+        prompt = (
+            f"基于以下上下文，用 Markdown 回答问题。引用上下文时必须使用半角格式，如 `[1]` `[2]`，禁止出现 `【】`、`（）` 等符号。若没有可引用内容，直接写“暂无参考”。\n\n"
+            f"{context_text}\n\n问题: {question}\n\n回答："
+            if context_text
+            else f"请回答下列问题：{question}\n\n要求：\n1. 输出 Markdown。\n2. 如果引用上下文，必须使用 `[1]` `[2]` 等半角格式，不得使用其他括号。\n3. 若无可引用内容，直接说明“暂无参考”。\n\n回答："
+        )
+
+        if hasattr(llm, "acomplete"):
+            llm_response = await llm.acomplete(prompt)
+        else:
+            llm_response = await asyncio.to_thread(llm.complete, prompt)
+
+        confidence = max((item.get("score") or 0.0 for item in source_nodes), default=0.0)
+
+        return {
+            "answer": str(llm_response),
+            "source_nodes": source_nodes,
+            "confidence": confidence,
+        }
     
     async def add_file(self, file_path: str) -> Dict[str, Any]:
         """add file to knowledge graph"""
@@ -466,24 +725,37 @@ class Neo4jKnowledgeService:
         if not self._initialized:
             raise Exception("Service not initialized")
         
+        use_vector = self.vector_index is not None
+        
         try:
-            response = await self._stream_query_response(
-                question,
-                mode=mode,
-                include_evidence=include_evidence,
-                max_results=max_results,
-            )
+            if use_vector:
+                response_payload = await self._query_via_vector_index(
+                    question,
+                    max_results=max_results,
+                )
+                response = response_payload["answer"]
+                source_nodes = response_payload["source_nodes"]
+            else:
+                response = await self._stream_query_response(
+                    question,
+                    mode=mode,
+                    include_evidence=include_evidence,
+                    max_results=max_results,
+                )
             
             # extract source node information
-            source_nodes = []
-            if hasattr(response, 'source_nodes'):
-                for node in response.source_nodes:
-                    source_nodes.append({
-                        "node_id": node.node_id,
-                        "text": node.text[:200] + "..." if len(node.text) > 200 else node.text,
-                        "metadata": node.metadata,
-                        "score": getattr(node, 'score', None)
-                    })
+            if not use_vector:
+                source_nodes: List[Dict[str, Any]] = []
+                if hasattr(response, 'source_nodes'):
+                    for node in response.source_nodes:
+                        source_nodes.append({
+                            "node_id": node.node_id,
+                            "text": node.text[:200] + "..." if len(node.text) > 200 else node.text,
+                            "metadata": node.metadata,
+                            "score": getattr(node, 'score', None)
+                        })
+            else:
+                source_nodes = response_payload["source_nodes"]
 
             # Respect max results for downstream consumers
             source_nodes = source_nodes[:max_results]
@@ -524,7 +796,7 @@ class Neo4jKnowledgeService:
                     )
 
             # Derive confidence score
-            raw_confidence = getattr(response, "score", None)
+            raw_confidence = getattr(response, "score", None) if not use_vector else response_payload.get("confidence")
             if raw_confidence is None:
                 raw_confidence = max(
                     (item.get("score") or 0.0 for item in source_nodes), default=0.0
@@ -593,101 +865,84 @@ class Neo4jKnowledgeService:
         
         start_time = time.time()
         accumulated_text = ""
-        source_nodes = []
-        evidence_metadata = []  # 初始化证据元数据列表
-        
+        source_nodes: List[Dict[str, Any]] = []
+        evidence_metadata: List[Dict[str, Any]] = []  # 初始化证据元数据列表
+
         logger.debug(f"[PERF-KG] Starting stream query: {question[:50]}...")
-        
+
+        def _node_metadata(node: Any) -> Dict[str, Any]:
+            if isinstance(node, dict):
+                return node.get("metadata") or {}
+            return getattr(node, "metadata", None) or {}
+
+        def _node_score(node: Any) -> float:
+            if isinstance(node, dict):
+                return float(node.get("score") or 0.0)
+            raw = getattr(node, "score", 0.0)
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                return 0.0
+
+        def _node_id(node: Any) -> Optional[str]:
+            if isinstance(node, dict):
+                return node.get("node_id")
+            return getattr(node, "node_id", None)
+
         try:
             # Get the LLM instance
             llm = Settings.llm
             
-            # Build context from graph if query engine is available
+            # Build context, prefer vector index
             context_text = ""
-            if self.query_engine:
+            if self.vector_index:
+                vector_start = perf_time.perf_counter()
+                context_text, source_nodes, evidence_metadata = await self._build_vector_context(
+                    question, max_results
+                )
+                logger.info(
+                    f"[PERF-KG] Vector retrieval completed in {perf_time.perf_counter() - vector_start:.2f}s (nodes={len(source_nodes)})"
+                )
+            
+            if not context_text and self.query_engine:
                 try:
-                    # Retrieve relevant nodes first
                     retrieve_start = perf_time.perf_counter()
-                    logger.debug(f"[PERF-KG] Starting retrieval...")
-                    
-                    # Step 1: 创建 retriever
+                    logger.debug(f"[PERF-KG] Starting graph retrieval...")
                     retriever_create_start = perf_time.perf_counter()
                     retriever = self.knowledge_index.as_retriever(
                         similarity_top_k=max_results,
-                        include_text=True
+                        include_text=True,
                     )
                     retriever_create_time = perf_time.perf_counter() - retriever_create_start
-                    logger.debug(f"[PERF-KG] Retriever created in {retriever_create_time:.2f}s")
-                    
-                    # Step 2: 执行检索（包含embedding生成 + 向量搜索）
-                    retrieve_exec_start = perf_time.perf_counter()
-                    logger.debug(f"[PERF-KG] Calling retriever.retrieve() with question: {question[:50]}...")
-                    
-                    # 增加超时时间到 180 秒 (3分钟)
                     nodes = await asyncio.wait_for(
                         asyncio.to_thread(retriever.retrieve, question),
-                        timeout=180
+                        timeout=180,
                     )
-                    source_nodes = nodes
-                    
-                    retrieve_exec_time = perf_time.perf_counter() - retrieve_exec_start
+                    context_text, source_nodes, evidence_metadata = self._format_nodes_as_context(
+                        nodes, max_results
+                    )
                     retrieve_time = perf_time.perf_counter() - retrieve_start
-                    logger.info(f"[PERF-KG] Retrieval completed in {retrieve_time:.2f}s (exec: {retrieve_exec_time:.2f}s, {len(nodes)} nodes)")
-                    logger.debug(f"[PERF-KG] Breakdown: retriever_create={retriever_create_time:.2f}s, retrieve_exec={retrieve_exec_time:.2f}s")
-                    
-                    # Build context from nodes with numbered references
-                    context_parts = []
-                    evidence_metadata = []  # 保留完整元数据
-                    
-                    for idx, node in enumerate(nodes[:max_results], start=1):
-                        metadata = node.metadata or {}
-                        text = node.text[:300] if len(node.text) > 300 else node.text
-                        
-                        # 构建文件路径信息
-                        file_path = metadata.get("file_path", "unknown")
-                        start_line = metadata.get("start_line")
-                        end_line = metadata.get("end_line")
-                        
-                        # 添加编号的上下文
-                        location = f"{file_path}"
-                        if start_line:
-                            location += f" (L{start_line}"
-                            if end_line and end_line != start_line:
-                                location += f"-{end_line}"
-                            location += ")"
-                        
-                        context_parts.append(f"[{idx}] {location}:\n{text}")
-                        
-                        # 保存完整元数据用于生成证据
-                        evidence_metadata.append({
-                            "id": node.node_id or f"ev_{idx}",
-                            "snippet": text,
-                            "full_text": node.text,
-                            "repo": metadata.get("repo"),
-                            "branch": metadata.get("branch", "main"),
-                            "file_path": file_path,
-                            "start_line": start_line,
-                            "end_line": end_line,
-                            "source_type": metadata.get("source_type", "code"),
-                            "score": getattr(node, 'score', 0.0),
-                        })
-                    
-                    if context_parts:
-                        context_text = f"相关上下文:\n\n" + "\n\n".join(context_parts)
-                        logger.debug(f"[PERF-KG] Built context with {len(context_parts)} nodes")
-                    else:
-                        logger.debug("[PERF-KG] No relevant nodes found for context")
+                    logger.info(
+                        f"[PERF-KG] Graph retrieval completed in {retrieve_time:.2f}s (nodes={len(source_nodes)})"
+                    )
+                    logger.debug(
+                        f"[PERF-KG] Graph retriever create time={retriever_create_time:.2f}s"
+                    )
                 except asyncio.TimeoutError:
-                    logger.warning(f"[PERF-KG] Context retrieval timed out after 30s for question: {question[:50]}...")
+                    logger.warning(
+                        f"[PERF-KG] Graph context retrieval timed out after 180s for question: {question[:50]}..."
+                    )
                 except Exception as ctx_exc:
-                    logger.warning(f"[PERF-KG] Failed to build context: {ctx_exc.__class__.__name__}: {ctx_exc}")
-            else:
-                logger.debug("[PERF-KG] Query engine not available, proceeding without context")
+                    logger.warning(
+                        f"[PERF-KG] Failed to build graph context: {ctx_exc.__class__.__name__}: {ctx_exc}"
+                    )
+            elif not context_text:
+                logger.debug("[PERF-KG] No vector or graph context available")
             
             # Construct prompt
             prompt_start = perf_time.perf_counter()
             if context_text:
-                prompt = f"""基于以下编号的上下文信息，用 Markdown 格式回答问题。引用上下文时请使用编号标记（如 [1] [2]）。
+                prompt = f"""基于以下编号的上下文信息，用 Markdown 格式回答问题。引用上下文时只能使用半角 `[1]`、`[2]` 等格式，禁止使用 `【】`、`（）` 等其他括号；若无可引用内容，直接写“暂无参考”。
 
 {context_text}
 
@@ -696,7 +951,7 @@ class Neo4jKnowledgeService:
 要求：
 1. 使用 Markdown 格式回答（支持标题、列表、代码块等）
 2. 代码示例请用代码块包裹，并指定语言，例如：```python
-3. **引用上下文时，必须用 [1] [2] 等编号标记来源**
+3. **引用上下文时，必须用 `[1]` `[2]` 等半角编号标记来源，禁止出现其他括号**
 4. 回答要简洁清晰，重点突出
 5. 如果有多个要点，使用列表或编号
 
@@ -709,8 +964,8 @@ class Neo4jKnowledgeService:
 要求：
 1. 使用 Markdown 格式（支持标题、列表、代码块等）
 2. 代码示例请用代码块包裹，并指定语言
-3. 回答要简洁清晰，重点突出
-
+3. 若引用上下文，必须使用半角 `[1]` `[2]` 等格式；若无上下文可引用，直接说明“暂无参考”。
+ 
 回答："""
             logger.debug(f"[PERF-KG] Prompt constructed (length={len(prompt)})")
             
@@ -767,6 +1022,15 @@ class Neo4jKnowledgeService:
                         "content": chunk,
                     }
                     await asyncio.sleep(0.01)
+
+            reference_lines = self._format_reference_lines(evidence_metadata)
+            if reference_lines:
+                reference_text = "\n".join(reference_lines) + "\n"
+                accumulated_text += reference_text
+                yield {
+                    "type": "text_delta",
+                    "content": reference_text,
+                }
             
             # After streaming completes, yield metadata
             processing_time_ms = int((time.time() - start_time) * 1000)
@@ -774,55 +1038,41 @@ class Neo4jKnowledgeService:
             # Calculate confidence score
             confidence_score = 0.0
             if source_nodes:
-                scores = []
-                for node in source_nodes:
-                    raw_score = getattr(node, 'score', 0.0)
-                    if isinstance(raw_score, (int, float)):
-                        scores.append(float(raw_score))
-                    else:
-                        try:
-                            scores.append(float(raw_score))
-                        except (TypeError, ValueError):  # pragma: no cover - defensive
-                            continue
+                scores = [_node_score(node) for node in source_nodes]
                 confidence_score = max(scores) if scores else 0.0
 
             # Clamp confidence into [0, 1] to satisfy API schema
             confidence_score = max(0.0, min(1.0, float(confidence_score)))
             
-            resolved_sources = source_ids or [
-                uuid.UUID(str((node.metadata or {}).get("source_id", uuid.uuid4())))
-                if (node.metadata or {}).get("source_id")
-                else uuid.uuid4()
-                for node in source_nodes[:5]
-            ]
+            if source_ids:
+                resolved_sources = source_ids
+            else:
+                resolved_sources = []
+                for node in source_nodes[:5]:
+                    metadata = _node_metadata(node)
+                    source_id = metadata.get("source_id")
+                    if source_id:
+                        try:
+                            resolved_sources.append(uuid.UUID(str(source_id)))
+                        except (ValueError, TypeError):
+                            resolved_sources.append(
+                                uuid.uuid5(uuid.NAMESPACE_URL, f"stream-source:{source_id}")
+                            )
+                    else:
+                        resolved_sources.append(uuid.uuid4())
             
             yield {
                 "type": "metadata",
                 "confidence_score": confidence_score,
                 "execution_time_ms": processing_time_ms,
-                "sources_queried": [str(s) for s in resolved_sources],
+                        "sources_queried": [str(s) for s in resolved_sources],
                 "retrieval_mode": mode,
             }
             
             # Extract evidence if requested - 使用保留的完整元数据
             if include_evidence and evidence_metadata:
                 for idx, ev_data in enumerate(evidence_metadata, start=1):
-                    # 构建 GitHub 链接（如果有 repo 信息）
-                    github_link = None
-                    if ev_data.get("repo") and ev_data.get("file_path"):
-                        repo = ev_data["repo"]
-                        branch = ev_data.get("branch", "main")
-                        file_path = ev_data["file_path"]
-                        start_line = ev_data.get("start_line")
-                        
-                        # 假设 repo 格式为 owner/repo_name
-                        github_link = f"https://github.com/{repo}/blob/{branch}/{file_path}"
-                        if start_line:
-                            end_line = ev_data.get("end_line", start_line)
-                            if end_line and end_line != start_line:
-                                github_link += f"#L{start_line}-L{end_line}"
-                            else:
-                                github_link += f"#L{start_line}"
+                    github_link = self._build_evidence_link(ev_data)
                     
                     yield {
                         "type": "evidence",

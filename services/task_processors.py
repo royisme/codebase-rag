@@ -15,6 +15,7 @@ from loguru import logger
 
 from .task_storage import TaskType, Task
 from services.code_indexing import CodeIndexingPipeline
+from services.source_service import get_source_service, update_job_with_new_session
 from schemas import ParseJobUpdate
 
 class TaskProcessor(ABC):
@@ -560,7 +561,6 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
 
             # 使用数据库会话和源服务
             from database import async_session_factory
-            from services.source_service import get_source_service
             from database.models import ParseStatus
 
             async with async_session_factory() as session:
@@ -576,11 +576,9 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
 
                 # 更新任务状态为运行中
                 if job_id:
-                    await source_service.update_job(
+                    await update_job_with_new_session(
                         job_id,
-                        ParseJobUpdate(
-                            status=ParseStatus.RUNNING
-                        )
+                        ParseJobUpdate(status=ParseStatus.RUNNING),
                     )
 
                 self._update_progress(progress_callback, 30, f"开始同步知识源: {source.name}")
@@ -605,13 +603,13 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
 
                 # 更新任务状态为完成
                 if job_id:
-                    await source_service.update_job(
+                    await update_job_with_new_session(
                         job_id,
                         ParseJobUpdate(
                             status=ParseStatus.COMPLETED,
                             progress_percentage=100,
-                            result_summary=result
-                        )
+                            result_summary=result,
+                        ),
                     )
 
                 self._update_progress(progress_callback, 100, "知识源同步完成")
@@ -632,19 +630,15 @@ class KnowledgeSourceSyncProcessor(TaskProcessor):
             # 更新任务状态为失败
             if job_id:
                 try:
-                    from database import async_session_factory
-                    from services.source_service import get_source_service
                     from database.models import ParseStatus
 
-                    async with async_session_factory() as session:
-                        source_service = get_source_service(session)
-                        await source_service.update_job(
-                            job_id,
-                            ParseJobUpdate(
-                                status=ParseStatus.FAILED,
-                                error_message=str(e)
-                            )
-                        )
+                    await update_job_with_new_session(
+                        job_id,
+                        ParseJobUpdate(
+                            status=ParseStatus.FAILED,
+                            error_message=str(e),
+                        ),
+                    )
                 except Exception as update_error:
                     logger.error(f"更新任务状态失败: {update_error}")
 

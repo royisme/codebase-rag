@@ -9,9 +9,23 @@ import uuid
 from typing import Dict, Any, Optional, List, Callable
 from enum import Enum
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from loguru import logger
+
+def utcnow() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
+    return datetime.now(timezone.utc)
+
+
+def ensure_aware(dt_value: Optional[datetime]) -> Optional[datetime]:
+    """Return a timezone-aware datetime (default to UTC)."""
+    if dt_value is None:
+        return None
+    if dt_value.tzinfo is None:
+        return dt_value.replace(tzinfo=timezone.utc)
+    return dt_value
+
 
 class TaskStatus(Enum):
     PENDING = "pending"
@@ -28,7 +42,7 @@ class TaskResult:
     message: str = ""
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    created_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=utcnow)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -118,10 +132,10 @@ class TaskQueue:
                     progress=task.progress,
                     message="",
                     error=task.error_message,
-                    created_at=task.created_at,
-                    started_at=task.started_at,
-                    completed_at=task.completed_at,
-                    metadata=task.payload
+                    created_at=ensure_aware(task.created_at),
+                    started_at=ensure_aware(task.started_at),
+                    completed_at=ensure_aware(task.completed_at),
+                    metadata=task.payload,
                 )
                 self.tasks[task.id] = task_result
                 
@@ -135,7 +149,7 @@ class TaskQueue:
                     )
                     task_result.status = TaskStatus.FAILED
                     task_result.error = "Service was restarted while task was processing"
-                    task_result.completed_at = datetime.now()
+                    task_result.completed_at = utcnow()
             
             logger.info(f"Restored {len(stored_tasks)} tasks from storage")
             
@@ -261,15 +275,15 @@ class TaskQueue:
                 task_id=task_id,
                 status=task.status,
                 progress=task.progress,
-                created_at=task.created_at,
-                metadata=task.payload
+                created_at=ensure_aware(task.created_at),
+                metadata=task.payload,
             )
             self.tasks[task_id] = task_result
         
         try:
             # update task status to processing
             task_result.status = TaskStatus.PROCESSING
-            task_result.started_at = datetime.now()
+            task_result.started_at = utcnow()
             task_result.message = "Task is processing"
             
             if self._storage:
@@ -296,7 +310,7 @@ class TaskQueue:
             
             # task completed
             task_result.status = TaskStatus.SUCCESS
-            task_result.completed_at = datetime.now()
+            task_result.completed_at = utcnow()
             task_result.progress = 100.0
             task_result.result = result
             task_result.message = "Task completed successfully"
@@ -313,7 +327,7 @@ class TaskQueue:
             
         except asyncio.CancelledError:
             task_result.status = TaskStatus.CANCELLED
-            task_result.completed_at = datetime.now()
+            task_result.completed_at = utcnow()
             task_result.message = "Task was cancelled"
             
             if self._storage:
@@ -329,7 +343,7 @@ class TaskQueue:
             
         except Exception as e:
             task_result.status = TaskStatus.FAILED
-            task_result.completed_at = datetime.now()
+            task_result.completed_at = utcnow()
             task_result.error = str(e)
             task_result.message = f"Task failed: {str(e)}"
             
@@ -392,7 +406,7 @@ class TaskQueue:
             tasks = [t for t in tasks if t.status == status_filter]
         
         # sort by creation time in descending order
-        tasks.sort(key=lambda x: x.created_at, reverse=True)
+        tasks.sort(key=lambda x: ensure_aware(x.created_at), reverse=True)
         
         return tasks[:limit]
     
@@ -407,7 +421,7 @@ class TaskQueue:
             task_result = self.tasks[task_id]
             if task_result.status == TaskStatus.PENDING:
                 task_result.status = TaskStatus.CANCELLED
-                task_result.completed_at = datetime.now()
+                task_result.completed_at = utcnow()
                 task_result.message = "Task was cancelled"
                 
                 if self._storage:
@@ -456,7 +470,9 @@ class TaskQueue:
                 
                 if len(completed_tasks) > 100:
                     # sort by completion time, delete oldest
-                    completed_tasks.sort(key=lambda x: x[1].completed_at or datetime.now())
+                    completed_tasks.sort(
+                        key=lambda x: ensure_aware(x[1].completed_at) or utcnow()
+                    )
                     tasks_to_remove = completed_tasks[:-100]
                     
                     for task_id, _ in tasks_to_remove:

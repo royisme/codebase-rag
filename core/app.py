@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from config import settings
+from services.embedding_utils import effective_vector_dimension
 from .exception_handlers import setup_exception_handlers
 from .middleware import setup_middleware
 from .routes import setup_routes
@@ -95,7 +96,7 @@ def create_app() -> FastAPI:
                     "uri": settings.neo4j_uri,
                     "database": settings.neo4j_database,
                     "vector_index": settings.vector_index_name,
-                    "vector_dimension": settings.vector_dimension
+                    "vector_dimension": effective_vector_dimension(settings.vector_dimension)
                 },
                 "ollama": {
                     "base_url": settings.ollama_base_url,

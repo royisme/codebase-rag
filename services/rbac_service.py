@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import CasbinRule
+from security.casbin_enforcer import normalize_action_pattern
 
 
 async def list_policies(session: AsyncSession) -> list[CasbinRule]:
@@ -40,7 +41,7 @@ async def apply_policy_update(
     if resource is not None:
         policy.v2 = resource
     if action is not None:
-        policy.v3 = action
+        policy.v3 = normalize_action_pattern(action)
     return policy
 
 
@@ -61,7 +62,7 @@ async def ensure_policy(
     result = await session.execute(stmt)
     policy = result.scalar_one_or_none()
     if policy:
-        policy.v3 = action
+        policy.v3 = normalize_action_pattern(action)
         return policy
 
     policy = CasbinRule(
@@ -69,7 +70,7 @@ async def ensure_policy(
         v0=subject,
         v1=domain,
         v2=resource,
-        v3=action,
+        v3=normalize_action_pattern(action),
     )
     session.add(policy)
     await session.flush()

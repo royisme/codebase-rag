@@ -8,7 +8,7 @@ import json
 import uuid
 import asyncio
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -19,6 +19,19 @@ from config import settings
 from database.session import sync_engine, async_engine
 
 from .task_queue import TaskResult, TaskStatus
+
+
+def utcnow() -> datetime:
+    """Return timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
+
+
+def ensure_aware(dt_value: Optional[datetime]) -> Optional[datetime]:
+    if dt_value is None:
+        return None
+    if dt_value.tzinfo is None:
+        return dt_value.replace(tzinfo=timezone.utc)
+    return dt_value
 
 class TaskType(Enum):
     DOCUMENT_PROCESSING = "document_processing"
@@ -93,9 +106,10 @@ class Task:
             if value is None:
                 return None
             if isinstance(value, datetime):
-                return value
+                return ensure_aware(value)
             try:
-                return datetime.fromisoformat(value)
+                parsed = datetime.fromisoformat(value)
+                return ensure_aware(parsed)
             except (ValueError, TypeError):
                 logger.warning("Unexpected datetime format for task %s: %s", data['id'], value)
                 return None
@@ -105,7 +119,7 @@ class Task:
             type=TaskType(data['type']),
             status=TaskStatus(data['status']),
             payload=payload,
-            created_at=_parse_datetime(data['created_at']) or datetime.now(),
+            created_at=_parse_datetime(data['created_at']) or utcnow(),
             started_at=_parse_datetime(data.get('started_at')),
             completed_at=_parse_datetime(data.get('completed_at')),
             error_message=data['error_message'],
@@ -187,7 +201,7 @@ class TaskStorage:
                 type=task_type,
                 status=TaskStatus.PENDING,
                 payload=payload,
-                created_at=datetime.now(),
+                created_at=utcnow(),
                 priority=priority
             )
             
@@ -266,7 +280,7 @@ class TaskStorage:
                                 error_message: Optional[str] = None, 
                                 progress: Optional[float] = None) -> bool:
         """Update task status (synchronous)"""
-        now_iso = datetime.now().isoformat()
+        now_iso = utcnow().isoformat()
         if self._use_sqlite:
             with sqlite3.connect(self.db_path) as conn:
                 updates = ["status = ?"]
@@ -497,7 +511,7 @@ class TaskStorage:
     
     def _cleanup_old_tasks_sync(self, days: int) -> int:
         """Clean up old tasks (synchronous)"""
-        cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_date = utcnow() - timedelta(days=days)
         cutoff_iso = cutoff_date.isoformat()
 
         if self._use_sqlite:
